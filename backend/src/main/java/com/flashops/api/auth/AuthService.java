@@ -96,20 +96,27 @@ public class AuthService {
 
   @Transactional
   public void changePassword(int userId, String currentPassword, String newPassword) {
-    if (newPassword == null || newPassword.length() < 8) {
+    String next = newPassword == null ? "" : newPassword.trim();
+    if (next.length() < 8) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "password too short");
     }
     Utilisateur u =
         utilisateurs
-            .findWithRoleById(userId)
+            .findById(userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "user not found"));
     if (!u.isActif()) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "inactive user");
     }
-    if (!passwordEncoder.matches(currentPassword, u.getMotDePasseHash())) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid current password");
+    String submitted = currentPassword == null ? "" : currentPassword.trim();
+    String hash = u.getMotDePasseHash() == null ? "" : u.getMotDePasseHash().trim();
+    if (submitted.isEmpty()
+        || hash.isBlank()
+        || !passwordEncoder.matches(submitted, hash)) {
+      // 400 : l'utilisateur est déjà authentifié. Un 401 ferait relancer
+      // le refresh de session côté front et masquerait l'erreur métier.
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid current password");
     }
-    u.setMotDePasseHash(passwordEncoder.encode(newPassword));
+    u.setMotDePasseHash(passwordEncoder.encode(next));
     u.setVersionSession(u.getVersionSession() + 1L);
     utilisateurs.save(u);
     jetons.revokeAllActiveByUtilisateurId(userId, Instant.now());

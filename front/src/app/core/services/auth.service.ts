@@ -95,6 +95,8 @@ export class AuthService {
   }
 
   changePassword(currentPassword: string, newPassword: string) {
+    const current = currentPassword ?? '';
+    const next = newPassword ?? '';
     return this.http.post<{
       message: string;
       logout_required?: boolean;
@@ -102,8 +104,10 @@ export class AuthService {
     }>(
       `${this.baseUrl}/auth/password`,
       {
-        current_password: currentPassword,
-        new_password: newPassword,
+        current_password: current,
+        new_password: next,
+        currentPassword: current,
+        newPassword: next,
       },
       this.authOptions()
     );
@@ -232,6 +236,7 @@ export class AuthService {
     return {
       headers: new HttpHeaders({
         Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
       }),
     };
   }

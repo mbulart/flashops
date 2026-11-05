@@ -55,10 +55,22 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(authedReq).pipe(
     catchError((err: HttpErrorResponse) => {
+      const apiError =
+        typeof err.error === 'string'
+          ? err.error
+          : typeof err.error?.error === 'string'
+            ? err.error.error
+            : '';
+      const isBusinessAuthError =
+        apiError.length > 0 &&
+        apiError !== 'unauthorized' &&
+        apiError !== 'invalid refresh token' &&
+        apiError !== 'expired refresh token';
       const canRetrySession =
         (err.status === 401 || err.status === 403) &&
         !isAuthRoute &&
         !isPublicRoute &&
+        !isBusinessAuthError &&
         !req.headers.has('X-Retry') &&
         (!!token || !!auth.refreshToken);
       if (canRetrySession) {

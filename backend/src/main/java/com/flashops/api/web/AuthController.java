@@ -58,13 +58,31 @@ public class AuthController {
   }
 
   @PostMapping({"/password", "/password/"})
-  public Map<String, Object> changePassword(@Valid @RequestBody AuthDtos.ChangePasswordRequest req) {
+  public Map<String, Object> changePassword(@RequestBody Map<String, Object> body) {
     int userId = AuthSupport.currentUserId();
-    authService.changePassword(userId, req.currentPassword(), req.newPassword());
+    authService.changePassword(
+        userId, firstText(body, "current_password", "currentPassword"), firstText(body, "new_password", "newPassword"));
     return Map.of(
         "message", "password updated",
         "logout_required", true,
         "sessions_revoked", true);
+  }
+
+  private static String firstText(Map<String, ?> body, String... keys) {
+    if (body == null || keys == null) {
+      return null;
+    }
+    for (String key : keys) {
+      Object value = body.get(key);
+      if (value == null) {
+        continue;
+      }
+      String text = String.valueOf(value);
+      if (!text.isBlank() && !"null".equals(text)) {
+        return text;
+      }
+    }
+    return null;
   }
 
   @PatchMapping({"/profile", "/profile/"})

@@ -1,5 +1,6 @@
 package com.flashops.api.web.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
@@ -11,8 +12,8 @@ public final class AuthDtos {
   public record LoginRequest(String email, String password) {}
 
   public record ChangePasswordRequest(
-      @JsonProperty("current_password") String currentPassword,
-      @JsonProperty("new_password") String newPassword) {}
+      @JsonProperty("current_password") @JsonAlias({"currentPassword"}) String currentPassword,
+      @JsonProperty("new_password") @JsonAlias({"newPassword"}) String newPassword) {}
 
   public record UpdateProfileRequest(
       String email, @JsonProperty("full_name") String fullName) {}
