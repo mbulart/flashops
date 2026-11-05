@@ -21,6 +21,10 @@ export interface User {
   is_active?: boolean;
   region_id?: number | null;
   zone_id?: number | null;
+  agence_id?: number | null;
+  responsable_zone_id?: number | null;
+  allowed_agence_ids?: number[];
+  allowed_zone_ids?: number[];
   last_login_at?: string;
   created_at?: string;
   has_profile_photo?: boolean;
@@ -126,6 +130,8 @@ export interface AdminUserInput {
   permission_ids?: number[];
   region_id?: number | null;
   zone_id?: number | null;
+  agence_id?: number | null;
+  responsable_zone_id?: number | null;
 }
 
 export interface UserActionSummary {
@@ -328,6 +334,64 @@ export interface ZoneInput {
   is_active?: boolean;
 }
 
+export interface RegionRef {
+  id: number;
+  code: string;
+  libelle: string;
+  par_defaut: boolean;
+  actif: boolean;
+}
+
+export interface RegionRefInput {
+  code: string;
+  libelle: string;
+  par_defaut: boolean;
+  actif: boolean;
+}
+
+export interface ResponsableZoneRef {
+  id: number;
+  code: string;
+  nom: string;
+  perimetre: string;
+  actif: boolean;
+  zone_libelle?: string | null;
+}
+
+export interface ResponsableZoneInput {
+  code: string;
+  nom: string;
+  perimetre: string;
+  actif: boolean;
+}
+
+export interface ZoneRef {
+  id: number;
+  code: string;
+  libelle: string;
+  perimetre: string;
+  region: string;
+  region_id?: number | null;
+  region_code?: string | null;
+  responsable_zone_id?: number | null;
+  responsable_nom?: string | null;
+  nb_communes: number;
+  nb_villes: number;
+  actif: boolean;
+}
+
+export interface ZoneRefInput {
+  code: string;
+  libelle: string;
+  perimetre: string;
+  region: string;
+  region_id?: number | null;
+  responsable_zone_id?: number | null;
+  nb_communes: number;
+  nb_villes: number;
+  actif: boolean;
+}
+
 export interface ZoneManager {
   id: number;
   code: string;
@@ -361,24 +425,72 @@ export interface ZoneTerritory {
   geo_code: string;
 }
 
+export interface Pays {
+  id: number;
+  code_iso: string;
+  libelle: string;
+  libelle_fr?: string | null;
+  geoname_id?: number | null;
+  actif: boolean;
+}
+
 export interface Province {
   id: number;
+  pays_id: number;
   code: string;
-  label: string;
+  libelle: string;
+  libelle_fr?: string | null;
+  geoname_id?: number | null;
+  ordre_tri?: number;
+  actif: boolean;
+  /** @deprecated utiliser libelle */
+  label?: string;
 }
 
 export interface Ville {
   id: number;
   province_id: number;
   code: string;
-  label: string;
+  libelle: string;
+  libelle_fr?: string | null;
+  geoname_id?: number | null;
+  actif: boolean;
+  /** @deprecated utiliser libelle */
+  label?: string;
+}
+
+export interface Territoire {
+  id: number;
+  province_id: number;
+  code: string;
+  libelle: string;
+  libelle_fr?: string | null;
+  geoname_id?: number | null;
+  actif: boolean;
 }
 
 export interface Commune {
   id: number;
-  ville_id: number;
+  ville_id?: number | null;
+  territoire_id?: number | null;
+  province_id?: number | null;
   code: string;
-  label: string;
+  libelle: string;
+  libelle_fr?: string | null;
+  geoname_id?: number | null;
+  actif: boolean;
+  /** @deprecated utiliser libelle */
+  label?: string;
+}
+
+export interface GeoSyncResult {
+  skipped: boolean;
+  pays: number;
+  provinces: number;
+  villes: number;
+  territoires: number;
+  communes: number;
+  status: string;
 }
 
 export interface Quartier {
@@ -496,6 +608,8 @@ export interface GeoPoint {
   tx_count: number;
   volume: number;
   currency: string;
+  /** Carte présence : vert si dans le résultat, rouge si sans opération. */
+  presence?: 'present' | 'missing';
 }
 
 export interface GeoPointsResponse {

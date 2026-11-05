@@ -43,5 +43,9 @@ public final class AuthDtos {
       @JsonProperty("is_active") boolean isActive,
       @JsonProperty("last_login_at") Instant lastLoginAt,
       @JsonProperty("has_profile_photo") boolean hasProfilePhoto,
-      @JsonProperty("profile_photo_updated_at") Instant profilePhotoUpdatedAt) {}
+      @JsonProperty("profile_photo_updated_at") Instant profilePhotoUpdatedAt,
+      @JsonProperty("agence_id") Integer agenceId,
+      @JsonProperty("responsable_zone_id") Integer responsableZoneId,
+      @JsonProperty("allowed_agence_ids") List<Integer> allowedAgenceIds,
+      @JsonProperty("allowed_zone_ids") List<Integer> allowedZoneIds) {}
 }

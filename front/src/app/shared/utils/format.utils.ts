@@ -22,6 +22,7 @@ export type PeriodPresetId =
   | 'month'
   | 'prev_month'
   | 'quarter'
+  | 'semestre'
   | 'year';
 
 export interface PeriodPreset {
@@ -38,8 +39,19 @@ export const PERIOD_PRESETS: PeriodPreset[] = [
   { id: 'month', label: 'Mois' },
   { id: 'prev_month', label: 'Mois préc.' },
   { id: 'quarter', label: 'Trimestre' },
+  { id: 'semestre', label: 'Semestre' },
   { id: 'year', label: 'Année' },
 ];
+
+/** Semestre civil (S1 : jan–juin, S2 : juil–déc), borné à la date de référence. */
+export function semestreRange(ref: Date = new Date()): { from: string; to: string } {
+  const month = ref.getMonth();
+  const from = new Date(ref.getFullYear(), month < 6 ? 0 : 6, 1);
+  const semesterEnd = new Date(ref.getFullYear(), month < 6 ? 6 : 12, 0);
+  const today = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  const to = semesterEnd < today ? semesterEnd : today;
+  return { from: toLocalIsoDate(from), to: toLocalIsoDate(to) };
+}
 
 export function periodPresetRange(id: PeriodPresetId, ref: Date = new Date()): { from: string; to: string } {
   const today = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
@@ -77,6 +89,8 @@ export function periodPresetRange(id: PeriodPresetId, ref: Date = new Date()): {
     }
     case 'quarter':
       return quarterRange(today);
+    case 'semestre':
+      return semestreRange(today);
     case 'year': {
       const from = new Date(today.getFullYear(), 0, 1);
       return { from: toLocalIsoDate(from), to: toLocalIsoDate(today) };
@@ -102,14 +116,24 @@ export function toLocalIsoDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-export function formatNumberFr(n: number): string {
-  return new Intl.NumberFormat('fr-FR').format(n);
+/** Séparateur de milliers lisible (espace insécable large, jamais le fine space fr-FR). */
+const THOUSANDS_SEP = '\u00A0';
+
+export function formatNumberFr(n: number, options?: Intl.NumberFormatOptions): string {
+  return new Intl.NumberFormat('fr-FR', options)
+    .format(n)
+    .replace(/[\u202F\u00A0\u2009]/g, THOUSANDS_SEP);
 }
 
-/** Montant (valeur) toujours suivi de la devise. */
+/** Montant espacé (milliers) + devise. Les ID ne passent pas par ici. */
 export function formatValeurFr(amount: number, currency?: string | null): string {
   const cur = String(currency || 'USD').trim().toUpperCase() || 'USD';
-  return `${formatNumberFr(amount)} ${cur}`;
+  const abs = Math.abs(amount);
+  const opts: Intl.NumberFormatOptions =
+    Number.isInteger(amount) || abs >= 100_000
+      ? { maximumFractionDigits: abs >= 100_000 ? 0 : 2 }
+      : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  return `${formatNumberFr(amount, opts)}${THOUSANDS_SEP}${cur}`;
 }
 
 export function downloadCsv(filename: string, rows: Record<string, unknown>[], columns: { key: string; label: string }[]): void {

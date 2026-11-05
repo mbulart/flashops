@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './core/guards/auth.guard';
+import { authGuard, guestGuard, permissionGuard } from './core/guards/auth.guard';
 import { MainLayoutComponent } from './layout/main-layout/main-layout.component';
 
 export const routes: Routes = [
@@ -15,7 +15,13 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        loadComponent: () => import('./pages/home/home.page').then((m) => m.HomePageComponent),
+        loadComponent: () => import('./pages/pilotage/pilotage.page').then((m) => m.PilotagePageComponent),
+        canActivate: [permissionGuard('dashboard.voir')],
+      },
+      {
+        path: 'agences',
+        loadComponent: () => import('./pages/agences/agences.page').then((m) => m.AgencesPageComponent),
+        canActivate: [permissionGuard('agences.lire')],
       },
       {
         path: 'profil',
@@ -53,6 +59,13 @@ export const routes: Routes = [
             path: 'actions',
             loadComponent: () =>
               import('./pages/parametrages/parametrages-actions.page').then((m) => m.ParametragesActionsPageComponent),
+          },
+          {
+            path: 'referentiels',
+            loadComponent: () =>
+              import('./pages/parametrages/parametrages-referentiels.page').then(
+                (m) => m.ParametragesReferentielsPageComponent
+              ),
           },
         ],
       },

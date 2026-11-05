@@ -1,8 +1,17 @@
 import { Component, Input, OnChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReportTimeseriesPoint } from '../../../core/models/api.models';
 import { formatNumberFr } from '../../utils/format.utils';
-import { mapHeatColor, type HeatMetric } from '../../utils/heat-scale.utils';
+import { heatIntensity, mapHeatColor, type HeatMetric } from '../../utils/heat-scale.utils';
+
+/** Point journalier (reports ou pilotage). */
+export type HeatmapDayPoint = {
+  period?: string;
+  jour?: string;
+  amount_sum?: number;
+  montant?: number;
+  tx_count?: number;
+  volume?: number;
+};
 
 interface HeatCell {
   date: string;
@@ -18,7 +27,7 @@ interface HeatCell {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="heatmap-wrap">
+    <div class="heatmap-wrap" [attr.data-density]="density()">
       <div class="heatmap-legend mb-2">
         <span class="small text-muted">{{ metric === 'volume' ? 'Volume faible' : 'Valeur faible' }}</span>
         <span class="heat-swatch" [style.background]="heatColor(0.08)"></span>
@@ -37,7 +46,9 @@ interface HeatCell {
             [attr.title]="tooltip(cell)"
             [attr.aria-label]="tooltip(cell)"
           >
-            <span class="heatmap-day">{{ cell.label }}</span>
+            @if (showDayLabels()) {
+              <span class="heatmap-day">{{ cell.label }}</span>
+            }
           </div>
         }
       </div>
@@ -48,6 +59,10 @@ interface HeatCell {
   `,
   styles: [
     `
+      :host {
+        display: block;
+        width: 100%;
+      }
       .heatmap-legend {
         display: flex;
         align-items: center;
@@ -60,8 +75,8 @@ interface HeatCell {
       }
       .heatmap-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(2.4rem, 1fr));
-        gap: 0.3rem;
+        grid-template-columns: repeat(auto-fill, minmax(var(--heat-cell, 2.4rem), 1fr));
+        gap: var(--heat-gap, 0.3rem);
       }
       .heatmap-cell {
         aspect-ratio: 1;
@@ -71,7 +86,7 @@ interface HeatCell {
         justify-content: center;
         padding: 0.15rem;
         cursor: default;
-        min-height: 2.2rem;
+        min-height: var(--heat-cell, 2.4rem);
       }
       .heatmap-day {
         font-size: 0.62rem;
@@ -83,11 +98,36 @@ interface HeatCell {
         color: #fff;
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
       }
+
+      /* Plus de jours → cases plus petites */
+      .heatmap-wrap[data-density='md'] {
+        --heat-cell: 1.75rem;
+        --heat-gap: 0.22rem;
+      }
+      .heatmap-wrap[data-density='md'] .heatmap-day {
+        font-size: 0.55rem;
+      }
+      .heatmap-wrap[data-density='sm'] {
+        --heat-cell: 1.15rem;
+        --heat-gap: 0.16rem;
+      }
+      .heatmap-wrap[data-density='sm'] .heatmap-cell {
+        border-radius: 3px;
+        padding: 0;
+      }
+      .heatmap-wrap[data-density='xs'] {
+        --heat-cell: 0.85rem;
+        --heat-gap: 0.12rem;
+      }
+      .heatmap-wrap[data-density='xs'] .heatmap-cell {
+        border-radius: 2px;
+        padding: 0;
+      }
     `,
   ],
 })
 export class HeatmapCalendarComponent implements OnChanges {
-  @Input() data: ReportTimeseriesPoint[] = [];
+  @Input() data: HeatmapDayPoint[] = [];
   @Input() metric: HeatMetric = 'value';
 
   cells: HeatCell[] = [];
@@ -98,6 +138,19 @@ export class HeatmapCalendarComponent implements OnChanges {
 
   heatColor = mapHeatColor;
 
+  /** md ≈ 2 mois, sm ≈ 1 trimestre+, xs ≈ semestre+ */
+  density(): 'lg' | 'md' | 'sm' | 'xs' {
+    const n = this.cells.length;
+    if (n > 180) return 'xs';
+    if (n > 90) return 'sm';
+    if (n > 45) return 'md';
+    return 'lg';
+  }
+
+  showDayLabels(): boolean {
+    return this.density() === 'lg' || this.density() === 'md';
+  }
+
   tooltip(cell: HeatCell): string {
     const unit = this.metric === 'volume' ? 'tx' : '';
     return `${cell.date} — ${formatNumberFr(cell.value)}${unit ? ' ' + unit : ''}`;
@@ -106,17 +159,19 @@ export class HeatmapCalendarComponent implements OnChanges {
   private rebuild(): void {
     const byDate = new Map<string, number>();
     for (const row of this.data) {
-      const key = row.period;
-      const val = this.metric === 'volume' ? row.tx_count : row.amount_sum;
-      byDate.set(key, (byDate.get(key) || 0) + (val || 0));
+      const key = (row.period || row.jour || '').trim();
+      if (!key) continue;
+      const val = this.metric === 'volume' ? Number(row.tx_count ?? row.volume ?? 0) : Number(row.amount_sum ?? row.montant ?? 0);
+      byDate.set(key, (byDate.get(key) || 0) + (Number.isFinite(val) ? val : 0));
     }
     const values = [...byDate.values()];
-    const max = Math.max(0, ...values);
+    const min = values.length ? Math.min(...values) : 0;
+    const max = values.length ? Math.max(...values) : 0;
     this.cells = [...byDate.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, value]) => {
         const d = new Date(`${date}T00:00:00`);
-        const intensity = max > 0 ? value / max : 0;
+        const intensity = heatIntensity(value, min, max);
         return {
           date,
           label: Number.isNaN(d.getTime()) ? date.slice(8, 10) : String(d.getDate()),

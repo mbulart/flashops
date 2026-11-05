@@ -7,4 +7,7 @@ front/.angular/
 .env
 backend/.env
 backend/application-local.yml
+backend/tmp-*.json
+backend/boot8081.*
+_tmp_pg/
 .tools/

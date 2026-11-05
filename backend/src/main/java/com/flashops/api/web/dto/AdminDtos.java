@@ -20,14 +20,18 @@ public final class AdminDtos {
       @JsonProperty("full_name") String fullName,
       AuthDtos.RoleView role,
       @JsonProperty("is_active") boolean isActive,
-      @JsonProperty("last_login_at") Instant lastLoginAt) {}
+      @JsonProperty("last_login_at") Instant lastLoginAt,
+      @JsonProperty("agence_id") Integer agenceId,
+      @JsonProperty("responsable_zone_id") Integer responsableZoneId) {}
 
   public record AdminUserInput(
       String email,
       @JsonProperty("full_name") String fullName,
       @JsonProperty("role_id") Short roleId,
       @JsonProperty("is_active") boolean isActive,
-      String password) {}
+      String password,
+      @JsonProperty("agence_id") Integer agenceId,
+      @JsonProperty("responsable_zone_id") Integer responsableZoneId) {}
 
   public record RolePermissionsInput(@JsonProperty("permission_ids") List<Integer> permissionIds) {}
 

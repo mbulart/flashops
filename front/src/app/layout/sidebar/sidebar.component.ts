@@ -151,7 +151,10 @@ export class SidebarComponent implements OnInit {
   readonly navGroups: NavGroup[] = [
     {
       label: 'Flash OPS',
-      items: [{ label: 'Accueil', path: '/', icon: 'bi bi-house', permission: 'dashboard.voir' }],
+      items: [
+        { label: 'Tableau de bord', path: '/', icon: 'bi bi-speedometer2', permission: 'dashboard.voir' },
+        { label: 'Agences', path: '/agences', icon: 'bi bi-building', permission: 'agences.lire' },
+      ],
     },
     {
       label: 'Paramétrages',
@@ -179,6 +182,12 @@ export class SidebarComponent implements OnInit {
           path: '/parametrages/systeme',
           icon: 'bi bi-gear',
           permission: 'auth.parametres.lire',
+        },
+        {
+          label: 'Référentiels',
+          path: '/parametrages/referentiels',
+          icon: 'bi bi-globe2',
+          permission: ['referentiels.geo.lire', 'referentiels.zones.lire'],
         },
         {
           label: 'Actions utilisateur',

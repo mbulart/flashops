@@ -23,17 +23,26 @@ export interface SearchSelectOption {
   imports: [CommonModule, FormsModule, SkeletonComponent],
   template: `
     <div class="search-select position-relative">
-      <div class="search-select-input-wrap">
+      <form class="search-select-input-wrap" autocomplete="off" (submit)="$event.preventDefault()">
         <i class="bi bi-search search-select-icon"></i>
         <input
           type="text"
           class="form-control search-select-input"
           [placeholder]="placeholder"
+          [attr.name]="autocompleteField"
+          [attr.id]="autocompleteField"
           [(ngModel)]="query"
+          [ngModelOptions]="{ standalone: true }"
           (input)="onInput()"
           (focus)="onFocus()"
           (blur)="onBlur()"
           autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+          data-lpignore="true"
+          data-1p-ignore
+          data-form-type="other"
         />
         @if (selected()) {
           <button
@@ -47,7 +56,7 @@ export interface SearchSelectOption {
         } @else {
           <i class="bi bi-chevron-down search-select-chevron"></i>
         }
-      </div>
+      </form>
 
       @if (panelOpen()) {
         <div class="search-select-panel shadow-sm" (mousedown)="$event.preventDefault()">
@@ -154,6 +163,7 @@ export class SearchSelectComponent implements OnDestroy {
   @Input() placeholder = 'Rechercher…';
   @Input() emptyLabel = 'Toutes';
   @Input() allowClear = true;
+  @Input() autocompleteField = 'flash-search-select-q';
   @Input() initialLimit = 50;
   @Input() searchLimit = 50;
   @Input() minSearchLength = 2;

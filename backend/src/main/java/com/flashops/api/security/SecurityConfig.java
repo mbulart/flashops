@@ -66,7 +66,11 @@ public class SecurityConfig {
   @Bean
   CorsConfigurationSource corsConfigurationSource(FlashOpsProperties props) {
     CorsConfiguration cfg = new CorsConfiguration();
-    cfg.setAllowedOrigins(Arrays.asList(props.cors().allowedOrigins().split(",")));
+    cfg.setAllowedOrigins(
+        Arrays.stream(props.cors().allowedOrigins().split(","))
+            .map(String::trim)
+            .filter(origin -> !origin.isBlank())
+            .toList());
     cfg.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     cfg.setAllowedHeaders(Arrays.asList("*"));
     cfg.setAllowCredentials(true);

@@ -6,6 +6,7 @@ const HEAT_STOPS: [number, number, number][] = [
 ];
 
 export type HeatMetric = 'value' | 'volume';
+export type MapMetric = HeatMetric | 'presence';
 
 export function heatColor(intensity: number): string {
   const x = Math.min(1, Math.max(0, intensity));
@@ -27,19 +28,25 @@ function lerpHeat(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-/** Carte agences + heatmap : rouge vif → vert vif (pas bordeaux / sang). */
+/** Intensité 0..1 relative au min/max de la période (milieu = 0.5 si égalité). */
+export function heatIntensity(value: number, min: number, max: number): number {
+  if (!(max > min)) return 0.5;
+  return Math.min(1, Math.max(0, (value - min) / (max - min)));
+}
+
+/** Carte + heatmap journalière : orange (faible) → vert (fort). */
 export function mapHeatColor(intensity: number): string {
   const x = Math.min(1, Math.max(0, intensity));
-  const hue = Math.round(lerpHeat(0, 120, x));
-  const sat = Math.round(lerpHeat(88, 82, x));
-  const light = Math.round(lerpHeat(56, 46, x));
+  const hue = Math.round(lerpHeat(28, 120, x));
+  const sat = Math.round(lerpHeat(92, 72, x));
+  const light = Math.round(lerpHeat(52, 42, x));
   return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
 export function mapHeatStrokeColor(intensity: number): string {
   const x = Math.min(1, Math.max(0, intensity));
-  const hue = Math.round(lerpHeat(0, 120, x));
-  const sat = Math.round(lerpHeat(75, 70, x));
+  const hue = Math.round(lerpHeat(28, 120, x));
+  const sat = Math.round(lerpHeat(85, 70, x));
   const light = Math.round(lerpHeat(38, 30, x));
   return `hsl(${hue}, ${sat}%, ${light}%)`;
 }

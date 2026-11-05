@@ -1,5 +1,16 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, EventEmitter, HostListener, Input, Output, inject } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  EventEmitter,
+  HostListener,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  ViewChild,
+  inject,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 export interface MultiSelectOption {
@@ -16,6 +27,7 @@ export interface MultiSelectOption {
       <button
         type="button"
         class="form-control multi-select-control text-start"
+        [disabled]="disabled"
         (click)="togglePanel(); $event.stopPropagation()"
       >
         <span class="multi-select-value">
@@ -42,19 +54,31 @@ export interface MultiSelectOption {
       </button>
 
       @if (panelOpen) {
-        <div class="multi-select-panel shadow-sm" (mousedown)="$event.preventDefault()">
+        <div class="multi-select-panel shadow-sm" (click)="$event.stopPropagation()">
           <div class="p-2 border-bottom">
-            <div class="position-relative">
+            <form class="position-relative" autocomplete="off" (submit)="$event.preventDefault()">
               <i class="bi bi-search search-icon"></i>
               <input
+                #searchInput
                 type="text"
                 class="form-control form-control-sm search-input"
                 placeholder="Rechercher…"
+                [attr.name]="autocompleteField"
+                [attr.id]="autocompleteField"
                 [(ngModel)]="query"
+                [ngModelOptions]="{ standalone: true }"
+                autocomplete="off"
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck="false"
+                data-lpignore="true"
+                data-1p-ignore
+                data-form-type="other"
+                (mousedown)="$event.stopPropagation()"
+                (click)="$event.stopPropagation()"
                 (keydown.escape)="close()"
-                autofocus
               />
-            </div>
+            </form>
           </div>
 
           <div class="options-list">
@@ -170,23 +194,41 @@ export interface MultiSelectOption {
     }
   `,
 })
-export class MultiSelectComponent {
+export class MultiSelectComponent implements OnInit, OnDestroy {
+  /** Une seule liste ouverte à la fois (ferme les autres multi-select). */
+  private static openInstance: MultiSelectComponent | null = null;
+
   private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly onOutsideInteraction = (event: Event) => {
+    if (!this.panelOpen) return;
+    const target = event.target as Node | null;
+    if (target && !this.host.nativeElement.contains(target)) {
+      this.close();
+    }
+  };
+
+  @ViewChild('searchInput') private searchInput?: ElementRef<HTMLInputElement>;
 
   @Input() options: MultiSelectOption[] = [];
   @Input() selectedIds: number[] = [];
   @Input() placeholder = 'Toutes';
+  @Input() disabled = false;
+  @Input() autocompleteField = 'flash-multi-filter-q';
   @Output() selectedIdsChange = new EventEmitter<number[]>();
 
   panelOpen = false;
   query = '';
 
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent): void {
-    if (!this.panelOpen) return;
-    const target = event.target as Node | null;
-    if (target && !this.host.nativeElement.contains(target)) {
-      this.close();
+  ngOnInit(): void {
+    document.addEventListener('pointerdown', this.onOutsideInteraction, true);
+    document.addEventListener('focusin', this.onOutsideInteraction, true);
+  }
+
+  ngOnDestroy(): void {
+    document.removeEventListener('pointerdown', this.onOutsideInteraction, true);
+    document.removeEventListener('focusin', this.onOutsideInteraction, true);
+    if (MultiSelectComponent.openInstance === this) {
+      MultiSelectComponent.openInstance = null;
     }
   }
 
@@ -196,13 +238,28 @@ export class MultiSelectComponent {
   }
 
   togglePanel(): void {
+    if (this.disabled) return;
     this.panelOpen = !this.panelOpen;
-    if (!this.panelOpen) this.query = '';
+    if (this.panelOpen) {
+      if (MultiSelectComponent.openInstance && MultiSelectComponent.openInstance !== this) {
+        MultiSelectComponent.openInstance.close();
+      }
+      MultiSelectComponent.openInstance = this;
+      setTimeout(() => this.searchInput?.nativeElement.focus(), 0);
+    } else {
+      this.query = '';
+      if (MultiSelectComponent.openInstance === this) {
+        MultiSelectComponent.openInstance = null;
+      }
+    }
   }
 
   close(): void {
     this.panelOpen = false;
     this.query = '';
+    if (MultiSelectComponent.openInstance === this) {
+      MultiSelectComponent.openInstance = null;
+    }
   }
 
   filteredOptions(): MultiSelectOption[] {

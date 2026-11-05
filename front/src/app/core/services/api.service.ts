@@ -60,7 +60,6 @@ export class ApiService {
   private categoriesCache?: Observable<Category[]>;
   private regionsCache?: Observable<Region[]>;
   private zonesCache?: Observable<Zone[]>;
-  private provincesCache?: Observable<Province[]>;
   private idDocTypesCache?: Observable<IDDocumentType[]>;
 
   private reportParams(filters: ReportQueryFilters): HttpParams {
@@ -199,13 +198,11 @@ export class ApiService {
       .pipe(map((r) => r.data ?? []));
   }
 
-  getProvinces(): Observable<Province[]> {
-    if (!this.provincesCache) {
-      this.provincesCache = this.http
-        .get<{ data: Province[] }>(`${this.baseUrl}/geo/provinces`)
-        .pipe(map((r) => r.data ?? []), shareReplay({ bufferSize: 1, refCount: false }));
-    }
-    return this.provincesCache;
+  getProvinces(paysId: number): Observable<Province[]> {
+    const params = new HttpParams().set('pays_id', String(paysId));
+    return this.http
+      .get<{ data: Province[] }>(`${this.baseUrl}/geo/provinces`, { params })
+      .pipe(map((r) => r.data ?? []));
   }
 
   getVilles(provinceId: number): Observable<Ville[]> {

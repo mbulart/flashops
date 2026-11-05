@@ -1,10 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { AdminUserInput, AdminRole, User } from '../../core/models/api.models';
+import { AgenceAdmin } from '../../core/models/agences.models';
+import { AdminUserInput, AdminRole, ResponsableZoneRef, User } from '../../core/models/api.models';
 import { AdminService } from '../../core/services/admin.service';
+import { AgencesService } from '../../core/services/agences.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
+import { ZoneReferentielService } from '../../core/services/zone-referentiel.service';
 import { SectionCardComponent } from '../../shared/components/section-card/section-card.component';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 import { TableActionsMenuComponent } from './components/table-actions-menu.component';
@@ -36,6 +39,7 @@ import { UserFormModalComponent } from './components/user-form-modal.component';
               <tr>
                 <th>Utilisateur</th>
                 <th>Rôle</th>
+                <th>Périmètre</th>
                 <th>Statut</th>
                 <th>Dernière connexion</th>
                 @if (auth.can('auth.utilisateurs.ecrire')) {
@@ -51,6 +55,7 @@ import { UserFormModalComponent } from './components/user-form-modal.component';
                     <small class="text-muted">{{ user.email }}</small>
                   </td>
                   <td><span class="badge text-bg-light border">{{ user.role.label }}</span></td>
+                  <td class="small text-muted">{{ scopeLabel(user) }}</td>
                   <td>
                     <span class="badge" [class.text-bg-success-subtle]="user.is_active" [class.text-bg-secondary-subtle]="!user.is_active">
                       {{ user.is_active ? 'Actif' : 'Inactif' }}
@@ -71,7 +76,7 @@ import { UserFormModalComponent } from './components/user-form-modal.component';
                   }
                 </tr>
               } @empty {
-                <tr><td [attr.colspan]="auth.can('auth.utilisateurs.ecrire') ? 5 : 4" class="text-center text-muted py-4">Aucun utilisateur</td></tr>
+                <tr><td [attr.colspan]="auth.can('auth.utilisateurs.ecrire') ? 6 : 5" class="text-center text-muted py-4">Aucun utilisateur</td></tr>
               }
             </tbody>
           </table>
@@ -83,6 +88,8 @@ import { UserFormModalComponent } from './components/user-form-modal.component';
       [open]="editorOpen()"
       [form]="form"
       [roles]="roles()"
+      [agences]="agences()"
+      [responsables]="responsables()"
       [editingId]="editingId()"
       [saving]="saving()"
       (cancel)="closeEditor()"
@@ -93,12 +100,16 @@ import { UserFormModalComponent } from './components/user-form-modal.component';
 export class ParametragesUsersPageComponent {
   readonly auth = inject(AuthService);
   private readonly admin = inject(AdminService);
+  private readonly agencesApi = inject(AgencesService);
+  private readonly zonesApi = inject(ZoneReferentielService);
   private readonly toast = inject(ToastService);
 
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly users = signal<User[]>([]);
   readonly roles = signal<AdminRole[]>([]);
+  readonly agences = signal<AgenceAdmin[]>([]);
+  readonly responsables = signal<ResponsableZoneRef[]>([]);
   readonly editorOpen = signal(false);
   readonly editingId = signal<number | null>(null);
 
@@ -120,6 +131,8 @@ export class ParametragesUsersPageComponent {
       full_name: user.full_name,
       role_id: user.role.id,
       is_active: user.is_active ?? true,
+      agence_id: user.agence_id ?? null,
+      responsable_zone_id: user.responsable_zone_id ?? null,
     };
     this.editingId.set(user.id);
     this.editorOpen.set(true);
@@ -128,6 +141,19 @@ export class ParametragesUsersPageComponent {
   closeEditor(): void {
     this.editorOpen.set(false);
     this.editingId.set(null);
+  }
+
+  scopeLabel(user: User): string {
+    const code = user.role?.code;
+    if (code === 'AGENT' && user.agence_id) {
+      const ag = this.agences().find((a) => a.agenceId === user.agence_id);
+      return ag ? `Agence ${ag.code_agence}` : `Agence #${user.agence_id}`;
+    }
+    if (code === 'RZ' && user.responsable_zone_id) {
+      const rz = this.responsables().find((r) => r.id === user.responsable_zone_id);
+      return rz ? `Zone ${rz.nom}` : `RZ #${user.responsable_zone_id}`;
+    }
+    return '—';
   }
 
   async save(password: string): Promise<void> {
@@ -163,6 +189,23 @@ export class ParametragesUsersPageComponent {
       ]);
       this.users.set(usersRes?.data ?? []);
       this.roles.set(rolesRes?.data ?? []);
+
+      const extras: Promise<void>[] = [];
+      if (this.auth.can('agences.lire')) {
+        extras.push(
+          firstValueFrom(this.agencesApi.list({ page: 1, size: 500 }))
+            .then((page) => this.agences.set(page?.items ?? []))
+            .catch(() => this.agences.set([]))
+        );
+      }
+      if (this.auth.can('referentiels.zones.lire')) {
+        extras.push(
+          firstValueFrom(this.zonesApi.listResponsables())
+            .then((list) => this.responsables.set(list ?? []))
+            .catch(() => this.responsables.set([]))
+        );
+      }
+      await Promise.all(extras);
     } catch {
       this.toast.error('Chargement des utilisateurs impossible');
     } finally {
@@ -172,6 +215,13 @@ export class ParametragesUsersPageComponent {
 
   private emptyForm(): AdminUserInput {
     const firstRole = this.roles()[0]?.id ?? 1;
-    return { email: '', full_name: '', role_id: firstRole, is_active: true };
+    return {
+      email: '',
+      full_name: '',
+      role_id: firstRole,
+      is_active: true,
+      agence_id: null,
+      responsable_zone_id: null,
+    };
   }
 }

@@ -1,0 +1,17 @@
+[Unit]
+Description=Flash OPS API
+After=network.target postgresql.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/flash-ops/backend
+EnvironmentFile=/etc/flash-ops/api.env
+ExecStart=/usr/bin/java -jar /var/www/flash-ops/backend/target/flash-ops-api-0.1.0-SNAPSHOT.jar
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

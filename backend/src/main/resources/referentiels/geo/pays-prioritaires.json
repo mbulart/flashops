@@ -1,0 +1,16 @@
+[
+  { "code_iso": "CD", "libelle": "République démocratique du Congo", "geoname_id": 203312 },
+  { "code_iso": "CG", "libelle": "République du Congo", "geoname_id": 2260494 },
+  { "code_iso": "AO", "libelle": "Angola", "geoname_id": 3351879 },
+  { "code_iso": "ZM", "libelle": "Zambie", "geoname_id": 895949 },
+  { "code_iso": "TZ", "libelle": "Tanzanie", "geoname_id": 149590 },
+  { "code_iso": "RW", "libelle": "Rwanda", "geoname_id": 49518 },
+  { "code_iso": "BI", "libelle": "Burundi", "geoname_id": 433561 },
+  { "code_iso": "UG", "libelle": "Ouganda", "geoname_id": 226074 },
+  { "code_iso": "CF", "libelle": "République centrafricaine", "geoname_id": 239880 },
+  { "code_iso": "GA", "libelle": "Gabon", "geoname_id": 2400553 },
+  { "code_iso": "CM", "libelle": "Cameroun", "geoname_id": 2233387 },
+  { "code_iso": "FR", "libelle": "France", "geoname_id": 3017382 },
+  { "code_iso": "BE", "libelle": "Belgique", "geoname_id": 2802361 },
+  { "code_iso": "US", "libelle": "États-Unis", "geoname_id": 6252001 }
+]

@@ -101,6 +101,7 @@ public class AdministrationService {
     u.setActif(input.isActive());
     u.setMotDePasseHash(passwordEncoder.encode(input.password()));
     u.setVersionSession(0L);
+    applyScopeFields(u, role, input);
     utilisateurs.save(u);
     audit.log(actorId, "auth.utilisateur.creer", "auth", "Création utilisateur", Map.of("user_id", u.getId(), "email", email));
     return toAdminUser(u);
@@ -124,8 +125,10 @@ public class AdministrationService {
     }
     u.setCourriel(email);
     u.setNomComplet(name);
-    u.setRole(loadRole(input.roleId()));
+    Role role = loadRole(input.roleId());
+    u.setRole(role);
     u.setActif(input.isActive());
+    applyScopeFields(u, role, input);
     if (input.password() != null && !input.password().isBlank()) {
       if (input.password().length() < 8) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "password too short");
@@ -235,7 +238,40 @@ public class AdministrationService {
 
   private AdminUserRow toAdminUser(Utilisateur u) {
     RoleView role = new RoleView(u.getRole().getId(), u.getRole().getCode(), u.getRole().getLibelle());
-    return new AdminUserRow(u.getId(), u.getCourriel(), u.getNomComplet(), role, u.isActif(), u.getDerniereConnexionLe());
+    return new AdminUserRow(
+        u.getId(),
+        u.getCourriel(),
+        u.getNomComplet(),
+        role,
+        u.isActif(),
+        u.getDerniereConnexionLe(),
+        u.getAgenceId(),
+        u.getResponsableZoneId());
+  }
+
+  private void applyScopeFields(Utilisateur u, Role role, AdminUserInput input) {
+    String code = role.getCode();
+    if ("AGENT".equals(code)) {
+      Integer agenceId = input.agenceId();
+      if (agenceId == null || agenceId <= 0) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "agence_id requis pour le rôle AGENT");
+      }
+      u.setAgenceId(agenceId);
+      u.setResponsableZoneId(null);
+      return;
+    }
+    if ("RZ".equals(code)) {
+      Integer rzId = input.responsableZoneId();
+      if (rzId == null || rzId <= 0) {
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST, "responsable_zone_id requis pour le rôle RZ");
+      }
+      u.setResponsableZoneId(rzId);
+      u.setAgenceId(null);
+      return;
+    }
+    u.setAgenceId(null);
+    u.setResponsableZoneId(null);
   }
 
   private PermissionRow toPermissionRow(Permission p) {

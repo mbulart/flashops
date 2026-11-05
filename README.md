@@ -24,7 +24,11 @@ copy .env.example .env
 
 API : http://localhost:8080/api/v1
 
-Compte seed : `admin@flashops.local` / `Admin@2030`
+Comptes seed :
+
+- Admin : `admin@flashops.local` / `Admin@2030`
+- Directeur : `coo@flash.one` / `FlashOps@2026`
+- RZ : `prenom.nom@flash-ops.cloud` / `FlashOps@2026`
 
 ### Front
 

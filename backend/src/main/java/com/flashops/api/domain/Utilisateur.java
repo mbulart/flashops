@@ -47,6 +47,14 @@ public class Utilisateur {
   @Column(name = "photo_modifie_le")
   private Instant photoModifieLe;
 
+  /** Rattachement agence — utilisé pour le rôle AGENT. */
+  @Column(name = "agence_id")
+  private Integer agenceId;
+
+  /** Rattachement responsable de zone — utilisé pour le rôle RZ. */
+  @Column(name = "responsable_zone_id")
+  private Integer responsableZoneId;
+
   public Integer getId() {
     return id;
   }
@@ -121,5 +129,21 @@ public class Utilisateur {
 
   public void setPhotoModifieLe(Instant photoModifieLe) {
     this.photoModifieLe = photoModifieLe;
+  }
+
+  public Integer getAgenceId() {
+    return agenceId;
+  }
+
+  public void setAgenceId(Integer agenceId) {
+    this.agenceId = agenceId;
+  }
+
+  public Integer getResponsableZoneId() {
+    return responsableZoneId;
+  }
+
+  public void setResponsableZoneId(Integer responsableZoneId) {
+    this.responsableZoneId = responsableZoneId;
   }
 }

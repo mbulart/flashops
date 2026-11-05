@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AdminRole, AdminUserInput } from '../../../core/models/api.models';
+import { AdminRole, AdminUserInput, ResponsableZoneRef } from '../../../core/models/api.models';
+import { AgenceAdmin } from '../../../core/models/agences.models';
 
 @Component({
   selector: 'app-user-form-modal',
@@ -35,7 +36,14 @@ import { AdminRole, AdminUserInput } from '../../../core/models/api.models';
               </div>
               <div class="col-md-6">
                 <label class="form-label" for="uf-role">Rôle</label>
-                <select id="uf-role" class="form-select" name="roleId" [(ngModel)]="form.role_id" required>
+                <select
+                  id="uf-role"
+                  class="form-select"
+                  name="roleId"
+                  [(ngModel)]="form.role_id"
+                  required
+                  (ngModelChange)="onRoleChange()"
+                >
                   @for (role of roles; track role.id) {
                     <option [ngValue]="role.id">{{ role.label }}</option>
                   }
@@ -59,6 +67,46 @@ import { AdminRole, AdminUserInput } from '../../../core/models/api.models';
                   autocomplete="new-password"
                 />
               </div>
+              @if (selectedRoleCode() === 'AGENT') {
+                <div class="col-12">
+                  <label class="form-label" for="uf-agence">Agence rattachée</label>
+                  <select
+                    id="uf-agence"
+                    class="form-select"
+                    name="agenceId"
+                    [(ngModel)]="form.agence_id"
+                    required
+                  >
+                    <option [ngValue]="null">Sélectionner une agence…</option>
+                    @for (ag of agences; track ag.agenceId) {
+                      <option [ngValue]="ag.agenceId">
+                        {{ ag.code_agence }} — {{ ag.nom || 'Sans nom' }}
+                      </option>
+                    }
+                  </select>
+                  <p class="form-text mb-0">
+                    Si l’agence est mère, l’agent voit aussi ses filles. Sinon, uniquement cette agence.
+                  </p>
+                </div>
+              }
+              @if (selectedRoleCode() === 'RZ') {
+                <div class="col-12">
+                  <label class="form-label" for="uf-rz">Responsable de zone</label>
+                  <select
+                    id="uf-rz"
+                    class="form-select"
+                    name="rzId"
+                    [(ngModel)]="form.responsable_zone_id"
+                    required
+                  >
+                    <option [ngValue]="null">Sélectionner un RZ…</option>
+                    @for (rz of responsables; track rz.id) {
+                      <option [ngValue]="rz.id">{{ rz.nom }} ({{ rz.code }})</option>
+                    }
+                  </select>
+                  <p class="form-text mb-0">Périmètre limité aux agences de sa zone.</p>
+                </div>
+              }
               <div class="col-12">
                 <div class="form-check form-switch">
                   <input id="uf-active" class="form-check-input" type="checkbox" name="active" [(ngModel)]="form.is_active" />
@@ -85,6 +133,8 @@ export class UserFormModalComponent implements OnChanges {
   @Input({ required: true }) open = false;
   @Input({ required: true }) form!: AdminUserInput;
   @Input() roles: AdminRole[] = [];
+  @Input() agences: AgenceAdmin[] = [];
+  @Input() responsables: ResponsableZoneRef[] = [];
   @Input() editingId: number | null = null;
   @Input() saving = false;
 
@@ -96,6 +146,21 @@ export class UserFormModalComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['open']?.currentValue === true) {
       this.passwordLocal = '';
+    }
+  }
+
+  selectedRoleCode(): string {
+    const role = this.roles.find((r) => r.id === this.form.role_id);
+    return role?.code ?? '';
+  }
+
+  onRoleChange(): void {
+    const code = this.selectedRoleCode();
+    if (code !== 'AGENT') {
+      this.form.agence_id = null;
+    }
+    if (code !== 'RZ') {
+      this.form.responsable_zone_id = null;
     }
   }
 

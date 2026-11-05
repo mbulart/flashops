@@ -7,6 +7,8 @@ import com.flashops.api.domain.Utilisateur;
 import com.flashops.api.repository.JetonActualisationRepository;
 import com.flashops.api.repository.PermissionRepository;
 import com.flashops.api.repository.UtilisateurRepository;
+import com.flashops.api.scope.UserDataScope;
+import com.flashops.api.scope.UserDataScopeService;
 import com.flashops.api.web.dto.AuthDtos;
 import com.flashops.api.web.dto.AuthDtos.PermissionView;
 import com.flashops.api.web.dto.AuthDtos.RoleView;
@@ -35,6 +37,7 @@ public class AuthService {
   private final JwtService jwtService;
   private final FlashOpsProperties props;
   private final ProfilePhotoStorage profilePhotoStorage;
+  private final UserDataScopeService dataScope;
   private final SecureRandom random = new SecureRandom();
 
   public AuthService(
@@ -44,7 +47,8 @@ public class AuthService {
       PasswordEncoder passwordEncoder,
       JwtService jwtService,
       FlashOpsProperties props,
-      ProfilePhotoStorage profilePhotoStorage) {
+      ProfilePhotoStorage profilePhotoStorage,
+      UserDataScopeService dataScope) {
     this.utilisateurs = utilisateurs;
     this.jetons = jetons;
     this.permissions = permissions;
@@ -52,6 +56,7 @@ public class AuthService {
     this.jwtService = jwtService;
     this.props = props;
     this.profilePhotoStorage = profilePhotoStorage;
+    this.dataScope = dataScope;
   }
 
   @Transactional
@@ -219,6 +224,9 @@ public class AuthService {
     List<String> codes = perms.stream().map(Permission::getCode).toList();
     RoleView role = new RoleView(u.getRole().getId(), u.getRole().getCode(), u.getRole().getLibelle());
     boolean hasPhoto = u.getPhotoFichier() != null && !u.getPhotoFichier().isBlank();
+    UserDataScope scope = dataScope.resolve(u.getId());
+    List<Integer> allowedAgences = scope.unrestricted() ? List.of() : scope.allowedAgenceIds();
+    List<Integer> allowedZones = scope.unrestricted() ? List.of() : scope.allowedZoneIds();
     return new UserView(
         u.getId(),
         u.getCourriel(),
@@ -229,7 +237,11 @@ public class AuthService {
         u.isActif(),
         u.getDerniereConnexionLe(),
         hasPhoto,
-        u.getPhotoModifieLe());
+        u.getPhotoModifieLe(),
+        u.getAgenceId(),
+        u.getResponsableZoneId(),
+        allowedAgences,
+        allowedZones);
   }
 
   private static String randomToken() {

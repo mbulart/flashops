@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.client.RestClient;
 
 @Configuration
 @EnableConfigurationProperties(FlashOpsProperties.class)
@@ -13,5 +14,10 @@ public class AppConfig {
   @Bean
   PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
+  }
+
+  @Bean
+  RestClient geoNamesRestClient() {
+    return RestClient.builder().baseUrl("https://secure.geonames.org").build();
   }
 }
