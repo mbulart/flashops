@@ -11,12 +11,17 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class AgenceAdminRepository {
+
+  private static final Logger log = LoggerFactory.getLogger(AgenceAdminRepository.class);
 
   private static final String SELECT_LIST =
       """
@@ -332,7 +337,7 @@ public class AgenceAdminRepository {
     }
   }
 
-  /** Agences géolocalisées, hors périmètre utilisateur — page publique. */
+  /** Agences CFC géolocalisées, actives sur 90 jours — page publique. */
   public List<PublicAgencesDtos.AgenceGeo> loadLocatedPublic() {
     String sql =
         """
@@ -359,10 +364,22 @@ public class AgenceAdminRepository {
           AND d.longitude IS NOT NULL
           AND d.latitude <> 0
           AND d.longitude <> 0
+          AND upper(btrim(coalesce(d.categorie, ''))) LIKE '%CFC%'
+          AND EXISTS (
+            SELECT 1
+            FROM pilotage.agg_operation_agence_jour g
+            WHERE g.agence_id = d.agence_id
+              AND g.jour::date >= (CURRENT_DATE - 90)
+          )
         ORDER BY d.nom, d.code_agence
         LIMIT 5000
         """;
-    return jdbc.query(sql, this::mapPublicGeo);
+    try {
+      return jdbc.query(sql, this::mapPublicGeo);
+    } catch (DataAccessException ex) {
+      log.error("Geo publique agences indisponible", ex);
+      return List.of();
+    }
   }
 
   private PublicAgencesDtos.AgenceGeo mapPublicGeo(ResultSet rs, int rowNum) throws SQLException {

@@ -307,7 +307,17 @@ type MapEngine = 'google' | 'leaflet';
       :host ::ng-deep .leaflet-container {
         width: 100%;
         height: 100%;
-        background: #e8eef5;
+        background: var(--app-bg, #e8eef5);
+      }
+      :host ::ng-deep .leaflet-popup-content-wrapper,
+      :host ::ng-deep .leaflet-popup-tip {
+        background: var(--card-bg, #fff);
+        color: var(--text-primary, #111);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+      }
+      :host ::ng-deep .leaflet-popup-content {
+        color: inherit;
+        margin: 0.65rem 0.85rem;
       }
       /* Capture temporaire pendant zoom/pan — ne bloque pas les gestes. */
       :host ::ng-deep .geo-map-tile-freeze {

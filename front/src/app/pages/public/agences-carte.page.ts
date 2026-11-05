@@ -43,6 +43,14 @@ import { buildAgencesGeoExcel } from './agences-geo-excel.export';
             }
             Exporter
           </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-icon"
+            (click)="theme.toggle()"
+            [title]="theme.mode() === 'light' ? 'Mode sombre' : 'Mode clair'"
+          >
+            <i class="bi" [class.bi-moon-stars]="theme.mode() === 'light'" [class.bi-sun]="theme.mode() === 'dark'"></i>
+          </button>
           @if (signedIn()) {
             <a class="carte-link" routerLink="/">Tableau de bord</a>
           } @else {
@@ -88,12 +96,14 @@ import { buildAgencesGeoExcel } from './agences-geo-excel.export';
       :host {
         display: block;
         height: 100%;
+        color: var(--text-primary, #111);
       }
       .carte-page {
         display: flex;
         flex-direction: column;
         height: 100vh;
-        background: var(--card-bg, #fff);
+        background: var(--app-bg, #f1f3f5);
+        color: inherit;
       }
       .carte-bar {
         display: flex;
@@ -103,6 +113,7 @@ import { buildAgencesGeoExcel } from './agences-geo-excel.export';
         padding: 0.5rem 1rem;
         border-bottom: 1px solid var(--card-border, #e5e7eb);
         background: var(--header-bg, #fff);
+        color: inherit;
       }
       .carte-logo {
         height: 1.75rem;
@@ -134,12 +145,13 @@ import { buildAgencesGeoExcel } from './agences-geo-excel.export';
         text-decoration: none;
       }
       .carte-link:hover {
-        color: var(--text-primary, #111);
+        color: var(--text-primary, inherit);
       }
       .carte-map {
         flex: 1 1 auto;
         min-height: 0;
         position: relative;
+        background: var(--app-bg, #f1f3f5);
       }
       .carte-state {
         position: absolute;
@@ -148,6 +160,7 @@ import { buildAgencesGeoExcel } from './agences-geo-excel.export';
         align-items: center;
         justify-content: center;
         font-size: 0.875rem;
+        color: var(--text-muted, #6b7280);
       }
     `,
   ],
@@ -155,7 +168,7 @@ import { buildAgencesGeoExcel } from './agences-geo-excel.export';
 export class AgencesCartePageComponent implements OnInit {
   private readonly publicAgences = inject(PublicAgencesService);
   private readonly appSettings = inject(AppSettingsService);
-  private readonly theme = inject(ThemeService);
+  readonly theme = inject(ThemeService);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
 

@@ -66,7 +66,7 @@ import { DocumentShareModalComponent } from '../document-share-modal/document-sh
                   <div class="table-responsive excel-preview-table-wrap">
                     <table class="table table-sm table-bordered table-hover mb-0 excel-preview-table">
                       @if (sheet.headers.length) {
-                        <thead class="table-light sticky-top">
+                        <thead class="excel-preview-head sticky-top">
                           <tr>
                             @for (h of sheet.headers; track $index) {
                               <th>{{ h }}</th>
@@ -121,7 +121,8 @@ import { DocumentShareModalComponent } from '../document-share-modal/document-sh
         min-height: 60vh;
         max-height: 70vh;
         overflow: auto;
-        background: #f9fafb;
+        background: var(--app-bg, #f9fafb);
+        color: var(--text-primary, #111);
       }
 
       .excel-preview-table-wrap {
@@ -131,12 +132,21 @@ import { DocumentShareModalComponent } from '../document-share-modal/document-sh
       .excel-preview-table {
         font-size: 0.75rem;
         white-space: nowrap;
-        background: #fff;
+        background: var(--card-bg, #fff);
+        color: var(--text-primary, #111);
       }
 
-      .excel-preview-table th {
+      .excel-preview-table th,
+      .excel-preview-table td {
+        border-color: var(--card-border, #e5e7eb);
+        color: inherit;
+      }
+
+      .excel-preview-head th {
         font-weight: 600;
         vertical-align: middle;
+        background: var(--header-bg, #f8f9fb);
+        color: var(--text-primary, #111);
       }
     `,
   ],
