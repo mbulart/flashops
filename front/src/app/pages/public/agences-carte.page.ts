@@ -1,10 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { GeoPoint } from '../../core/models/api.models';
 import { PublicAgenceGeo } from '../../core/models/public-agences.models';
 import { AppSettingsService } from '../../core/services/app-settings.service';
-import { AuthService } from '../../core/services/auth.service';
 import { PublicAgencesService } from '../../core/services/public-agences.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -16,7 +14,7 @@ import { buildAgencesGeoExcel } from './agences-geo-excel.export';
 @Component({
   selector: 'app-agences-carte-page',
   standalone: true,
-  imports: [CommonModule, RouterLink, GeoMapComponent, ExcelPreviewModalComponent],
+  imports: [CommonModule, GeoMapComponent, ExcelPreviewModalComponent],
   template: `
     <div class="carte-page">
       <header class="carte-bar">
@@ -51,11 +49,6 @@ import { buildAgencesGeoExcel } from './agences-geo-excel.export';
           >
             <i class="bi" [class.bi-moon-stars]="theme.mode() === 'light'" [class.bi-sun]="theme.mode() === 'dark'"></i>
           </button>
-          @if (signedIn()) {
-            <a class="carte-link" routerLink="/">Tableau de bord</a>
-          } @else {
-            <a class="carte-link" routerLink="/login">Connexion</a>
-          }
         </div>
       </header>
 
@@ -139,14 +132,6 @@ import { buildAgencesGeoExcel } from './agences-geo-excel.export';
         align-items: center;
         gap: 0.75rem;
       }
-      .carte-link {
-        font-size: 0.8rem;
-        color: var(--text-muted, #6b7280);
-        text-decoration: none;
-      }
-      .carte-link:hover {
-        color: var(--text-primary, inherit);
-      }
       .carte-map {
         flex: 1 1 auto;
         min-height: 0;
@@ -169,7 +154,6 @@ export class AgencesCartePageComponent implements OnInit {
   private readonly publicAgences = inject(PublicAgencesService);
   private readonly appSettings = inject(AppSettingsService);
   readonly theme = inject(ThemeService);
-  private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
 
   readonly agencies = signal<PublicAgenceGeo[]>([]);
@@ -181,7 +165,6 @@ export class AgencesCartePageComponent implements OnInit {
   readonly previewSheets = signal<ExcelPreviewSheet[]>([]);
 
   readonly exportFilename = 'agences.xlsx';
-  readonly signedIn = computed(() => this.auth.isAuthenticated());
   readonly appName = computed(() => this.appSettings.settings().app_name);
   readonly brandLogo = computed(() => {
     const settings = this.appSettings.settings();
