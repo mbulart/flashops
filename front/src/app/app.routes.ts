@@ -9,6 +9,11 @@ export const routes: Routes = [
     canActivate: [guestGuard],
   },
   {
+    path: 'carte',
+    loadComponent: () =>
+      import('./pages/public/agences-carte.page').then((m) => m.AgencesCartePageComponent),
+  },
+  {
     path: '',
     component: MainLayoutComponent,
     canActivate: [authGuard],

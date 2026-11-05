@@ -54,6 +54,8 @@ public class SecurityConfig {
                         HttpMethod.GET,
                         "/api/v1/config/public",
                         "/api/v1/config/public/",
+                        "/api/v1/public/agences",
+                        "/api/v1/public/agences/",
                         "/api/v1/health",
                         "/api/v1/health/")
                     .permitAll()

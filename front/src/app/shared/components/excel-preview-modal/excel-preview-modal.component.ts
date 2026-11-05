@@ -90,10 +90,12 @@ import { DocumentShareModalComponent } from '../document-share-modal/document-sh
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-outline-secondary" (click)="close()">Fermer</button>
-              <button type="button" class="btn btn-outline-primary" (click)="openShare()" [disabled]="!buffer || loading()">
-                <i class="bi bi-envelope me-1"></i>
-                Partager
-              </button>
+              @if (!hideShare) {
+                <button type="button" class="btn btn-outline-primary" (click)="openShare()" [disabled]="!buffer || loading()">
+                  <i class="bi bi-envelope me-1"></i>
+                  Partager
+                </button>
+              }
               <button type="button" class="btn btn-primary" (click)="download()" [disabled]="!buffer || loading()">
                 <i class="bi bi-download me-1"></i>
                 Télécharger
@@ -144,6 +146,8 @@ export class ExcelPreviewModalComponent implements OnChanges {
   @Input() title = 'Aperçu Excel';
   @Input() filename = 'export.xlsx';
   @Input() buffer: ArrayBuffer | null = null;
+  @Input() hideShare = false;
+  @Input() previewSheets: ExcelPreviewSheet[] | null = null;
 
   @Output() closed = new EventEmitter<void>();
 
@@ -158,8 +162,8 @@ export class ExcelPreviewModalComponent implements OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if ('open' in changes || 'buffer' in changes) {
-      if (this.open && this.buffer) {
+    if ('open' in changes || 'buffer' in changes || 'previewSheets' in changes) {
+      if (this.open && (this.buffer || this.previewSheets?.length)) {
         void this.loadPreview();
       } else if (!this.open) {
         this.sheets.set([]);
@@ -198,10 +202,15 @@ export class ExcelPreviewModalComponent implements OnChanges {
   }
 
   private async loadPreview(): Promise<void> {
-    if (!this.buffer) return;
     this.loading.set(true);
     this.error.set(null);
     try {
+      if (this.previewSheets?.length) {
+        this.sheets.set(this.previewSheets);
+        this.activeSheet.set(0);
+        return;
+      }
+      if (!this.buffer) return;
       const parsed = await parseExcelBufferPreview(this.buffer);
       this.sheets.set(parsed);
       const dataIdx = parsed.findIndex((s) => s.name !== 'Synthese');

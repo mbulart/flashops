@@ -603,6 +603,7 @@ export interface GeoPoint {
   label: string;
   city?: string;
   commune?: string;
+  address?: string;
   lat: number;
   lng: number;
   tx_count: number;

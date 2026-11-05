@@ -1,7 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -13,7 +13,7 @@ type LoginMode = 'password' | 'token';
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="login-page">
       <div class="login-card card shadow-sm">
@@ -110,12 +110,24 @@ type LoginMode = 'password' | 'token';
           </form>
         }
         }
+        <a class="login-map-link" routerLink="/carte">Carte des agences</a>
       </div>
     </div>
   `,
   styles: `
     .login-mode .nav-link {
       font-size: 0.875rem;
+    }
+    .login-map-link {
+      display: block;
+      margin-top: 1.25rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted, #6b7280);
+      text-decoration: none;
+    }
+    .login-map-link:hover {
+      color: var(--text-primary, #111);
     }
   `,
 })

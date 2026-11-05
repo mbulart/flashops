@@ -3,6 +3,7 @@ package com.flashops.api.agences;
 import com.flashops.api.web.dto.AgenceAdminDtos.AgenceAdminInput;
 import com.flashops.api.web.dto.AgenceAdminDtos.AgenceAdminPage;
 import com.flashops.api.web.dto.AgenceAdminDtos.AgenceAdminRow;
+import com.flashops.api.web.dto.PublicAgencesDtos;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -329,6 +330,51 @@ public class AgenceAdminRepository {
       args.add(Date.valueOf(q.from().trim()));
       args.add(Date.valueOf(q.to().trim()));
     }
+  }
+
+  /** Agences géolocalisées, hors périmètre utilisateur — page publique. */
+  public List<PublicAgencesDtos.AgenceGeo> loadLocatedPublic() {
+    String sql =
+        """
+        SELECT d.agence_id,
+               coalesce(nullif(btrim(d.code_agence), ''), '') AS code,
+               coalesce(nullif(btrim(d.nom), ''), '') AS nom,
+               coalesce(
+                 nullif(btrim(d.adresse), ''),
+                 nullif(
+                   concat_ws(
+                     ', ',
+                     nullif(btrim(d.commune), ''),
+                     nullif(btrim(d.ville), '')
+                   ),
+                   ''
+                 ),
+                 ''
+               ) AS adresse,
+               d.latitude,
+               d.longitude
+        FROM pilotage.dim_agence AS d
+        WHERE d.agence_id <> 0
+          AND d.latitude IS NOT NULL
+          AND d.longitude IS NOT NULL
+          AND d.latitude <> 0
+          AND d.longitude <> 0
+        ORDER BY d.nom, d.code_agence
+        LIMIT 5000
+        """;
+    return jdbc.query(sql, this::mapPublicGeo);
+  }
+
+  private PublicAgencesDtos.AgenceGeo mapPublicGeo(ResultSet rs, int rowNum) throws SQLException {
+    BigDecimal lat = (BigDecimal) rs.getObject("latitude");
+    BigDecimal lng = (BigDecimal) rs.getObject("longitude");
+    return new PublicAgencesDtos.AgenceGeo(
+        rs.getInt("agence_id"),
+        rs.getString("code"),
+        rs.getString("nom"),
+        rs.getString("adresse"),
+        lat == null ? 0d : lat.doubleValue(),
+        lng == null ? 0d : lng.doubleValue());
   }
 
   private AgenceAdminRow mapRow(ResultSet rs, int rowNum) throws SQLException {

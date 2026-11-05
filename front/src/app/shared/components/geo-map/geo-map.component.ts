@@ -53,14 +53,14 @@ type MapEngine = 'google' | 'leaflet';
       @if (engine() === 'google' && !compactChrome) {
         <div class="geo-map-provider geo-map-provider--google">Google Maps</div>
       }
-      @if (!staticPin && points.length && presenceMode) {
+      @if (!staticPin && !ringColor && points.length && presenceMode) {
         <div class="geo-map-legend">
           <span class="geo-map-swatch geo-map-swatch--present"></span>
           <span class="small text-muted">Dans le résultat</span>
           <span class="geo-map-swatch geo-map-swatch--missing"></span>
           <span class="small text-muted">Sans opération</span>
         </div>
-      } @else if (!staticPin && points.length) {
+      } @else if (!staticPin && !ringColor && points.length) {
         <div class="geo-map-legend">
           <span class="small text-muted">{{ activityMetric === 'volume' ? 'Volume faible' : 'Valeur faible' }}</span>
           <span class="geo-map-swatch" [style.background]="heatColor(0.08)"></span>
@@ -366,6 +366,10 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() activityMetric: HeatMetric = 'value';
   /** Toutes les agences : vert = dans le résultat, rouge clignotant = sans opération. */
   @Input() presenceMode = false;
+  /** Contour uniforme (ex. jaune). Masque la légende chaleur / présence. */
+  @Input() ringColor = '';
+  /** Affiche volume / valeur dans le popup. */
+  @Input() showActivity = true;
   /** When true, map clicks emit coordinates (edit / place pin). */
   @Input() pickMode = false;
   /**
@@ -508,6 +512,8 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       changes['pickMode'] ||
       changes['activityMetric'] ||
       changes['presenceMode'] ||
+      changes['ringColor'] ||
+      changes['showActivity'] ||
       changes['pinIconUrl'] ||
       changes['pinLabel']
     ) {
@@ -876,7 +882,7 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   private renderPoints(force: boolean): void {
     if (this.destroyed) return;
     const pts = (this.points || []).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
-    const fingerprint = `${this.engine()}|${this.staticPin ? 1 : 0}|${this.pinIconUrl}|${this.pinLabel}|${this.activityMetric}|${this.presenceMode ? 1 : 0}|${pts
+    const fingerprint = `${this.engine()}|${this.staticPin ? 1 : 0}|${this.pinIconUrl}|${this.pinLabel}|${this.activityMetric}|${this.presenceMode ? 1 : 0}|${this.ringColor}|${this.showActivity ? 1 : 0}|${pts
       .map((p) => {
         const act = pointActivity(p, this.activityMetric);
         return `${p.agency_id}:${p.lat.toFixed(5)}:${p.lng.toFixed(5)}:${Math.round(act)}:${p.presence ?? ''}`;
@@ -933,7 +939,7 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
           anchor: new google.maps.Point(18, 18),
         };
       } else {
-        const radius = this.presenceMode ? 12 : this.staticPin ? 14 : 6 + Math.sqrt(intensity) * 18;
+        const radius = this.ringColor ? 12 : this.presenceMode ? 12 : this.staticPin ? 14 : 6 + Math.sqrt(intensity) * 18;
         const width = Math.max(12, Math.round(radius * 2 / 2) * 2);
         const height = Math.max(10, Math.round(width * (Math.sqrt(3) / 2)));
         const fill = this.markerFill(p, intensity);
@@ -1004,7 +1010,7 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
       const icon = brand
         ? this.getBrandDivIcon(brand)
         : (() => {
-            const radius = this.presenceMode ? 12 : this.staticPin ? 14 : 6 + Math.sqrt(intensity) * 18;
+            const radius = this.ringColor ? 12 : this.presenceMode ? 12 : this.staticPin ? 14 : 6 + Math.sqrt(intensity) * 18;
             const width = Math.max(12, Math.round(radius * 2 / 2) * 2);
             const height = Math.max(10, Math.round(width * (Math.sqrt(3) / 2)));
             const fill = this.markerFill(p, intensity);
@@ -1138,21 +1144,28 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private markerRing(p: GeoPoint, intensity: number): string {
+    if (this.ringColor) return this.ringColor;
     if (this.presenceMode) return this.isMissing(p) ? '#dc2626' : '#16a34a';
     return this.staticPin ? '#ffd500' : mapHeatStrokeColor(intensity);
   }
 
   private markerFill(p: GeoPoint, intensity: number): string {
+    if (this.ringColor) return this.ringColor;
     if (this.presenceMode) return this.isMissing(p) ? '#ef4444' : '#22c55e';
     return this.staticPin ? '#ffd500' : mapHeatColor(intensity);
   }
 
   private markerStroke(p: GeoPoint, intensity: number): string {
+    if (this.ringColor) return '#1a1a1a';
     if (this.presenceMode) return this.isMissing(p) ? '#991b1b' : '#166534';
     return this.staticPin ? '#1a1a1a' : mapHeatStrokeColor(intensity);
   }
 
   private popupBody(p: GeoPoint): string {
+    if (!this.showActivity) {
+      const addr = (p.address || p.city || '').trim();
+      return addr ? escapeHtml(addr) : '';
+    }
     const status = this.presenceMode
       ? this.isMissing(p)
         ? 'Sans opération sur la période<br/>'
