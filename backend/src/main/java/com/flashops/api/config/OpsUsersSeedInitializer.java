@@ -26,6 +26,7 @@ public class OpsUsersSeedInitializer implements ApplicationRunner {
     new SeedUser("coordination.ops@flash.one", "Bob Kabeya", "ADMIN"),
     new SeedUser("bnzeko@flash.one", "Benie Nzeko", "VAS"),
     new SeedUser("b.kalambay@flash.one", "Béni Kalambay", "VAS"),
+    new SeedUser("a.mbelu@flash.one", "Amina Mbelu", "BGFI"),
   };
 
   private final UtilisateurRepository utilisateurs;

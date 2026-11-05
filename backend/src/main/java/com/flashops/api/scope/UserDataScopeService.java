@@ -39,6 +39,9 @@ public class UserDataScopeService {
       }
       return UserDataScope.restricted(resolveRzAgenceIds(rzId), resolveRzZoneIds(rzId));
     }
+    if ("BGFI".equals(code)) {
+      return UserDataScope.restricted(resolveBgfiAgenceIds(), List.of());
+    }
     return UserDataScope.all();
   }
 
@@ -74,6 +77,23 @@ public class UserDataScopeService {
     }
     // Agence fille : uniquement elle-même
     return List.of(agenceId);
+  }
+
+  private List<Integer> resolveBgfiAgenceIds() {
+    return jdbc.query(
+        """
+        SELECT d.agence_id
+        FROM pilotage.dim_agence AS d
+        WHERE d.agence_id <> 0
+          AND (
+            coalesce(d.nom, '') ILIKE '%BGFI%'
+            OR coalesce(d.code_agence, '') ILIKE '%BGFI%'
+            OR coalesce(d.pos_id, '') ILIKE '%BGFI%'
+            OR coalesce(d.fp_agent, '') ILIKE '%BGFI%'
+          )
+        ORDER BY d.agence_id
+        """,
+        (rs, i) -> rs.getInt("agence_id"));
   }
 
   private List<Integer> resolveRzAgenceIds(int responsableZoneId) {
