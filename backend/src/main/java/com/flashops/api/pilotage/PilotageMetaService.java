@@ -20,13 +20,24 @@ public class PilotageMetaService {
   }
 
   public PilotageDtos.MetaResponse meta() {
+    return meta(PilotageDomainScope.ALL);
+  }
+
+  public PilotageDtos.MetaResponse meta(List<String> allowedDomaines) {
+    var domaines =
+        DOMAINES.stream()
+            .filter(d -> allowedDomaines == null || allowedDomaines.isEmpty() || allowedDomaines.contains(d.code()))
+            .toList();
+    if (domaines.isEmpty()) {
+      domaines = DOMAINES;
+    }
     var snapshot = repository.loadSnapshot();
     if (snapshot.isPresent()) {
       var s = snapshot.get();
       return new PilotageDtos.MetaResponse(
-          DOMAINES, s.devises(), s.dataFrom(), s.dataTo(), true);
+          domaines, s.devises(), s.dataFrom(), s.dataTo(), true);
     }
     return new PilotageDtos.MetaResponse(
-        DOMAINES, List.of("CDF", "USD"), "2022-01-01", null, false);
+        domaines, List.of("CDF", "USD"), "2022-01-01", null, false);
   }
 }

@@ -1269,6 +1269,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
         this.metaReady.set(meta.pilotageSchemaReady);
         this.draftDevise = this.devises().includes('USD') ? 'USD' : this.devises()[0];
         this.restoreDraftFromUrl();
+        this.clampDraftDomaines();
         this.metaLoading.set(false);
         this.loadFiltresForDomains(false);
         this.loadLocationAndReseauRefs();
@@ -2032,7 +2033,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   }
 
   resetFilters(): void {
-    this.draftDomaineIds = [pilotageDomaineOptionId('transfert')];
+    this.draftDomaineIds = this.defaultDomaineIds();
     this.draftDevise = this.devises().includes('USD') ? 'USD' : this.devises()[0];
     this.activePreset = '30d';
     this.resetDraftDates();
@@ -2133,6 +2134,19 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
         if (showError) this.toast.error('Corridors indisponibles.');
       },
     });
+  }
+
+  private defaultDomaineIds(): number[] {
+    const first = this.domaines()[0];
+    return first ? [pilotageDomaineOptionId(first.code)] : [];
+  }
+
+  private clampDraftDomaines(): void {
+    const allowed = new Set(this.domaines().map((d) => d.code));
+    const kept = this.selectedDomaines().filter((code) => allowed.has(code));
+    this.draftDomaineIds = kept.length
+      ? kept.map((code) => pilotageDomaineOptionId(code))
+      : this.defaultDomaineIds();
   }
 
   private selectedDomaines(): PilotageDomaine[] {

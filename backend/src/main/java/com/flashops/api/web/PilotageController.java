@@ -5,6 +5,7 @@ import com.flashops.api.pilotage.PilotageAgenceFilterScope;
 import com.flashops.api.pilotage.PilotageAnalyticsService;
 import com.flashops.api.pilotage.PilotageBundleParams;
 import com.flashops.api.pilotage.PilotageBundleQuery;
+import com.flashops.api.pilotage.PilotageDomainScope;
 import com.flashops.api.pilotage.PilotageFiltresService;
 import com.flashops.api.pilotage.PilotageMetaService;
 import com.flashops.api.scope.UserDataScope;
@@ -29,24 +30,28 @@ public class PilotageController {
   private final PilotageAnalyticsService analyticsService;
   private final PermissionGuard permissions;
   private final UserDataScopeService dataScope;
+  private final PilotageDomainScope domainScope;
 
   public PilotageController(
       PilotageMetaService metaService,
       PilotageFiltresService filtresService,
       PilotageAnalyticsService analyticsService,
       PermissionGuard permissions,
-      UserDataScopeService dataScope) {
+      UserDataScopeService dataScope,
+      PilotageDomainScope domainScope) {
     this.metaService = metaService;
     this.filtresService = filtresService;
     this.analyticsService = analyticsService;
     this.permissions = permissions;
     this.dataScope = dataScope;
+    this.domainScope = domainScope;
   }
 
   @GetMapping("/meta")
   public Map<String, PilotageDtos.MetaResponse> meta() {
-    permissions.require(AuthSupport.currentUserId(), "dashboard.voir");
-    return Map.of("data", metaService.meta());
+    int userId = AuthSupport.currentUserId();
+    permissions.require(userId, "dashboard.voir");
+    return Map.of("data", metaService.meta(domainScope.allowed(userId)));
   }
 
   @GetMapping("/bundle")
@@ -200,8 +205,9 @@ public class PilotageController {
 
   @GetMapping("/filtres")
   public Map<String, PilotageDtos.FiltresResponse> filtres(@RequestParam("domaine") String domaine) {
-    permissions.require(AuthSupport.currentUserId(), "dashboard.voir");
-    return Map.of("data", filtresService.filtres(domaine));
+    int userId = AuthSupport.currentUserId();
+    permissions.require(userId, "dashboard.voir");
+    return Map.of("data", filtresService.filtres(domainScope.require(userId, domaine)));
   }
 
   @GetMapping("/agences/{agenceId:\\d+}")
@@ -383,8 +389,9 @@ public class PilotageController {
 
   @GetMapping("/couloirs")
   public Map<String, List<PilotageDtos.CouloirRow>> couloirs(@RequestParam("domaine") String domaine) {
-    permissions.require(AuthSupport.currentUserId(), "dashboard.voir");
-    return Map.of("data", filtresService.listCouloirs(domaine));
+    int userId = AuthSupport.currentUserId();
+    permissions.require(userId, "dashboard.voir");
+    return Map.of("data", filtresService.listCouloirs(domainScope.require(userId, domaine)));
   }
 
   @GetMapping("/reseau/regions")
@@ -433,7 +440,7 @@ public class PilotageController {
     List<Integer> zones = scope.intersectZones(zoneId);
     var query =
         PilotageBundleParams.toQuery(
-            domaines,
+            domainScope.restrict(userId, domaines),
             devise,
             from,
             to,
