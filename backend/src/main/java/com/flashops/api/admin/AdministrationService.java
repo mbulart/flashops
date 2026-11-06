@@ -94,12 +94,13 @@ public class AdministrationService {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "email already used");
     }
     Role role = loadRole(input.roleId());
+    assertCanAssignRole(actorId, role, null);
     Utilisateur u = new Utilisateur();
     u.setCourriel(email);
     u.setNomComplet(name);
     u.setRole(role);
     u.setActif(input.isActive());
-    u.setMotDePasseHash(passwordEncoder.encode(input.password()));
+    applyPasswordHash(u, input.password());
     u.setVersionSession(0L);
     applyScopeFields(u, role, input);
     utilisateurs.save(u);
@@ -126,15 +127,12 @@ public class AdministrationService {
     u.setCourriel(email);
     u.setNomComplet(name);
     Role role = loadRole(input.roleId());
+    assertCanAssignRole(actorId, role, u);
     u.setRole(role);
     u.setActif(input.isActive());
     applyScopeFields(u, role, input);
     if (input.password() != null && !input.password().isBlank()) {
-      if (input.password().length() < 8) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "password too short");
-      }
-      u.setMotDePasseHash(passwordEncoder.encode(input.password()));
-      u.setVersionSession(u.getVersionSession() + 1L);
+      applyPasswordHash(u, input.password());
     }
     utilisateurs.save(u);
     audit.log(actorId, "auth.utilisateur.modifier", "auth", "Modification utilisateur", Map.of("user_id", userId));
@@ -159,7 +157,7 @@ public class AdministrationService {
     guard.require(actorId, "auth.roles.ecrire");
     Role role =
         roles.findById(roleId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "role not found"));
-    if ("ADMIN".equals(role.getCode())) {
+    if ("ADMIN".equals(role.getCode()) || "SUPER_ADMIN".equals(role.getCode())) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "admin role permissions are fixed");
     }
     List<Integer> ids = input.permissionIds() == null ? List.of() : input.permissionIds();
@@ -323,6 +321,27 @@ public class AdministrationService {
       return null;
     }
     return new ActionUserBrief(u.getId(), u.getCourriel(), u.getNomComplet());
+  }
+
+  private void applyPasswordHash(Utilisateur u, String rawPassword) {
+    String next = rawPassword == null ? "" : rawPassword.trim();
+    if (next.length() < 8) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "password too short");
+    }
+    u.setMotDePasseHash(passwordEncoder.encode(next));
+    if (u.getId() != null) {
+      u.setVersionSession(u.getVersionSession() + 1L);
+    }
+  }
+
+  private void assertCanAssignRole(int actorId, Role role, Utilisateur target) {
+    boolean actorSuper = guard.isSuperAdmin(actorId);
+    boolean nextSuper = role != null && "SUPER_ADMIN".equals(role.getCode());
+    boolean targetSuper =
+        target != null && target.getRole() != null && "SUPER_ADMIN".equals(target.getRole().getCode());
+    if ((nextSuper || targetSuper) && !actorSuper) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "insufficient permissions");
+    }
   }
 
   private static String normalizeEmail(String email) {

@@ -1,12 +1,10 @@
 import {
   Component,
-  ElementRef,
   EventEmitter,
   Input,
   OnChanges,
   Output,
   SimpleChanges,
-  ViewChild,
   inject,
   signal,
 } from '@angular/core';
@@ -38,91 +36,87 @@ import { firstValueFrom } from 'rxjs';
               <i class="bi bi-x-lg"></i>
             </button>
           </div>
-          <div class="card-body">
-            <form autocomplete="off" (ngSubmit)="submit()">
-              <p class="profile-modal__section-label">Identité</p>
-              <div class="mb-3">
-                <label class="form-label" for="profile-full-name">Nom affiché</label>
-                <input
-                  id="profile-full-name"
-                  type="text"
-                  class="form-control"
-                  name="fullName"
-                  [(ngModel)]="fullName"
-                  required
-                  autocomplete="off"
-                />
-              </div>
-              <div class="mb-4">
-                <label class="form-label" for="profile-email">Adresse e-mail</label>
-                <input
-                  id="profile-email"
-                  type="email"
-                  class="form-control"
-                  name="email"
-                  [(ngModel)]="email"
-                  required
-                  autocomplete="off"
-                />
-              </div>
-            </form>
+          <form class="card-body" (ngSubmit)="submit()" #f="ngForm" autocomplete="off">
+            <p class="profile-modal__section-label">Identité</p>
+            <div class="mb-3">
+              <label class="form-label" for="profile-full-name">Nom affiché</label>
+              <input
+                id="profile-full-name"
+                type="text"
+                class="form-control"
+                name="fullName"
+                [(ngModel)]="fullName"
+                required
+                autocomplete="off"
+              />
+            </div>
+            <div class="mb-4">
+              <label class="form-label" for="profile-email">Adresse e-mail</label>
+              <input
+                id="profile-email"
+                type="email"
+                class="form-control"
+                name="email"
+                [(ngModel)]="email"
+                required
+                autocomplete="off"
+              />
+            </div>
 
             <hr class="my-3" />
 
-            <form autocomplete="off" (ngSubmit)="submit()">
-              <p class="profile-modal__section-label">Mot de passe</p>
-              <p class="form-text mb-3">Renseignez les champs ci-dessous uniquement si vous souhaitez le changer.</p>
-              <div class="mb-3">
-                <label class="form-label" for="current-password">Mot de passe actuel</label>
-                <input
-                  id="current-password"
-                  type="password"
-                  class="form-control"
-                  name="profileCurrentPassword"
-                  #currentPasswordInput
-                  [(ngModel)]="currentPassword"
-                  autocomplete="off"
-                />
-              </div>
-              <div class="mb-3">
-                <label class="form-label" for="new-password">Nouveau mot de passe</label>
-                <input
-                  id="new-password"
-                  type="password"
-                  class="form-control"
-                  name="profileNewPassword"
-                  #newPasswordInput
-                  [(ngModel)]="newPassword"
-                  minlength="8"
-                  autocomplete="new-password"
-                />
-              </div>
-              <div class="mb-4">
-                <label class="form-label" for="confirm-password">Confirmer le mot de passe</label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  class="form-control"
-                  name="profileConfirmPassword"
-                  #confirmPasswordInput
-                  [(ngModel)]="confirmPassword"
-                  autocomplete="new-password"
-                />
-              </div>
+            <p class="profile-modal__section-label">Mot de passe</p>
+            <p class="form-text mb-3">Laissez vide pour conserver le mot de passe actuel.</p>
+            <div class="mb-3">
+              <label class="form-label" for="current-password">Mot de passe actuel</label>
+              <input
+                id="current-password"
+                type="password"
+                class="form-control"
+                name="password"
+                [(ngModel)]="currentPassword"
+                autocomplete="new-password"
+                [required]="passwordTouched()"
+              />
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="new-password">Nouveau mot de passe</label>
+              <input
+                id="new-password"
+                type="password"
+                class="form-control"
+                name="newPassword"
+                [(ngModel)]="newPassword"
+                minlength="8"
+                autocomplete="new-password"
+                [required]="passwordTouched()"
+              />
+            </div>
+            <div class="mb-4">
+              <label class="form-label" for="confirm-password">Confirmer le mot de passe</label>
+              <input
+                id="confirm-password"
+                type="password"
+                class="form-control"
+                name="confirmPassword"
+                [(ngModel)]="confirmPassword"
+                autocomplete="new-password"
+                [required]="passwordTouched()"
+              />
+            </div>
 
-              <div class="d-flex gap-2 justify-content-end">
-                <button type="button" class="btn btn-outline-secondary" (click)="close.emit()" [disabled]="saving()">
-                  Annuler
-                </button>
-                <button type="submit" class="btn btn-primary" [disabled]="saving() || !canSubmit()">
-                  @if (saving()) {
-                    <span class="spinner-border spinner-border-sm me-2"></span>
-                  }
-                  Enregistrer
-                </button>
-              </div>
-            </form>
-          </div>
+            <div class="d-flex gap-2 justify-content-end">
+              <button type="button" class="btn btn-outline-secondary" (click)="close.emit()" [disabled]="saving()">
+                Annuler
+              </button>
+              <button type="submit" class="btn btn-primary" [disabled]="saving() || f.invalid || !canSubmit()">
+                @if (saving()) {
+                  <span class="spinner-border spinner-border-sm me-2"></span>
+                }
+                Enregistrer
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     }
@@ -185,10 +179,6 @@ export class ProfileAccountModalComponent implements OnChanges {
 
   readonly saving = signal(false);
 
-  @ViewChild('currentPasswordInput') currentPasswordInput?: ElementRef<HTMLInputElement>;
-  @ViewChild('newPasswordInput') newPasswordInput?: ElementRef<HTMLInputElement>;
-  @ViewChild('confirmPasswordInput') confirmPasswordInput?: ElementRef<HTMLInputElement>;
-
   fullName = '';
   email = '';
   currentPassword = '';
@@ -214,38 +204,8 @@ export class ProfileAccountModalComponent implements OnChanges {
     return name !== prevName || mail !== prevMail;
   }
 
-  private readInput(
-    ref: ElementRef<HTMLInputElement> | undefined,
-    fallback: string,
-    elementId: string
-  ): string {
-    const fromRef = ref?.nativeElement?.value;
-    if (typeof fromRef === 'string' && fromRef.length > 0) return fromRef;
-    const fromDom = (document.getElementById(elementId) as HTMLInputElement | null)?.value;
-    if (typeof fromDom === 'string' && fromDom.length > 0) return fromDom;
-    return fallback;
-  }
-
-  private syncPasswordsFromDom(): void {
-    this.currentPassword = this.readInput(
-      this.currentPasswordInput,
-      this.currentPassword,
-      'current-password'
-    );
-    this.newPassword = this.readInput(this.newPasswordInput, this.newPassword, 'new-password');
-    this.confirmPassword = this.readInput(
-      this.confirmPasswordInput,
-      this.confirmPassword,
-      'confirm-password'
-    );
-  }
-
-  private passwordTouched(): boolean {
-    return !!(
-      this.readInput(this.currentPasswordInput, this.currentPassword, 'current-password') ||
-      this.readInput(this.newPasswordInput, this.newPassword, 'new-password') ||
-      this.readInput(this.confirmPasswordInput, this.confirmPassword, 'confirm-password')
-    );
+  passwordTouched(): boolean {
+    return !!(this.currentPassword || this.newPassword || this.confirmPassword);
   }
 
   canSubmit(): boolean {
@@ -254,46 +214,27 @@ export class ProfileAccountModalComponent implements OnChanges {
     if (!name || !mail.includes('@')) return false;
     if (!this.profileDirty() && !this.passwordTouched()) return false;
     if (!this.passwordTouched()) return true;
-    const current = this.readInput(
-      this.currentPasswordInput,
-      this.currentPassword,
-      'current-password'
-    );
-    const next = this.readInput(this.newPasswordInput, this.newPassword, 'new-password');
-    const confirm = this.readInput(
-      this.confirmPasswordInput,
-      this.confirmPassword,
-      'confirm-password'
-    );
-    return !!current && next.length >= 8 && next === confirm;
+    const next = this.newPassword.trim();
+    return !!this.currentPassword && next.length >= 8 && next === this.confirmPassword.trim();
   }
 
   submit(): void {
-    this.syncPasswordsFromDom();
     if (!this.canSubmit() || this.saving() || !this.user) return;
     void this.runSubmit();
   }
 
   private async runSubmit(): Promise<void> {
-    this.syncPasswordsFromDom();
     const currentPwd = this.currentPassword;
-    const newPwd = this.newPassword;
+    const newPwd = this.newPassword.trim();
     const profileDirty = this.profileDirty();
+    const changePassword = this.passwordTouched();
     this.saving.set(true);
     try {
-      const ready = await this.auth.ensureAccessForWrite();
-      if (!ready) {
-        this.toast.warning('Session expirée. Reconnectez-vous.');
-        this.auth.logout();
-        return;
-      }
       if (profileDirty) {
-        await firstValueFrom(
-          this.auth.updateProfile(this.email.trim(), this.fullName.trim())
-        );
+        await firstValueFrom(this.auth.updateProfile(this.email.trim(), this.fullName.trim()));
       }
       let passwordChanged = false;
-      if (currentPwd || newPwd) {
+      if (changePassword) {
         const pwdRes = await firstValueFrom(this.auth.changePassword(currentPwd, newPwd));
         passwordChanged = !!pwdRes.logout_required || !!pwdRes.sessions_revoked;
       }
@@ -317,8 +258,7 @@ export class ProfileAccountModalComponent implements OnChanges {
 
   private handleSubmitError(err: unknown): void {
     const httpErr = err instanceof HttpErrorResponse ? err : null;
-    const msg =
-      typeof httpErr?.error?.error === 'string' ? httpErr.error.error : '';
+    const msg = typeof httpErr?.error?.error === 'string' ? httpErr.error.error : '';
     if (msg === 'email already used') {
       this.toast.error('Cette adresse e-mail est déjà utilisée.');
     } else if (msg === 'invalid email') {

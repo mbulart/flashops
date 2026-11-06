@@ -68,7 +68,7 @@ public class AuthService {
     if (!u.isActif()) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "inactive user");
     }
-    if (!passwordEncoder.matches(password, u.getMotDePasseHash())) {
+    if (!passwordMatches(password, u.getMotDePasseHash())) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid credentials");
     }
     u.setDerniereConnexionLe(Instant.now());
@@ -107,17 +107,12 @@ public class AuthService {
     if (!u.isActif()) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "inactive user");
     }
-    String submitted = currentPassword == null ? "" : currentPassword.trim();
-    String hash = u.getMotDePasseHash() == null ? "" : u.getMotDePasseHash().trim();
-    if (submitted.isEmpty()
-        || hash.isBlank()
-        || !passwordEncoder.matches(submitted, hash)) {
+    if (!passwordMatches(currentPassword, u.getMotDePasseHash())) {
       // 400 : l'utilisateur est déjà authentifié. Un 401 ferait relancer
       // le refresh de session côté front et masquerait l'erreur métier.
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid current password");
     }
-    u.setMotDePasseHash(passwordEncoder.encode(next));
-    u.setVersionSession(u.getVersionSession() + 1L);
+    applyPasswordHash(u, next);
     utilisateurs.save(u);
     jetons.revokeAllActiveByUtilisateurId(userId, Instant.now());
   }
@@ -201,6 +196,22 @@ public class AuthService {
             .findWithRoleById(userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "user not found"));
     return toUserView(u);
+  }
+
+  private boolean passwordMatches(String raw, String hash) {
+    if (raw == null || hash == null || hash.isBlank()) {
+      return false;
+    }
+    if (passwordEncoder.matches(raw, hash)) {
+      return true;
+    }
+    String trimmed = raw.trim();
+    return !trimmed.isEmpty() && !trimmed.equals(raw) && passwordEncoder.matches(trimmed, hash);
+  }
+
+  private void applyPasswordHash(Utilisateur u, String rawPassword) {
+    u.setMotDePasseHash(passwordEncoder.encode(rawPassword));
+    u.setVersionSession(u.getVersionSession() + 1L);
   }
 
   private TokenPair issueTokens(Utilisateur u) {

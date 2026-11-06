@@ -18,12 +18,17 @@ public class PermissionGuard {
     this.permissions = permissions;
   }
 
+  public boolean isSuperAdmin(int userId) {
+    Utilisateur u = utilisateurs.findWithRoleById(userId).orElse(null);
+    return u != null && u.getRole() != null && "SUPER_ADMIN".equals(u.getRole().getCode());
+  }
+
   public void require(int userId, String permissionCode) {
     Utilisateur u =
         utilisateurs
             .findWithRoleById(userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "unauthorized"));
-    if ("ADMIN".equals(u.getRole().getCode())) {
+    if ("SUPER_ADMIN".equals(u.getRole().getCode())) {
       return;
     }
     boolean ok =

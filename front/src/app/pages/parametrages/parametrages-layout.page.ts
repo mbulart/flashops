@@ -36,14 +36,14 @@ export class ParametragesLayoutPageComponent {
     { label: 'Rôles', path: '/parametrages/roles', permission: 'auth.roles.lire' },
     { label: 'Permissions', path: '/parametrages/permissions', permission: 'auth.permissions.lire' },
     { label: 'Réglages système', path: '/parametrages/systeme', permission: 'auth.parametres.lire' },
-    { label: 'Référentiels', path: '/parametrages/referentiels', permission: 'referentiels.geo.lire' },
+    { label: 'Référentiels', path: '/parametrages/referentiels', permission: 'referentiels.zones.ecrire' },
     { label: 'Actions utilisateur', path: '/parametrages/actions', permission: 'audit.actions.lire' },
   ];
 
   get visibleNav(): SubNavItem[] {
     return this.items.filter((i) => {
       if (i.path === '/parametrages/referentiels') {
-        return this.auth.can('referentiels.geo.lire') || this.auth.can('referentiels.zones.lire');
+        return this.auth.can('referentiels.geo.synchroniser') || this.auth.can('referentiels.zones.ecrire');
       }
       return this.auth.can(i.permission);
     });

@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, permissionGuard } from './core/guards/auth.guard';
+import { authGuard, guestGuard, permissionAnyGuard, permissionGuard } from './core/guards/auth.guard';
 import { MainLayoutComponent } from './layout/main-layout/main-layout.component';
 
 export const routes: Routes = [
@@ -36,17 +36,30 @@ export const routes: Routes = [
         path: 'parametrages',
         loadComponent: () =>
           import('./pages/parametrages/parametrages-layout.page').then((m) => m.ParametragesLayoutPageComponent),
+        canActivate: [
+          permissionAnyGuard(
+            'auth.utilisateurs.lire',
+            'auth.roles.lire',
+            'auth.permissions.lire',
+            'auth.parametres.lire',
+            'audit.actions.lire',
+            'referentiels.geo.synchroniser',
+            'referentiels.zones.ecrire'
+          ),
+        ],
         children: [
           { path: '', redirectTo: 'utilisateurs', pathMatch: 'full' },
           {
             path: 'utilisateurs',
             loadComponent: () =>
               import('./pages/parametrages/parametrages-users.page').then((m) => m.ParametragesUsersPageComponent),
+            canActivate: [permissionGuard('auth.utilisateurs.lire')],
           },
           {
             path: 'roles',
             loadComponent: () =>
               import('./pages/parametrages/parametrages-roles.page').then((m) => m.ParametragesRolesPageComponent),
+            canActivate: [permissionGuard('auth.roles.lire')],
           },
           {
             path: 'permissions',
@@ -54,16 +67,19 @@ export const routes: Routes = [
               import('./pages/parametrages/parametrages-permissions.page').then(
                 (m) => m.ParametragesPermissionsPageComponent
               ),
+            canActivate: [permissionGuard('auth.permissions.lire')],
           },
           {
             path: 'systeme',
             loadComponent: () =>
               import('./pages/parametrages/parametrages-system.page').then((m) => m.ParametragesSystemPageComponent),
+            canActivate: [permissionGuard('auth.parametres.lire')],
           },
           {
             path: 'actions',
             loadComponent: () =>
               import('./pages/parametrages/parametrages-actions.page').then((m) => m.ParametragesActionsPageComponent),
+            canActivate: [permissionGuard('audit.actions.lire')],
           },
           {
             path: 'referentiels',
@@ -71,6 +87,9 @@ export const routes: Routes = [
               import('./pages/parametrages/parametrages-referentiels.page').then(
                 (m) => m.ParametragesReferentielsPageComponent
               ),
+            canActivate: [
+              permissionAnyGuard('referentiels.geo.synchroniser', 'referentiels.zones.ecrire'),
+            ],
           },
         ],
       },

@@ -37,12 +37,12 @@ export class AuthService {
   }
 
   can(permission: string): boolean {
-    if (this.roleCode() === 'ADMIN') return true;
+    if (this.roleCode() === 'SUPER_ADMIN') return true;
     return this.permissionCodes().includes(permission);
   }
 
   canAny(...permissions: string[]): boolean {
-    if (this.roleCode() === 'ADMIN') return true;
+    if (this.roleCode() === 'SUPER_ADMIN') return true;
     const codes = this.permissionCodes();
     return permissions.some((p) => codes.includes(p));
   }

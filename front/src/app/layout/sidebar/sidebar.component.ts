@@ -187,7 +187,7 @@ export class SidebarComponent implements OnInit {
           label: 'Référentiels',
           path: '/parametrages/referentiels',
           icon: 'bi bi-globe2',
-          permission: ['referentiels.geo.lire', 'referentiels.zones.lire'],
+          permission: ['referentiels.geo.synchroniser', 'referentiels.zones.ecrire'],
         },
         {
           label: 'Actions utilisateur',

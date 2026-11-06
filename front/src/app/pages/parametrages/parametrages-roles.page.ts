@@ -44,8 +44,10 @@ import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.com
         <app-section-card [title]="selectedRole() ? 'Permissions — ' + selectedRole()!.label : 'Permissions du rôle'">
           @if (!selectedRole()) {
             <p class="text-muted mb-0">Sélectionnez un rôle.</p>
+          } @else if (selectedRole()!.code === 'SUPER_ADMIN') {
+            <p class="text-muted mb-0">Le rôle super administrateur possède toutes les permissions.</p>
           } @else if (selectedRole()!.code === 'ADMIN') {
-            <p class="text-muted mb-0">Le rôle administrateur possède toutes les permissions.</p>
+            <p class="text-muted mb-0">Accès opérationnel (pilotage, agences), sans gestion des paramétrages.</p>
           } @else {
             @for (group of permissionGroups(); track group.module) {
               <div class="mb-3">
