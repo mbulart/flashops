@@ -373,7 +373,9 @@ function writeDetailSheet(
   const families = groupProductFamilies(products);
   for (const family of families) {
     const monthTotals = familyMonthTotals(family.members, months);
+    const cumulOn = pickCumulCarrier(family);
     for (const product of family.members) {
+      const showCumul = product === cumulOn;
       let productRows = 0;
       for (const mois of months) {
         const cell = product.byMonth.get(mois);
@@ -381,22 +383,17 @@ function writeDetailSheet(
         const montant = cell?.montant ?? 0;
         if (!volume && !montant) continue;
         const combined = monthTotals.get(mois) ?? { volume: 0, montant: 0 };
-        writeDetailDataRow(
-          ws,
-          cursor,
-          index,
-          [
-            productDisplayName(product),
-            product.module,
-            ecranDisplay(product.ecran) || '—',
-            product.partenaire || '—',
-            monthLabel(mois),
-            volume,
-            montant,
-            combined.volume,
-            combined.montant,
-          ]
-        );
+        writeDetailDataRow(ws, cursor, index, [
+          productDisplayName(product),
+          product.module,
+          ecranDisplay(product.ecran) || '—',
+          product.partenaire || '—',
+          monthLabel(mois),
+          volume,
+          montant,
+          showCumul ? combined.volume : '',
+          showCumul ? combined.montant : '',
+        ]);
         cursor += 1;
         index += 1;
         productRows += 1;
@@ -410,52 +407,10 @@ function writeDetailSheet(
         '',
         product.volume,
         product.montant,
-        family.volume,
-        family.montant,
+        showCumul ? family.volume : '',
+        showCumul ? family.montant : '',
       ]);
       cursor += 1;
-    }
-
-    if (family.members.length > 1) {
-      let combinedRows = 0;
-      for (const mois of months) {
-        const combined = monthTotals.get(mois);
-        if (!combined || (!combined.volume && !combined.montant)) continue;
-        writeDetailDataRow(
-          ws,
-          cursor,
-          index,
-          [
-            `${family.produit} — Envoi+Retrait`,
-            family.module,
-            'Envoi+Retrait',
-            '—',
-            monthLabel(mois),
-            combined.volume,
-            combined.montant,
-            combined.volume,
-            combined.montant,
-          ],
-          true
-        );
-        cursor += 1;
-        index += 1;
-        combinedRows += 1;
-      }
-      if (combinedRows) {
-        writeDetailTotalRow(ws, cursor, [
-          `Total ${family.produit} — Envoi+Retrait`,
-          '',
-          '',
-          '',
-          '',
-          family.volume,
-          family.montant,
-          family.volume,
-          family.montant,
-        ]);
-        cursor += 1;
-      }
     }
   }
 
@@ -513,6 +468,16 @@ function groupProductFamilies(products: ProductAgg[]): ProductFamily[] {
 
 function productFamilyKey(product: Pick<ProductAgg, 'module' | 'produit'>): string {
   return `${product.module}|${product.produit}`;
+}
+
+/** Cumuls Envoi+Retrait affichés une seule fois : priorité au bloc Envoi. */
+function pickCumulCarrier(family: ProductFamily): ProductAgg {
+  if (family.members.length === 1) return family.members[0];
+  const envoi = family.members.find((m) => {
+    const key = (m.ecran || '').trim().toLowerCase();
+    return key === 'envois' || key === 'envoi';
+  });
+  return envoi ?? family.members[0];
 }
 
 function familyMonthTotals(
