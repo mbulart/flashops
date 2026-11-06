@@ -20,6 +20,10 @@ public class PilotageFiltresService {
   }
 
   public PilotageDtos.FiltresResponse filtres(String domaine) {
+    return filtres(domaine, List.of());
+  }
+
+  public PilotageDtos.FiltresResponse filtres(String domaine, List<String> restrictProductKeys) {
     if (domaine == null || !DOMAINES.contains(domaine)) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "domaine invalide");
     }
@@ -28,8 +32,14 @@ public class PilotageFiltresService {
             .load(domaine)
             .orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "pilotage indisponible"));
+    var stream = snap.produits().stream();
+    if (restrictProductKeys != null && !restrictProductKeys.isEmpty()) {
+      stream =
+          stream.filter(
+              p -> productMatchesKeys(p.module(), p.produit(), restrictProductKeys));
+    }
     var produits =
-        snap.produits().stream()
+        stream
             .map(
                 p ->
                     new PilotageDtos.ProduitRow(
@@ -40,6 +50,28 @@ public class PilotageFiltresService {
             .map(t -> new PilotageDtos.TypeOperationRow(t.typeOperationId(), t.libelle()))
             .toList();
     return new PilotageDtos.FiltresResponse(produits, snap.categories(), types);
+  }
+
+  private static boolean productMatchesKeys(String module, String produit, List<String> keys) {
+    String m = normalizeKey(module);
+    String p = normalizeKey(produit);
+    for (String key : keys) {
+      String k = normalizeKey(key);
+      if (k.isEmpty()) {
+        continue;
+      }
+      if (m.equals(k) || p.equals(k) || m.contains(k) || p.contains(k)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static String normalizeKey(String raw) {
+    if (raw == null) {
+      return "";
+    }
+    return raw.trim().toUpperCase().replace(' ', '_').replace('-', '_');
   }
 
   public List<PilotageDtos.AgenceRow> searchAgences(

@@ -48,7 +48,13 @@ final class PilotageSqlScope {
     }
 
     sql.append(" WHERE 1=1");
-    PilotageProductRules.appendAggregateDomaines(alias, q.resolvedDomaines(), sql, args);
+    PilotageProductRules.appendAggregateDomaines(
+        alias,
+        q.resolvedDomaines(),
+        sql,
+        args,
+        q.extraProductKeys(),
+        q.transfertRestrictedToExtras());
 
     sql.append(" AND ").append(alias).append(".jour >= ?::date AND ").append(alias).append(".jour <= ?::date");
     args.add(q.from());
@@ -121,7 +127,12 @@ final class PilotageSqlScope {
     }
 
     sql.append(" WHERE p.produit_id <> 0");
-    PilotageProductRules.appendDimProduitDomaines("p", q.resolvedDomaines(), sql);
+    PilotageProductRules.appendDimProduitDomaines(
+        "p",
+        q.resolvedDomaines(),
+        sql,
+        q.extraProductKeys(),
+        q.transfertRestrictedToExtras());
     sql.append(" AND d.jour >= ?::date AND d.jour <= ?::date");
     args.add(q.from());
     args.add(q.to());
@@ -202,7 +213,13 @@ final class PilotageSqlScope {
     args.add(q.devise());
     sql.append(" WHERE g.mois = ?::date");
     args.add(moisIso);
-    PilotageProductRules.appendAggregateDomaines("g", q.resolvedDomaines(), sql, args);
+    PilotageProductRules.appendAggregateDomaines(
+        "g",
+        q.resolvedDomaines(),
+        sql,
+        args,
+        q.extraProductKeys(),
+        q.transfertRestrictedToExtras());
     appendCommonProductStatutFilters(q, "g", sql, args, false);
     return new ScopedSql(sql.toString(), args, false, null);
   }

@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -29,15 +30,23 @@ public class OpsUsersSeedInitializer implements ApplicationRunner {
     new SeedUser("a.mbelu@flash.one", "Amina Mbelu", "BGFI"),
   };
 
+  private static final String BENIE_EMAIL = "bnzeko@flash.one";
+  private static final String FLASH_TRANSFER_PERM = "pilotage.produit.flash_transfer";
+
   private final UtilisateurRepository utilisateurs;
   private final RoleRepository roles;
   private final PasswordEncoder passwordEncoder;
+  private final JdbcTemplate jdbc;
 
   public OpsUsersSeedInitializer(
-      UtilisateurRepository utilisateurs, RoleRepository roles, PasswordEncoder passwordEncoder) {
+      UtilisateurRepository utilisateurs,
+      RoleRepository roles,
+      PasswordEncoder passwordEncoder,
+      JdbcTemplate jdbc) {
     this.utilisateurs = utilisateurs;
     this.roles = roles;
     this.passwordEncoder = passwordEncoder;
+    this.jdbc = jdbc;
   }
 
   @Override
@@ -95,6 +104,26 @@ public class OpsUsersSeedInitializer implements ApplicationRunner {
     }
     if (created > 0 || updated > 0) {
       log.info("Seed ops terminé — créés={}, synchronisés={}", created, updated);
+    }
+    grantBenieFlashTransfer();
+  }
+
+  private void grantBenieFlashTransfer() {
+    int n =
+        jdbc.update(
+            """
+            INSERT INTO utilisateurs_permissions (utilisateur_id, permission_id)
+            SELECT u.id, p.id
+            FROM utilisateurs u
+            CROSS JOIN permissions p
+            WHERE lower(u.courriel) = ?
+              AND p.code = ?
+            ON CONFLICT DO NOTHING
+            """,
+            BENIE_EMAIL,
+            FLASH_TRANSFER_PERM);
+    if (n > 0) {
+      log.info("Permission {} accordée à {}", FLASH_TRANSFER_PERM, BENIE_EMAIL);
     }
   }
 

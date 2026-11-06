@@ -116,7 +116,12 @@ public class PilotageAnalyticsRepository {
       }
       body = body + " AND g.produit_id = ANY(?)";
       var domainFilter = new StringBuilder();
-      PilotageProductRules.appendDimProduitDomaines("p", q.resolvedDomaines(), domainFilter);
+      PilotageProductRules.appendDimProduitDomaines(
+          "p",
+          q.resolvedDomaines(),
+          domainFilter,
+          q.extraProductKeys(),
+          q.transfertRestrictedToExtras());
       body = body + domainFilter;
       var sql =
           new StringBuilder(
@@ -178,7 +183,12 @@ public class PilotageAnalyticsRepository {
       }
       body = body + " AND g.produit_id <> 0";
       var domainFilter = new StringBuilder();
-      PilotageProductRules.appendDimProduitDomaines("p", q.resolvedDomaines(), domainFilter);
+      PilotageProductRules.appendDimProduitDomaines(
+          "p",
+          q.resolvedDomaines(),
+          domainFilter,
+          q.extraProductKeys(),
+          q.transfertRestrictedToExtras());
       body = body + domainFilter;
       var sql =
           new StringBuilder(
@@ -236,7 +246,12 @@ public class PilotageAnalyticsRepository {
       }
       body = body + " AND g.produit_id <> 0";
       var domainFilter = new StringBuilder();
-      PilotageProductRules.appendDimProduitDomaines("p", q.resolvedDomaines(), domainFilter);
+      PilotageProductRules.appendDimProduitDomaines(
+          "p",
+          q.resolvedDomaines(),
+          domainFilter,
+          q.extraProductKeys(),
+          q.transfertRestrictedToExtras());
       body = body + domainFilter;
       var sql =
           new StringBuilder(

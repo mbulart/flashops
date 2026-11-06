@@ -18,7 +18,45 @@ public record PilotageBundleQuery(
     String jourFiltre,
     List<String> couloirCodes,
     PilotageAgenceFilterScope geoScope,
-    List<String> domaines) {
+    List<String> domaines,
+    List<String> extraProductKeys,
+    boolean transfertRestrictedToExtras) {
+
+  public PilotageBundleQuery(
+      String domaine,
+      String devise,
+      String from,
+      String to,
+      List<Integer> produitIds,
+      String ecran,
+      List<String> statutUniformes,
+      List<String> categories,
+      List<Integer> agenceIds,
+      List<Integer> agentIds,
+      List<Integer> typeOperationIds,
+      String jourFiltre,
+      List<String> couloirCodes,
+      PilotageAgenceFilterScope geoScope,
+      List<String> domaines) {
+    this(
+        domaine,
+        devise,
+        from,
+        to,
+        produitIds,
+        ecran,
+        statutUniformes,
+        categories,
+        agenceIds,
+        agentIds,
+        typeOperationIds,
+        jourFiltre,
+        couloirCodes,
+        geoScope,
+        domaines,
+        List.of(),
+        false);
+  }
 
   public List<String> resolvedDomaines() {
     List<String> list = PilotageProductRules.cleanDomaines(domaines);
@@ -78,7 +116,9 @@ public record PilotageBundleQuery(
         jourFiltre,
         couloirCodes,
         geoScope,
-        domaines);
+        domaines,
+        extraProductKeys,
+        transfertRestrictedToExtras);
   }
 
   public PilotageBundleQuery withAgenceIds(List<Integer> nextAgenceIds) {
@@ -97,7 +137,9 @@ public record PilotageBundleQuery(
         jourFiltre,
         couloirCodes,
         geoScope,
-        domaines);
+        domaines,
+        extraProductKeys,
+        transfertRestrictedToExtras);
   }
 
   public PilotageBundleQuery withGeoScope(PilotageAgenceFilterScope nextGeoScope) {
@@ -116,6 +158,29 @@ public record PilotageBundleQuery(
         jourFiltre,
         couloirCodes,
         nextGeoScope,
-        domaines);
+        domaines,
+        extraProductKeys,
+        transfertRestrictedToExtras);
+  }
+
+  public PilotageBundleQuery withProductAccess(List<String> keys, boolean restrictTransfert) {
+    return new PilotageBundleQuery(
+        domaine,
+        devise,
+        from,
+        to,
+        produitIds,
+        ecran,
+        statutUniformes,
+        categories,
+        agenceIds,
+        agentIds,
+        typeOperationIds,
+        jourFiltre,
+        couloirCodes,
+        geoScope,
+        domaines,
+        keys == null ? List.of() : List.copyOf(keys),
+        restrictTransfert);
   }
 }

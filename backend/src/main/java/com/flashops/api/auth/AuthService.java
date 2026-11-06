@@ -19,7 +19,9 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -228,18 +230,26 @@ public class AuthService {
   }
 
   private UserView toUserView(Utilisateur u) {
-    List<Permission> perms = permissions.findByRoleId(u.getRole().getId());
-    List<PermissionView> permViews =
-        perms.stream()
-            .map(
-                p ->
-                    new PermissionView(
-                        p.getId(),
-                        p.getCode(),
-                        p.getLibelle(),
-                        p.getModule() == null ? "general" : p.getModule()))
-            .toList();
-    List<String> codes = perms.stream().map(Permission::getCode).toList();
+    List<String> codes = permissions.findCodesForUser(u.getId());
+    List<Permission> rolePerms = permissions.findByRoleId(u.getRole().getId());
+    Map<String, Permission> byCode = new LinkedHashMap<>();
+    for (Permission p : rolePerms) {
+      byCode.put(p.getCode(), p);
+    }
+    List<PermissionView> permViews = new java.util.ArrayList<>();
+    for (String code : codes) {
+      Permission p = byCode.get(code);
+      if (p != null) {
+        permViews.add(
+            new PermissionView(
+                p.getId(),
+                p.getCode(),
+                p.getLibelle(),
+                p.getModule() == null ? "general" : p.getModule()));
+      } else {
+        permViews.add(new PermissionView(null, code, code, "pilotage"));
+      }
+    }
     RoleView role = new RoleView(u.getRole().getId(), u.getRole().getCode(), u.getRole().getLibelle());
     boolean hasPhoto = u.getPhotoFichier() != null && !u.getPhotoFichier().isBlank();
     UserDataScope scope = dataScope.resolve(u.getId());

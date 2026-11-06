@@ -291,7 +291,7 @@ function writeMatrixSheet(
   const colTotals = months.map(() => 0);
   products.forEach((product, index) => {
     const excelRow = ws.getRow(headerRow + 1 + index);
-    const values: (string | number)[] = [product.produit, product.module];
+    const values: (string | number)[] = [productDisplayName(product), product.module];
     let total = 0;
     months.forEach((mois, monthIndex) => {
       const value = product.byMonth.get(mois)?.[metric] ?? 0;
@@ -360,6 +360,7 @@ function writeDetailSheet(
   let cursor = headerRow + 1;
   let index = 0;
   for (const product of products) {
+    let productRows = 0;
     for (const mois of months) {
       const cell = product.byMonth.get(mois);
       const volume = cell?.volume ?? 0;
@@ -367,9 +368,9 @@ function writeDetailSheet(
       if (!volume && !montant) continue;
       const excelRow = ws.getRow(cursor);
       const values: (string | number)[] = [
-        product.produit,
+        productDisplayName(product),
         product.module,
-        product.ecran || '—',
+        ecranDisplay(product.ecran) || '—',
         product.partenaire || '—',
         monthLabel(mois),
         volume,
@@ -391,12 +392,40 @@ function writeDetailSheet(
       excelRow.height = 18;
       cursor += 1;
       index += 1;
+      productRows += 1;
     }
+    if (!productRows) continue;
+    const subtotal = ws.getRow(cursor);
+    [
+      `Total ${productDisplayName(product)}`,
+      '',
+      '',
+      '',
+      '',
+      product.volume,
+      product.montant,
+    ].forEach((value, i) => {
+      const c = subtotal.getCell(i + 1);
+      c.value = value;
+      c.fill = solid('FFFFF8E1');
+      c.font = { name: 'Calibri', bold: true, size: 10, color: { argb: BLACK } };
+      c.border = border();
+      if (i === 5) {
+        c.numFmt = '#,##0';
+        c.alignment = { horizontal: 'right', vertical: 'middle' };
+      }
+      if (i === 6) {
+        c.numFmt = '#,##0.00';
+        c.alignment = { horizontal: 'right', vertical: 'middle' };
+      }
+    });
+    subtotal.height = 18;
+    cursor += 1;
   }
   const totalVolume = products.reduce((sum, p) => sum + p.volume, 0);
   const totalMontant = products.reduce((sum, p) => sum + p.montant, 0);
   const totalRow = ws.getRow(cursor);
-  ['Total', '', '', '', '', totalVolume, totalMontant].forEach((value, i) => {
+  ['Total général', '', '', '', '', totalVolume, totalMontant].forEach((value, i) => {
     const c = totalRow.getCell(i + 1);
     c.value = value;
     c.fill = solid(TOTAL_BG);
@@ -409,10 +438,30 @@ function writeDetailSheet(
     from: { row: headerRow, column: 1 },
     to: { row: headerRow, column: headers.length },
   };
-  setWidths(ws, [28, 16, 14, 18, 14, 14, 18]);
+  setWidths(ws, [32, 16, 14, 18, 14, 14, 18]);
   const foot = cursor + 2;
   footer(ws, foot, headers.length, `${input.identity.code} · détail mensuel`);
   placeSignature(ws, foot + 2, signatureId, signature, input.appName);
+}
+
+function productDisplayName(product: Pick<ProductAgg, 'produit' | 'ecran'>): string {
+  const name = (product.produit || 'Non renseigné').trim();
+  const sens = ecranDisplay(product.ecran);
+  return sens ? `${name} — ${sens}` : name;
+}
+
+function ecranDisplay(ecran: string | undefined): string {
+  const key = (ecran || '').trim();
+  if (!key) return '';
+  const map: Record<string, string> = {
+    Envois: 'Envoi',
+    Retraits: 'Retrait',
+    Cashin: 'Cashin',
+    Cashout: 'Cashout',
+    TransfertFond: 'Transfert de fonds',
+    MobileMoney: 'Mobile Money',
+  };
+  return map[key] ?? key;
 }
 
 function aggregateProducts(rows: PilotageProductMonthlyRow[]): ProductAgg[] {
@@ -423,7 +472,10 @@ function aggregateProducts(rows: PilotageProductMonthlyRow[]): ProductAgg[] {
     if (!item) {
       item = {
         key,
-        label: [row.produit, row.ecran].filter(Boolean).join(' · '),
+        label: productDisplayName({
+          produit: row.produit || 'Non renseigné',
+          ecran: row.ecran || '',
+        }),
         module: row.module || '—',
         produit: row.produit || 'Non renseigné',
         ecran: row.ecran || '',

@@ -8,6 +8,8 @@ import com.flashops.api.pilotage.PilotageBundleQuery;
 import com.flashops.api.pilotage.PilotageDomainScope;
 import com.flashops.api.pilotage.PilotageFiltresService;
 import com.flashops.api.pilotage.PilotageMetaService;
+import com.flashops.api.pilotage.PilotageProductAccess;
+import com.flashops.api.pilotage.PilotageProductAccessService;
 import com.flashops.api.scope.UserDataScope;
 import com.flashops.api.scope.UserDataScopeService;
 import com.flashops.api.web.dto.GeoDtos;
@@ -31,6 +33,7 @@ public class PilotageController {
   private final PermissionGuard permissions;
   private final UserDataScopeService dataScope;
   private final PilotageDomainScope domainScope;
+  private final PilotageProductAccessService productAccess;
 
   public PilotageController(
       PilotageMetaService metaService,
@@ -38,20 +41,22 @@ public class PilotageController {
       PilotageAnalyticsService analyticsService,
       PermissionGuard permissions,
       UserDataScopeService dataScope,
-      PilotageDomainScope domainScope) {
+      PilotageDomainScope domainScope,
+      PilotageProductAccessService productAccess) {
     this.metaService = metaService;
     this.filtresService = filtresService;
     this.analyticsService = analyticsService;
     this.permissions = permissions;
     this.dataScope = dataScope;
     this.domainScope = domainScope;
+    this.productAccess = productAccess;
   }
 
   @GetMapping("/meta")
   public Map<String, PilotageDtos.MetaResponse> meta() {
     int userId = AuthSupport.currentUserId();
     permissions.require(userId, "dashboard.voir");
-    return Map.of("data", metaService.meta(domainScope.allowed(userId)));
+    return Map.of("data", metaService.meta(productAccess.resolve(userId).domains()));
   }
 
   @GetMapping("/bundle")
@@ -255,7 +260,13 @@ public class PilotageController {
   public Map<String, PilotageDtos.FiltresResponse> filtres(@RequestParam("domaine") String domaine) {
     int userId = AuthSupport.currentUserId();
     permissions.require(userId, "dashboard.voir");
-    return Map.of("data", filtresService.filtres(domainScope.require(userId, domaine)));
+    PilotageProductAccess access = productAccess.resolve(userId);
+    String resolved = productAccess.restrictDomains(userId, List.of(domaine)).get(0);
+    return Map.of(
+        "data",
+        filtresService.filtres(
+            resolved,
+            access.transfertRestrictedToExtras() ? access.extraProductKeys() : List.of()));
   }
 
   @GetMapping("/agences/{agenceId:\\d+}")
@@ -439,7 +450,8 @@ public class PilotageController {
   public Map<String, List<PilotageDtos.CouloirRow>> couloirs(@RequestParam("domaine") String domaine) {
     int userId = AuthSupport.currentUserId();
     permissions.require(userId, "dashboard.voir");
-    return Map.of("data", filtresService.listCouloirs(domainScope.require(userId, domaine)));
+    String resolved = productAccess.restrictDomains(userId, List.of(domaine)).get(0);
+    return Map.of("data", filtresService.listCouloirs(resolved));
   }
 
   @GetMapping("/reseau/regions")
@@ -485,10 +497,11 @@ public class PilotageController {
       List<Integer> communeId) {
     int userId = AuthSupport.currentUserId();
     UserDataScope scope = dataScope.resolve(userId);
+    PilotageProductAccess access = productAccess.resolve(userId);
     List<Integer> zones = scope.intersectZones(zoneId);
     var query =
         PilotageBundleParams.toQuery(
-            domainScope.restrict(userId, domaines),
+            productAccess.restrictDomains(userId, domaines),
             devise,
             from,
             to,
@@ -508,7 +521,9 @@ public class PilotageController {
             villeId,
             territoireId,
             communeId);
-    return query.withAgenceIds(scope.intersectAgences(query.agenceIds()));
+    return query
+        .withAgenceIds(scope.intersectAgences(query.agenceIds()))
+        .withProductAccess(access.extraProductKeys(), access.transfertRestrictedToExtras());
   }
 
   private PilotageAgenceFilterScope scopedGeo(PilotageAgenceFilterScope geo, int userId) {
