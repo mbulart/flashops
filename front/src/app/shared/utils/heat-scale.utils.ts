@@ -34,19 +34,19 @@ export function heatIntensity(value: number, min: number, max: number): number {
   return Math.min(1, Math.max(0, (value - min) / (max - min)));
 }
 
-/** Carte + heatmap journalière : orange (faible) → vert (fort). */
+/** Carte + heatmap journalière : rouge sang (faible) → vert luisant (fort). */
 export function mapHeatColor(intensity: number): string {
   const x = Math.min(1, Math.max(0, intensity));
-  const hue = Math.round(lerpHeat(28, 120, x));
-  const sat = Math.round(lerpHeat(92, 72, x));
-  const light = Math.round(lerpHeat(52, 42, x));
+  const hue = Math.round(lerpHeat(0, 142, x));
+  const sat = Math.round(lerpHeat(96, 92, x));
+  const light = Math.round(lerpHeat(42, 52, x));
   return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
 export function mapHeatStrokeColor(intensity: number): string {
   const x = Math.min(1, Math.max(0, intensity));
-  const hue = Math.round(lerpHeat(28, 120, x));
-  const sat = Math.round(lerpHeat(85, 70, x));
-  const light = Math.round(lerpHeat(38, 30, x));
+  const hue = Math.round(lerpHeat(0, 142, x));
+  const sat = Math.round(lerpHeat(90, 88, x));
+  const light = Math.round(lerpHeat(30, 36, x));
   return `hsl(${hue}, ${sat}%, ${light}%)`;
 }

@@ -698,7 +698,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
               }
             </app-section-card>
 
-            <app-section-card title="Heatmap journalière" subtitle="Orange = faible · Vert = fort sur la période">
+            <app-section-card title="Heatmap journalière" subtitle="Rouge = faible · Vert = fort sur la période">
               <div actions class="pilotage-chart-toolbar">
                 <div class="btn-group btn-group-sm pilotage-chart-toggle" role="group" aria-label="Métrique heatmap">
                   <button
