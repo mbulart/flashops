@@ -216,6 +216,65 @@ public class PilotageAnalyticsRepository {
     }
   }
 
+  /** Volume et valeur par mois pour chaque produit du périmètre (sans limite). */
+  public List<ProductMonthlyRow> loadProductMonthly(PilotageBundleQuery q) {
+    try {
+      if (q.couloirOnFact()) {
+        return loadFaitProductMonthly(q);
+      }
+      Grain grain = resolveGrain(q);
+      var scoped = PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), grain.joinAgence(), grain.agent());
+      var fromWhere = scoped.fromAndWhere();
+      var joinProduit = " INNER JOIN pilotage.dim_produit AS p ON p.produit_id = g.produit_id";
+      String body;
+      if (fromWhere.contains(" WHERE 1=1")) {
+        body = fromWhere.replace(" WHERE 1=1", joinProduit + " WHERE 1=1");
+      } else if (fromWhere.contains(" WHERE p.produit_id <> 0")) {
+        body = fromWhere.replace(" WHERE p.produit_id <> 0", joinProduit + " WHERE p.produit_id <> 0");
+      } else {
+        body = fromWhere + joinProduit;
+      }
+      body = body + " AND g.produit_id <> 0";
+      var domainFilter = new StringBuilder();
+      PilotageProductRules.appendDimProduitDomaines("p", q.resolvedDomaines(), domainFilter);
+      body = body + domainFilter;
+      var sql =
+          new StringBuilder(
+              """
+              SELECT to_char(date_trunc('month', g.jour::date), 'YYYY-MM') AS mois,
+                     g.produit_id,
+                     coalesce(nullif(btrim(p.module), ''), '?') AS module,
+                     coalesce(nullif(btrim(p.produit), ''), 'Non renseigné') AS produit,
+                     coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
+                     coalesce(nullif(btrim(p.partenaire), ''), '') AS partenaire,
+                     coalesce(sum(g.nb), 0)::bigint AS nb,
+                     coalesce(sum(g.montant), 0) AS montant
+              """);
+      sql.append(body);
+      sql.append(
+          """
+           GROUP BY 1, g.produit_id, p.module, p.produit, p.ecran, p.partenaire
+           ORDER BY 1, sum(g.montant) DESC, sum(g.nb) DESC
+          """);
+      return jdbc.query(
+          sql.toString(),
+          (rs, rowNum) ->
+              new ProductMonthlyRow(
+                  rs.getString("mois"),
+                  rs.getInt("produit_id"),
+                  rs.getString("module"),
+                  rs.getString("produit"),
+                  rs.getString("ecran"),
+                  rs.getString("partenaire"),
+                  rs.getLong("nb"),
+                  rs.getBigDecimal("montant")),
+          scoped.args().toArray());
+    } catch (DataAccessException ex) {
+      log.error("Ventilation mensuelle produits indisponible", ex);
+      return List.of();
+    }
+  }
+
   public Optional<MonthCompareRow> loadMonthCompare(PilotageBundleQuery q, String moisIso) {
     try {
       if (q.hasCouloir()) {
@@ -326,6 +385,39 @@ public class PilotageAnalyticsRepository {
                 rs.getLong("nb"),
                 rs.getBigDecimal("montant")),
         args.toArray());
+  }
+
+  private List<ProductMonthlyRow> loadFaitProductMonthly(PilotageBundleQuery q) {
+    var scoped = PilotageSqlScope.buildFait(jdbc, q);
+    var sql =
+        """
+        SELECT to_char(date_trunc('month', d.jour::date), 'YYYY-MM') AS mois,
+               f.produit_id,
+               coalesce(nullif(btrim(p.module), ''), '?') AS module,
+               coalesce(nullif(btrim(p.produit), ''), 'Non renseigné') AS produit,
+               coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
+               coalesce(nullif(btrim(p.partenaire), ''), '') AS partenaire,
+               count(*)::bigint AS nb,
+               coalesce(sum(f.montant), 0) AS montant
+        """
+            + scoped.fromAndWhere()
+            + """
+             GROUP BY 1, f.produit_id, p.module, p.produit, p.ecran, p.partenaire
+             ORDER BY 1, sum(f.montant) DESC, count(*) DESC
+            """;
+    return jdbc.query(
+        sql,
+        (rs, rowNum) ->
+            new ProductMonthlyRow(
+                rs.getString("mois"),
+                rs.getInt("produit_id"),
+                rs.getString("module"),
+                rs.getString("produit"),
+                rs.getString("ecran"),
+                rs.getString("partenaire"),
+                rs.getLong("nb"),
+                rs.getBigDecimal("montant")),
+        scoped.args().toArray());
   }
 
   private List<ProductRow> loadFaitProducts(PilotageBundleQuery q) {
@@ -1055,6 +1147,16 @@ public class PilotageAnalyticsRepository {
       BigDecimal montant) {}
 
   public record ProductRow(
+      int produitId,
+      String module,
+      String produit,
+      String ecran,
+      String partenaire,
+      long nb,
+      BigDecimal montant) {}
+
+  public record ProductMonthlyRow(
+      String mois,
       int produitId,
       String module,
       String produit,

@@ -1,7 +1,16 @@
 import { CommonModule, Location } from '@angular/common';
 import { HttpParams } from '@angular/common/http';
 import { ChartConfiguration } from 'chart.js';
-import { Component, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  HostListener,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { ActivatedRoute, ParamMap } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import { FormsModule } from '@angular/forms';
@@ -67,6 +76,8 @@ import {
   PilotageSeriesGranularity,
 } from './pilotage-charts.util';
 import { downloadPilotageExcel } from './pilotage-excel.export';
+import { downloadPilotageProduitsMensuelExcel } from './pilotage-produits-mensuel.export';
+import { buildPilotageReportIdentity } from './pilotage-report-identity';
 
 const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
   { code: 'transfert', label: 'Transferts' },
@@ -815,14 +826,64 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                   <option [ngValue]="size">{{ size }} / page</option>
                 }
               </select>
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-dark"
-                [disabled]="exportingExcel()"
-                (click)="exportAgences()"
-              >
-                <i class="bi bi-download me-1"></i>{{ exportingExcel() ? 'Export…' : 'Exporter' }}
-              </button>
+              <div class="pilotage-export-collapse" [class.is-open]="exportMenuOpen()">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-dark"
+                  [disabled]="exportingExcel()"
+                  [attr.aria-expanded]="exportMenuOpen()"
+                  aria-controls="pilotage-export-panel"
+                  (click)="toggleExportMenu($event)"
+                >
+                  <i class="bi bi-download me-1"></i>
+                  {{ exportingExcel() ? 'Export…' : 'Exporter' }}
+                  <i
+                    class="bi ms-1"
+                    [class.bi-chevron-up]="exportMenuOpen()"
+                    [class.bi-chevron-down]="!exportMenuOpen()"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+                @if (exportMenuOpen()) {
+                  <div
+                    id="pilotage-export-panel"
+                    class="pilotage-export-collapse__panel shadow-sm"
+                    role="menu"
+                    (click)="$event.stopPropagation()"
+                  >
+                    <button
+                      type="button"
+                      class="pilotage-export-collapse__item"
+                      role="menuitem"
+                      [disabled]="exportingExcel()"
+                      (click)="exportAgences()"
+                    >
+                      <span class="pilotage-export-collapse__item-title">
+                        <i class="bi bi-building me-2" aria-hidden="true"></i>
+                        Agences et opérations
+                      </span>
+                      <span class="pilotage-export-collapse__item-desc">
+                        Classement agences, détail des opérations et analyses.
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      class="pilotage-export-collapse__item"
+                      role="menuitem"
+                      [disabled]="exportingExcel()"
+                      (click)="exportProduitsMensuel()"
+                    >
+                      <span class="pilotage-export-collapse__item-title">
+                        <i class="bi bi-calendar3 me-2" aria-hidden="true"></i>
+                        Produits par mois
+                      </span>
+                      <span class="pilotage-export-collapse__item-desc">
+                        Volume et valeur mensuels par produit, totaux et graphique Flash.
+                      </span>
+                    </button>
+                  </div>
+                }
+              </div>
             </div>
             @if (agencyLoading() || bundleLoading()) {
               <app-skeleton type="table" [rows]="6" [cols]="4" />
@@ -904,6 +965,68 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
     }
   `,
   styles: `
+    .pilotage-export-collapse {
+      position: relative;
+    }
+
+    .pilotage-export-collapse__panel {
+      position: absolute;
+      top: calc(100% + 0.35rem);
+      right: 0;
+      z-index: 30;
+      width: min(22rem, 80vw);
+      padding: 0.35rem;
+      border: 1px solid var(--card-border);
+      border-radius: 0.65rem;
+      background: var(--card-bg);
+    }
+
+    .pilotage-export-collapse__item {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.2rem;
+      width: 100%;
+      margin: 0;
+      padding: 0.7rem 0.8rem;
+      border: 0;
+      border-radius: 0.5rem;
+      background: transparent;
+      color: var(--text-primary);
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .pilotage-export-collapse__item:hover:not(:disabled),
+    .pilotage-export-collapse__item:focus-visible {
+      background: var(--flash-gray-100, rgba(0, 0, 0, 0.04));
+      outline: none;
+    }
+
+    .pilotage-export-collapse__item:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .pilotage-export-collapse__item-title {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .pilotage-export-collapse__item-desc {
+      font-size: 0.75rem;
+      line-height: 1.35;
+      color: var(--text-muted);
+    }
+
+    :host-context([data-bs-theme='dark']) .pilotage-export-collapse__item:hover:not(:disabled),
+    :host-context([data-bs-theme='dark']) .pilotage-export-collapse__item:focus-visible {
+      background: #2a2a2a;
+    }
+
     .pilotage-export-loader {
       position: fixed;
       inset: 0;
@@ -1047,6 +1170,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   readonly bundleLoading = signal(false);
   readonly bundleError = signal(false);
   readonly exportingExcel = signal(false);
+  readonly exportMenuOpen = signal(false);
   readonly agencyPageSizes = [5, 10, 20, 50];
   readonly agencyOrder = signal<'top' | 'pire'>('top');
   readonly agencyPageSize = signal(10);
@@ -1563,24 +1687,54 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     if (c.modePaiement === 'cash') chips.push('Cash');
     if (c.modePaiement === 'momo') chips.push('Mobile money');
     if (c.sousProduit) chips.push(pilotagePartenaireLabel(c.sousProduit));
-    if (c.ecran && (c.domaines ?? [c.domaine]).includes('transfert')) {
-      const label = this.sensTransfertOptions.find((e) => e.id === c.ecran)?.label;
-      if (label) chips.push(`Sens : ${label}`);
+    if (c.ecran) {
+      const domaines = c.domaines?.length ? c.domaines : [c.domaine];
+      const ecranDomain = domaines.find((d) => d === 'transfert' || d === 'monnaie');
+      if (ecranDomain) {
+        const label = pilotageEcransForDomain(ecranDomain).find((e) => e.id === c.ecran)?.label;
+        if (label) {
+          chips.push(ecranDomain === 'monnaie' ? `Type : ${label}` : `Sens : ${label}`);
+        }
+      }
     }
-    if (c.statutUniformes.length) chips.push(`${c.statutUniformes.length} statut(s)`);
-    if (c.categories.length) chips.push(`${c.categories.length} catégorie(s)`);
-    if (c.agenceIds.length) chips.push(`${c.agenceIds.length} agence(s)`);
-    if (c.agentIds.length) chips.push(`${c.agentIds.length} agent(s)`);
-    if (c.typeOperationIds.length) chips.push(`${c.typeOperationIds.length} type(s) op.`);
+    if (c.statutUniformes.length) {
+      chips.push(
+        c.statutUniformes.length === 1
+          ? `Statut : ${c.statutUniformes[0]}`
+          : `${c.statutUniformes.length} statut(s)`
+      );
+    }
+    if (c.categories.length) {
+      chips.push(
+        c.categories.length === 1
+          ? `Catégorie : ${c.categories[0]}`
+          : `${c.categories.length} catégorie(s)`
+      );
+    }
+    if (c.agenceIds.length) {
+      chips.push(
+        c.agenceIds.length === 1 ? '1 agence sélectionnée' : `${c.agenceIds.length} agences`
+      );
+    }
+    if (c.agentIds.length) {
+      chips.push(c.agentIds.length === 1 ? '1 agent sélectionné' : `${c.agentIds.length} agents`);
+    }
+    if (c.typeOperationIds.length) {
+      chips.push(
+        c.typeOperationIds.length === 1
+          ? '1 type d’opération'
+          : `${c.typeOperationIds.length} types d’opération`
+      );
+    }
     if (c.jourFiltre === 'hors_weekend') chips.push('Hors week-end');
-    if (c.jourFiltre === 'feries') chips.push('Fériés');
-    if (c.jourFiltre === 'par_mois') chips.push('Par mois');
+    if (c.jourFiltre === 'feries') chips.push('Jours fériés');
+    if (c.jourFiltre === 'par_mois') chips.push('Vue par mois');
     const loc = c.locationLabels;
-    if (loc.pays) chips.push(loc.pays);
-    if (loc.province) chips.push(loc.province);
-    if (loc.ville) chips.push(loc.ville);
-    if (loc.territoire) chips.push(loc.territoire);
-    if (loc.commune) chips.push(loc.commune);
+    if (loc.pays) chips.push(`Pays : ${loc.pays}`);
+    if (loc.province) chips.push(`Province : ${loc.province}`);
+    if (loc.ville) chips.push(`Ville : ${loc.ville}`);
+    if (loc.territoire) chips.push(`Territoire : ${loc.territoire}`);
+    if (loc.commune) chips.push(`Commune : ${loc.commune}`);
     if (loc.region) chips.push(`Région : ${loc.region}`);
     if (loc.zone) chips.push(`Zone : ${loc.zone}`);
     if (c.couloirCodes.length === 1) {
@@ -1590,6 +1744,17 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
       chips.push(`${c.couloirCodes.length} corridors`);
     }
     return chips;
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.exportMenuOpen()) this.exportMenuOpen.set(false);
+  }
+
+  toggleExportMenu(event: Event): void {
+    event.stopPropagation();
+    if (this.exportingExcel()) return;
+    this.exportMenuOpen.update((open) => !open);
   }
 
   applyPreset(id: PeriodPresetId): void {
@@ -1790,37 +1955,32 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     const criteria = this.criteria();
     const bundle = this.bundle();
     if (!criteria || !bundle || this.exportingExcel()) return;
+    this.exportMenuOpen.set(false);
     this.exportingExcel.set(true);
     this.exportProgress.set(3);
     this.startExportCreep();
     this.pilotage.loadExport(criteria, (ratio) => this.bumpExportProgress(ratio * 100)).subscribe({
       next: (data) => {
-        const domaines = criteria.domaines?.length ? criteria.domaines : [criteria.domaine];
-        const title = `Pilotage ${this.domainesLabel(domaines)} · ${criteria.devise}`;
-        const period = `${this.formatDateFr(criteria.from)} — ${this.formatDateFr(criteria.to)}`;
-        const chips = this.optionalScopeChips(criteria);
-        const subtitle = [period, ...chips].join(' · ');
+        const identity = this.buildExportIdentity('agences', criteria);
         const settings = this.appSettings.settings();
         const logo = settings.logo_light || '/branding/logo-light1.png';
-        downloadPilotageExcel({
-          filename: `pilotage-agences-${domaines.join('-')}-${criteria.from}-${criteria.to}.xlsx`,
-          title,
-          subtitle,
-          meta: [
-            { label: 'Domaine', value: this.domainesLabel(domaines) },
-            { label: 'Devise', value: criteria.devise },
-            { label: 'Période', value: period },
-            ...chips.map((chip) => ({ label: 'Filtre', value: chip })),
-          ],
-          bundle,
-          agencies: data.agencies,
-          lignes: data.lignes,
-          lignesTronquees: data.lignesTronquees,
-          lignesLimite: data.lignesLimite,
-          logoUrl: logo,
-          appName: settings.app_name || 'Flash OPS',
-          faviconUrl: settings.favicon || '/branding/logo-light1.png',
-        }, (percent) => this.bumpExportProgress(percent))
+        downloadPilotageExcel(
+          {
+            filename: identity.filename,
+            title: identity.title,
+            subtitle: identity.subtitle,
+            meta: identity.meta,
+            bundle,
+            agencies: data.agencies,
+            lignes: data.lignes,
+            lignesTronquees: data.lignesTronquees,
+            lignesLimite: data.lignesLimite,
+            logoUrl: logo,
+            appName: settings.app_name || 'Flash OPS',
+            faviconUrl: settings.favicon || '/branding/logo-light1.png',
+          },
+          (percent) => this.bumpExportProgress(percent)
+        )
           .then(() => {
             if (data.lignesTronquees) {
               this.toast.warning(
@@ -1835,6 +1995,61 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
         this.finishExport();
         this.toast.error('Export Excel impossible.');
       },
+    });
+  }
+
+  exportProduitsMensuel(): void {
+    const criteria = this.criteria();
+    if (!criteria || this.exportingExcel()) return;
+    this.exportMenuOpen.set(false);
+    this.exportingExcel.set(true);
+    this.exportProgress.set(3);
+    this.startExportCreep();
+    this.pilotage
+      .loadProduitsMensuel(criteria, (ratio) => this.bumpExportProgress(ratio * 100))
+      .subscribe({
+        next: (data) => {
+          const identity = this.buildExportIdentity('produits-mensuel', criteria);
+          const settings = this.appSettings.settings();
+          downloadPilotageProduitsMensuelExcel(
+            {
+              identity,
+              from: data.from || criteria.from,
+              to: data.to || criteria.to,
+              devise: data.devise || criteria.devise,
+              rows: data.rows,
+              logoUrl: settings.logo_light || '/branding/logo-light1.png',
+              appName: settings.app_name || 'Flash OPS',
+              faviconUrl: settings.favicon || '/branding/logo-light1.png',
+            },
+            (percent) => this.bumpExportProgress(percent)
+          )
+            .then(() => {
+              if (!data.rows.length) {
+                this.toast.warning('Aucune donnée produit pour ce périmètre.');
+              }
+            })
+            .catch(() => this.toast.error('Export produits mensuel impossible.'))
+            .finally(() => this.finishExport());
+        },
+        error: () => {
+          this.finishExport();
+          this.toast.error('Export produits mensuel impossible.');
+        },
+      });
+  }
+
+  private buildExportIdentity(
+    kind: 'agences' | 'produits-mensuel',
+    criteria: PilotageCriteria
+  ) {
+    const domaines = criteria.domaines?.length ? criteria.domaines : [criteria.domaine];
+    return buildPilotageReportIdentity({
+      kind,
+      criteria,
+      domainesLabel: this.domainesLabel(domaines),
+      period: `${this.formatDateFr(criteria.from)} — ${this.formatDateFr(criteria.to)}`,
+      chips: this.optionalScopeChips(criteria),
     });
   }
 

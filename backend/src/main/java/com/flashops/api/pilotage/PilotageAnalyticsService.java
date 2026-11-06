@@ -231,6 +231,26 @@ public class PilotageAnalyticsService {
     return new PilotageDtos.ExportResponse(agencies, rows, lignes.truncated(), lignes.limit());
   }
 
+  public PilotageDtos.ProduitsMensuelExport exportProduitsMensuel(PilotageBundleQuery q) {
+    validate(q);
+    var rows =
+        repository.loadProductMonthly(q).stream()
+            .map(
+                r ->
+                    new PilotageDtos.ProductMonthlyPoint(
+                        r.mois(),
+                        r.produitId(),
+                        r.module(),
+                        r.produit(),
+                        r.ecran(),
+                        r.partenaire(),
+                        r.nb(),
+                        r.montant()))
+            .toList();
+    return new PilotageDtos.ProduitsMensuelExport(
+        q.from(), q.to(), String.join(",", q.resolvedDomaines()), q.devise(), rows);
+  }
+
   private static java.util.List<PilotageDtos.AgenceRank> toAgenceRanks(
       java.util.List<PilotageAnalyticsRepository.AgenceRankRow> rows) {
     return rows.stream()

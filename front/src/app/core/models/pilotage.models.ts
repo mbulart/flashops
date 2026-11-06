@@ -178,6 +178,25 @@ export interface PilotageExport {
   lignesLimite: number;
 }
 
+export interface PilotageProductMonthlyRow {
+  mois: string;
+  produitId: number;
+  module: string;
+  produit: string;
+  ecran: string;
+  partenaire?: string;
+  volume: number;
+  montant: number;
+}
+
+export interface PilotageProduitsMensuelExport {
+  from: string;
+  to: string;
+  domaine: string;
+  devise: string;
+  rows: PilotageProductMonthlyRow[];
+}
+
 export interface PilotageAgenceRank {
   agenceId: number;
   codeAgence: string;

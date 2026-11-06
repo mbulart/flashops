@@ -95,6 +95,23 @@ public final class PilotageDtos {
       boolean lignesTronquees,
       int lignesLimite) {}
 
+  public record ProductMonthlyPoint(
+      String mois,
+      @JsonProperty("produit_id") int produitId,
+      String module,
+      String produit,
+      String ecran,
+      String partenaire,
+      long volume,
+      java.math.BigDecimal montant) {}
+
+  public record ProduitsMensuelExport(
+      String from,
+      String to,
+      String domaine,
+      String devise,
+      java.util.List<ProductMonthlyPoint> rows) {}
+
   public record AgenceRank(
       int agenceId,
       @JsonProperty("code_agence") String codeAgence,

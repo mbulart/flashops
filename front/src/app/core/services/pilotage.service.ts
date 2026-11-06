@@ -19,6 +19,8 @@ import {
   PilotageDomaine,
   PilotageExport,
   PilotageLigneExport,
+  PilotageProduitsMensuelExport,
+  PilotageProductMonthlyRow,
   PilotageFiltres,
   PilotageMeta,
   PilotageProductSlice,
@@ -163,6 +165,32 @@ export class PilotageService {
         }),
         filter((event): event is HttpResponse<{ data: PilotageExport }> => event.type === HttpEventType.Response),
         map((event) => normalizeExport(event.body!.data))
+      );
+  }
+
+  loadProduitsMensuel(criteria: PilotageCriteria, onProgress?: (ratio: number) => void) {
+    const params = this.criteriaParams(criteria);
+    return this.http
+      .get<{ data: PilotageProduitsMensuelExport }>(`${this.baseUrl}/export/produits-mensuel`, {
+        params,
+        reportProgress: true,
+        observe: 'events',
+      })
+      .pipe(
+        tap((event) => {
+          if (!onProgress || event.type !== HttpEventType.DownloadProgress) return;
+          const total = event.total ?? 0;
+          if (total > 0) {
+            onProgress(Math.min(0.82, (event.loaded / total) * 0.82));
+            return;
+          }
+          onProgress(Math.min(0.55, event.loaded / (event.loaded + 120_000)));
+        }),
+        filter(
+          (event): event is HttpResponse<{ data: PilotageProduitsMensuelExport }> =>
+            event.type === HttpEventType.Response
+        ),
+        map((event) => normalizeProduitsMensuel(event.body!.data))
       );
   }
 
@@ -516,6 +544,29 @@ function normalizeAgenceClassement(raw: PilotageAgenceClassementPage | null | un
     page: Number(raw?.page ?? 1),
     size: Number(raw?.size ?? 10),
     items: (raw?.items ?? []).map((row) => normalizeAgenceRank(row)),
+  };
+}
+
+function normalizeProduitsMensuel(raw: PilotageProduitsMensuelExport): PilotageProduitsMensuelExport {
+  const rows = (raw.rows ?? []).map((row) => {
+    const item = row as PilotageProductMonthlyRow & { produit_id?: number };
+    return {
+      mois: item.mois ?? '',
+      produitId: Number(item.produitId ?? item.produit_id ?? 0),
+      module: item.module ?? '',
+      produit: item.produit ?? '',
+      ecran: item.ecran ?? '',
+      partenaire: item.partenaire ?? '',
+      volume: Number(item.volume ?? 0),
+      montant: Number(item.montant ?? 0),
+    };
+  });
+  return {
+    from: raw.from,
+    to: raw.to,
+    domaine: raw.domaine,
+    devise: raw.devise,
+    rows,
   };
 }
 
