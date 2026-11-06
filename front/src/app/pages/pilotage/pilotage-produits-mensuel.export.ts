@@ -350,13 +350,6 @@ function writeDetailSheet(
   signatureId: number | undefined,
   signature: Logo | null
 ): void {
-  const productMonthVolume = buildProductMonthVolume(products);
-  const productFamilyVolume = new Map<string, number>();
-  for (const [key, volume] of productMonthVolume) {
-    const family = key.slice(0, key.lastIndexOf('|'));
-    productFamilyVolume.set(family, (productFamilyVolume.get(family) ?? 0) + volume);
-  }
-
   const headers = [
     'Produit',
     'Module',
@@ -364,8 +357,9 @@ function writeDetailSheet(
     'Partenaire',
     'Mois',
     'Volume',
-    'Volume produit',
     `Valeur (${input.devise})`,
+    'Volume Envoi+Retrait',
+    `Valeur Envoi+Retrait (${input.devise})`,
   ];
   const ws = workbook.addWorksheet('Détail', {
     views: [{ showGridLines: false, state: 'frozen', ySplit: 7 }],
@@ -375,111 +369,221 @@ function writeDetailSheet(
   writeHeader(ws, headerRow, headers);
   let cursor = headerRow + 1;
   let index = 0;
-  for (const product of products) {
-    const familyKey = productFamilyKey(product);
-    let productRows = 0;
-    for (const mois of months) {
-      const cell = product.byMonth.get(mois);
-      const volume = cell?.volume ?? 0;
-      const montant = cell?.montant ?? 0;
-      if (!volume && !montant) continue;
-      const volumeProduit = productMonthVolume.get(`${familyKey}|${mois}`) ?? volume;
-      const excelRow = ws.getRow(cursor);
-      const values: (string | number)[] = [
-        productDisplayName(product),
-        product.module,
-        ecranDisplay(product.ecran) || '—',
-        product.partenaire || '—',
-        monthLabel(mois),
-        volume,
-        volumeProduit,
-        montant,
-      ];
-      values.forEach((value, i) => {
-        const c = excelRow.getCell(i + 1);
-        c.value = value;
-        styleBody(c, index);
-        if (i === 5 || i === 6) {
-          c.numFmt = '#,##0';
-          c.alignment = { horizontal: 'right', vertical: 'middle' };
-        }
-        if (i === 7) {
-          c.numFmt = '#,##0.00';
-          c.alignment = { horizontal: 'right', vertical: 'middle' };
-        }
-      });
-      excelRow.height = 18;
+
+  const families = groupProductFamilies(products);
+  for (const family of families) {
+    const monthTotals = familyMonthTotals(family.members, months);
+    for (const product of family.members) {
+      let productRows = 0;
+      for (const mois of months) {
+        const cell = product.byMonth.get(mois);
+        const volume = cell?.volume ?? 0;
+        const montant = cell?.montant ?? 0;
+        if (!volume && !montant) continue;
+        const combined = monthTotals.get(mois) ?? { volume: 0, montant: 0 };
+        writeDetailDataRow(
+          ws,
+          cursor,
+          index,
+          [
+            productDisplayName(product),
+            product.module,
+            ecranDisplay(product.ecran) || '—',
+            product.partenaire || '—',
+            monthLabel(mois),
+            volume,
+            montant,
+            combined.volume,
+            combined.montant,
+          ]
+        );
+        cursor += 1;
+        index += 1;
+        productRows += 1;
+      }
+      if (!productRows) continue;
+      writeDetailTotalRow(ws, cursor, [
+        `Total ${productDisplayName(product)}`,
+        '',
+        '',
+        '',
+        '',
+        product.volume,
+        product.montant,
+        family.volume,
+        family.montant,
+      ]);
       cursor += 1;
-      index += 1;
-      productRows += 1;
     }
-    if (!productRows) continue;
-    const subtotal = ws.getRow(cursor);
-    [
-      `Total ${productDisplayName(product)}`,
-      '',
-      '',
-      '',
-      '',
-      product.volume,
-      productFamilyVolume.get(familyKey) ?? product.volume,
-      product.montant,
-    ].forEach((value, i) => {
-      const c = subtotal.getCell(i + 1);
-      c.value = value;
-      c.fill = solid('FFFFF8E1');
-      c.font = { name: 'Calibri', bold: true, size: 10, color: { argb: BLACK } };
-      c.border = border();
-      if (i === 5 || i === 6) {
-        c.numFmt = '#,##0';
-        c.alignment = { horizontal: 'right', vertical: 'middle' };
+
+    if (family.members.length > 1) {
+      let combinedRows = 0;
+      for (const mois of months) {
+        const combined = monthTotals.get(mois);
+        if (!combined || (!combined.volume && !combined.montant)) continue;
+        writeDetailDataRow(
+          ws,
+          cursor,
+          index,
+          [
+            `${family.produit} — Envoi+Retrait`,
+            family.module,
+            'Envoi+Retrait',
+            '—',
+            monthLabel(mois),
+            combined.volume,
+            combined.montant,
+            combined.volume,
+            combined.montant,
+          ],
+          true
+        );
+        cursor += 1;
+        index += 1;
+        combinedRows += 1;
       }
-      if (i === 7) {
-        c.numFmt = '#,##0.00';
-        c.alignment = { horizontal: 'right', vertical: 'middle' };
+      if (combinedRows) {
+        writeDetailTotalRow(ws, cursor, [
+          `Total ${family.produit} — Envoi+Retrait`,
+          '',
+          '',
+          '',
+          '',
+          family.volume,
+          family.montant,
+          family.volume,
+          family.montant,
+        ]);
+        cursor += 1;
       }
-    });
-    subtotal.height = 18;
-    cursor += 1;
+    }
   }
+
   const totalVolume = products.reduce((sum, p) => sum + p.volume, 0);
   const totalMontant = products.reduce((sum, p) => sum + p.montant, 0);
-  const totalRow = ws.getRow(cursor);
-  ['Total général', '', '', '', '', totalVolume, totalVolume, totalMontant].forEach((value, i) => {
-    const c = totalRow.getCell(i + 1);
-    c.value = value;
-    c.fill = solid(TOTAL_BG);
-    c.font = { name: 'Calibri', bold: true, size: 10, color: { argb: BLACK } };
-    c.border = border();
-    if (i === 5 || i === 6) c.numFmt = '#,##0';
-    if (i === 7) c.numFmt = '#,##0.00';
-  });
+  writeDetailTotalRow(
+    ws,
+    cursor,
+    ['Total général', '', '', '', '', totalVolume, totalMontant, totalVolume, totalMontant],
+    TOTAL_BG
+  );
   ws.autoFilter = {
     from: { row: headerRow, column: 1 },
     to: { row: headerRow, column: headers.length },
   };
-  setWidths(ws, [32, 16, 14, 18, 14, 14, 16, 18]);
+  setWidths(ws, [34, 14, 14, 16, 14, 12, 16, 18, 22]);
   const foot = cursor + 2;
   footer(ws, foot, headers.length, `${input.identity.code} · détail mensuel`);
   placeSignature(ws, foot + 2, signatureId, signature, input.appName);
 }
 
-/** Clé famille = même produit/module (Envoi + Retrait regroupés). */
+interface ProductFamily {
+  key: string;
+  module: string;
+  produit: string;
+  members: ProductAgg[];
+  volume: number;
+  montant: number;
+}
+
+function groupProductFamilies(products: ProductAgg[]): ProductFamily[] {
+  const map = new Map<string, ProductFamily>();
+  const order: string[] = [];
+  for (const product of products) {
+    const key = productFamilyKey(product);
+    let family = map.get(key);
+    if (!family) {
+      family = {
+        key,
+        module: product.module,
+        produit: product.produit,
+        members: [],
+        volume: 0,
+        montant: 0,
+      };
+      map.set(key, family);
+      order.push(key);
+    }
+    family.members.push(product);
+    family.volume += product.volume;
+    family.montant += product.montant;
+  }
+  return order.map((key) => map.get(key)!);
+}
+
 function productFamilyKey(product: Pick<ProductAgg, 'module' | 'produit'>): string {
   return `${product.module}|${product.produit}`;
 }
 
-/** Volume Envoi+Retrait (tous écrans) par produit et par mois. */
-function buildProductMonthVolume(products: ProductAgg[]): Map<string, number> {
-  const map = new Map<string, number>();
-  for (const product of products) {
-    const family = productFamilyKey(product);
-    for (const [mois, cell] of product.byMonth) {
-      const key = `${family}|${mois}`;
-      map.set(key, (map.get(key) ?? 0) + (cell.volume || 0));
+function familyMonthTotals(
+  members: ProductAgg[],
+  months: string[]
+): Map<string, { volume: number; montant: number }> {
+  const map = new Map<string, { volume: number; montant: number }>();
+  for (const mois of months) {
+    let volume = 0;
+    let montant = 0;
+    for (const product of members) {
+      const cell = product.byMonth.get(mois);
+      volume += cell?.volume ?? 0;
+      montant += cell?.montant ?? 0;
     }
+    if (volume || montant) map.set(mois, { volume, montant });
   }
   return map;
+}
+
+function writeDetailDataRow(
+  ws: ExcelSheet,
+  rowNumber: number,
+  index: number,
+  values: (string | number)[],
+  emphasize = false
+): void {
+  const excelRow = ws.getRow(rowNumber);
+  values.forEach((value, i) => {
+    const c = excelRow.getCell(i + 1);
+    c.value = value;
+    styleBody(c, index);
+    if (emphasize) {
+      c.fill = solid('FFFFF8E1');
+      c.font = { name: 'Calibri', bold: true, size: 10, color: { argb: BLACK } };
+    }
+    if (i === 5 || i === 7) {
+      c.numFmt = '#,##0';
+      c.alignment = { horizontal: 'right', vertical: 'middle' };
+    }
+    if (i === 6 || i === 8) {
+      c.numFmt = '#,##0.00';
+      c.alignment = { horizontal: 'right', vertical: 'middle' };
+    }
+  });
+  excelRow.height = 18;
+}
+
+function writeDetailTotalRow(
+  ws: ExcelSheet,
+  rowNumber: number,
+  values: (string | number)[],
+  bg = 'FFFFF8E1'
+): void {
+  const row = ws.getRow(rowNumber);
+  values.forEach((value, i) => {
+    const c = row.getCell(i + 1);
+    c.value = value;
+    c.fill = solid(bg);
+    c.font = { name: 'Calibri', bold: true, size: 10, color: { argb: BLACK } };
+    c.border = border();
+    if (i === 5 || i === 7) {
+      c.numFmt = '#,##0';
+      c.alignment = { horizontal: 'right', vertical: 'middle' };
+    }
+    if (i === 6 || i === 8) {
+      c.numFmt = '#,##0.00';
+      c.alignment = { horizontal: 'right', vertical: 'middle' };
+    }
+  });
+  row.height = 18;
 }
 
 function productDisplayName(product: Pick<ProductAgg, 'produit' | 'ecran'>): string {
