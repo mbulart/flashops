@@ -350,7 +350,23 @@ function writeDetailSheet(
   signatureId: number | undefined,
   signature: Logo | null
 ): void {
-  const headers = ['Produit', 'Module', 'Écran', 'Partenaire', 'Mois', 'Volume', `Valeur (${input.devise})`];
+  const productMonthVolume = buildProductMonthVolume(products);
+  const productFamilyVolume = new Map<string, number>();
+  for (const [key, volume] of productMonthVolume) {
+    const family = key.slice(0, key.lastIndexOf('|'));
+    productFamilyVolume.set(family, (productFamilyVolume.get(family) ?? 0) + volume);
+  }
+
+  const headers = [
+    'Produit',
+    'Module',
+    'Écran',
+    'Partenaire',
+    'Mois',
+    'Volume',
+    'Volume produit',
+    `Valeur (${input.devise})`,
+  ];
   const ws = workbook.addWorksheet('Détail', {
     views: [{ showGridLines: false, state: 'frozen', ySplit: 7 }],
   });
@@ -360,12 +376,14 @@ function writeDetailSheet(
   let cursor = headerRow + 1;
   let index = 0;
   for (const product of products) {
+    const familyKey = productFamilyKey(product);
     let productRows = 0;
     for (const mois of months) {
       const cell = product.byMonth.get(mois);
       const volume = cell?.volume ?? 0;
       const montant = cell?.montant ?? 0;
       if (!volume && !montant) continue;
+      const volumeProduit = productMonthVolume.get(`${familyKey}|${mois}`) ?? volume;
       const excelRow = ws.getRow(cursor);
       const values: (string | number)[] = [
         productDisplayName(product),
@@ -374,17 +392,18 @@ function writeDetailSheet(
         product.partenaire || '—',
         monthLabel(mois),
         volume,
+        volumeProduit,
         montant,
       ];
       values.forEach((value, i) => {
         const c = excelRow.getCell(i + 1);
         c.value = value;
         styleBody(c, index);
-        if (i === 5) {
+        if (i === 5 || i === 6) {
           c.numFmt = '#,##0';
           c.alignment = { horizontal: 'right', vertical: 'middle' };
         }
-        if (i === 6) {
+        if (i === 7) {
           c.numFmt = '#,##0.00';
           c.alignment = { horizontal: 'right', vertical: 'middle' };
         }
@@ -403,6 +422,7 @@ function writeDetailSheet(
       '',
       '',
       product.volume,
+      productFamilyVolume.get(familyKey) ?? product.volume,
       product.montant,
     ].forEach((value, i) => {
       const c = subtotal.getCell(i + 1);
@@ -410,11 +430,11 @@ function writeDetailSheet(
       c.fill = solid('FFFFF8E1');
       c.font = { name: 'Calibri', bold: true, size: 10, color: { argb: BLACK } };
       c.border = border();
-      if (i === 5) {
+      if (i === 5 || i === 6) {
         c.numFmt = '#,##0';
         c.alignment = { horizontal: 'right', vertical: 'middle' };
       }
-      if (i === 6) {
+      if (i === 7) {
         c.numFmt = '#,##0.00';
         c.alignment = { horizontal: 'right', vertical: 'middle' };
       }
@@ -425,23 +445,41 @@ function writeDetailSheet(
   const totalVolume = products.reduce((sum, p) => sum + p.volume, 0);
   const totalMontant = products.reduce((sum, p) => sum + p.montant, 0);
   const totalRow = ws.getRow(cursor);
-  ['Total général', '', '', '', '', totalVolume, totalMontant].forEach((value, i) => {
+  ['Total général', '', '', '', '', totalVolume, totalVolume, totalMontant].forEach((value, i) => {
     const c = totalRow.getCell(i + 1);
     c.value = value;
     c.fill = solid(TOTAL_BG);
     c.font = { name: 'Calibri', bold: true, size: 10, color: { argb: BLACK } };
     c.border = border();
-    if (i === 5) c.numFmt = '#,##0';
-    if (i === 6) c.numFmt = '#,##0.00';
+    if (i === 5 || i === 6) c.numFmt = '#,##0';
+    if (i === 7) c.numFmt = '#,##0.00';
   });
   ws.autoFilter = {
     from: { row: headerRow, column: 1 },
     to: { row: headerRow, column: headers.length },
   };
-  setWidths(ws, [32, 16, 14, 18, 14, 14, 18]);
+  setWidths(ws, [32, 16, 14, 18, 14, 14, 16, 18]);
   const foot = cursor + 2;
   footer(ws, foot, headers.length, `${input.identity.code} · détail mensuel`);
   placeSignature(ws, foot + 2, signatureId, signature, input.appName);
+}
+
+/** Clé famille = même produit/module (Envoi + Retrait regroupés). */
+function productFamilyKey(product: Pick<ProductAgg, 'module' | 'produit'>): string {
+  return `${product.module}|${product.produit}`;
+}
+
+/** Volume Envoi+Retrait (tous écrans) par produit et par mois. */
+function buildProductMonthVolume(products: ProductAgg[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const product of products) {
+    const family = productFamilyKey(product);
+    for (const [mois, cell] of product.byMonth) {
+      const key = `${family}|${mois}`;
+      map.set(key, (map.get(key) ?? 0) + (cell.volume || 0));
+    }
+  }
+  return map;
 }
 
 function productDisplayName(product: Pick<ProductAgg, 'produit' | 'ecran'>): string {
