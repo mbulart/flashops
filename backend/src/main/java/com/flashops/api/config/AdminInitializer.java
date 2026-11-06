@@ -11,6 +11,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @Order(24)
@@ -36,6 +37,7 @@ public class AdminInitializer implements ApplicationRunner {
   }
 
   @Override
+  @Transactional
   public void run(ApplicationArguments args) {
     String email = props.admin().email().trim().toLowerCase();
     if (email.isBlank() || LEGACY_EMAIL.equals(email)) {

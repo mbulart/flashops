@@ -14,7 +14,7 @@ public interface JetonActualisationRepository extends JpaRepository<JetonActuali
   @EntityGraph(attributePaths = {"utilisateur", "utilisateur.role"})
   Optional<JetonActualisation> findByEmpreinteJetonAndRevoqueLeIsNull(String empreinteJeton);
 
-  @Modifying(clearAutomatically = true)
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query(
       """
       UPDATE JetonActualisation j

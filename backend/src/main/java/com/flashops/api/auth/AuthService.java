@@ -113,7 +113,7 @@ public class AuthService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid current password");
     }
     applyPasswordHash(u, next);
-    utilisateurs.save(u);
+    utilisateurs.saveAndFlush(u);
     jetons.revokeAllActiveByUtilisateurId(userId, Instant.now());
   }
 
