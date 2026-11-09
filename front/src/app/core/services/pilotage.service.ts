@@ -211,12 +211,16 @@ export class PilotageService {
     criteria: PilotageCriteria,
     page: number,
     size: number,
-    partyQuery = ''
+    partyQuery = '',
+    options?: { export?: boolean }
   ) {
     let params = this.criteriaParams(criteria).set('page', String(page)).set('size', String(size));
     const partie = partyQuery.trim();
     if (partie) {
       params = params.set('partie', partie);
+    }
+    if (options?.export) {
+      params = params.set('export', 'true');
     }
     return this.http
       .get<{ data: PilotageAgenceTransactionsPage }>(`${this.baseUrl}/agences/${agenceId}/transactions`, { params })
@@ -484,11 +488,13 @@ function normalizeAgenceFiche(raw: PilotageAgenceFiche): PilotageAgenceFiche {
 }
 
 function normalizeAgenceTransactions(raw: PilotageAgenceTransactionsPage): PilotageAgenceTransactionsPage {
+  const page = raw as PilotageAgenceTransactionsPage & { montant_total?: number };
   return {
     total: Number(raw?.total ?? 0),
     page: Number(raw?.page ?? 1),
     size: Number(raw?.size ?? 10),
     moyenne: Number(raw?.moyenne ?? 0),
+    montantTotal: Number(page?.montantTotal ?? page?.montant_total ?? 0),
     lignes: (raw?.lignes ?? []).map((line) => {
       const row = line as PilotageAgenceTransaction & { operation_id?: number };
       return {
@@ -497,6 +503,7 @@ function normalizeAgenceTransactions(raw: PilotageAgenceTransactionsPage): Pilot
         heure: row.heure ?? '',
         produit: row.produit ?? '',
         ecran: row.ecran ?? '',
+        operateur: row.operateur ?? '',
         expediteur: row.expediteur ?? '',
         beneficiaire: row.beneficiaire ?? '',
         statut: row.statut ?? '',

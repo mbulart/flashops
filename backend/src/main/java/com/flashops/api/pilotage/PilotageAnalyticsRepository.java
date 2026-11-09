@@ -536,7 +536,17 @@ public class PilotageAnalyticsRepository {
    */
   public AgenceTransactions loadAgenceTransactions(
       PilotageBundleQuery q, int agenceId, int page, int size, String partyQuery) {
-    int safeSize = Math.min(Math.max(size, 1), 50);
+    return loadAgenceTransactions(q, agenceId, page, size, partyQuery, false);
+  }
+
+  public AgenceTransactions loadAgenceTransactions(
+      PilotageBundleQuery q,
+      int agenceId,
+      int page,
+      int size,
+      String partyQuery,
+      boolean exportAll) {
+    int safeSize = Math.min(Math.max(size, 1), exportAll ? 5_000 : 50);
     int safePage = Math.max(page, 1);
     long offset = (long) (safePage - 1) * safeSize;
     if (offset > 200_000L) {
@@ -556,8 +566,13 @@ public class PilotageAnalyticsRepository {
     }
     var stats =
         jdbc.queryForObject(
-            "SELECT count(*)::bigint AS total, coalesce(avg(f.montant), 0) AS moyenne " + scope,
-            (rs, rowNum) -> new AgenceTxStats(rs.getLong("total"), rs.getBigDecimal("moyenne")),
+            "SELECT count(*)::bigint AS total,"
+                + " coalesce(avg(f.montant), 0) AS moyenne,"
+                + " coalesce(sum(f.montant), 0) AS montant_total "
+                + scope,
+            (rs, rowNum) ->
+                new AgenceTxStats(
+                    rs.getLong("total"), rs.getBigDecimal("moyenne"), rs.getBigDecimal("montant_total")),
             args.toArray());
     var sql =
         """
@@ -572,12 +587,16 @@ public class PilotageAnalyticsRepository {
                ) AS heure,
                coalesce(nullif(btrim(p.produit), ''), '') AS produit,
                coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
+               coalesce(nullif(btrim(agent.nom), ''), '') AS operateur,
                coalesce(nullif(btrim(f.expediteur), ''), '') AS expediteur,
                coalesce(nullif(btrim(f.beneficiaire), ''), '') AS beneficiaire,
                coalesce(s.statut_uniforme, '') AS statut,
                f.montant
         """
-            + scope
+            + scope.replace(
+                " FROM pilotage.fait_operation AS f",
+                " FROM pilotage.fait_operation AS f"
+                    + " LEFT JOIN pilotage.dim_agent AS agent ON agent.agent_id = f.agent_id")
             + """
              ORDER BY d.jour DESC, coalesce(f.date_operation, d.jour::timestamp) DESC, f.operation_id DESC
              LIMIT ? OFFSET ?
@@ -588,7 +607,9 @@ public class PilotageAnalyticsRepository {
     var rows = jdbc.query(sql, this::mapAgenceTransaction, pageArgs.toArray());
     long total = stats == null ? 0L : stats.total();
     BigDecimal moyenne = stats == null || stats.moyenne() == null ? BigDecimal.ZERO : stats.moyenne();
-    return new AgenceTransactions(total, safePage, safeSize, moyenne, rows);
+    BigDecimal montantTotal =
+        stats == null || stats.montantTotal() == null ? BigDecimal.ZERO : stats.montantTotal();
+    return new AgenceTransactions(total, safePage, safeSize, moyenne, montantTotal, rows);
   }
 
   public List<AgenceRankRow> loadTopAgences(PilotageBundleQuery q, int limit) {
@@ -930,12 +951,14 @@ public class PilotageAnalyticsRepository {
     String expediteur = rs.getString("expediteur");
     String beneficiaire = rs.getString("beneficiaire");
     String ecran = rs.getString("ecran");
+    String operateur = rs.getString("operateur");
     return new AgenceTransactionRow(
         rs.getLong("operation_id"),
         rs.getString("jour"),
         heure == null ? "" : heure,
         rs.getString("produit"),
         ecran == null ? "" : ecran,
+        operateur == null ? "" : operateur,
         expediteur == null ? "" : expediteur,
         beneficiaire == null ? "" : beneficiaire,
         rs.getString("statut"),
@@ -1209,15 +1232,21 @@ public class PilotageAnalyticsRepository {
       String heure,
       String produit,
       String ecran,
+      String operateur,
       String expediteur,
       String beneficiaire,
       String statut,
       BigDecimal montant) {}
 
   public record AgenceTransactions(
-      long total, int page, int size, BigDecimal moyenne, List<AgenceTransactionRow> rows) {}
+      long total,
+      int page,
+      int size,
+      BigDecimal moyenne,
+      BigDecimal montantTotal,
+      List<AgenceTransactionRow> rows) {}
 
-  private record AgenceTxStats(long total, BigDecimal moyenne) {}
+  private record AgenceTxStats(long total, BigDecimal moyenne, BigDecimal montantTotal) {}
 
   public record AgenceRankRow(
       int agenceId,

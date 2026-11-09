@@ -173,6 +173,7 @@ public final class PilotageDtos {
       String heure,
       String produit,
       String ecran,
+      String operateur,
       String expediteur,
       String beneficiaire,
       String statut,
@@ -183,5 +184,6 @@ public final class PilotageDtos {
       int page,
       int size,
       java.math.BigDecimal moyenne,
+      java.math.BigDecimal montantTotal,
       java.util.List<AgenceTransaction> lignes) {}
 }

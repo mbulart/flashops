@@ -37,6 +37,7 @@ import {
 import { SkeletonComponent } from '../../../shared/components/skeleton/skeleton.component';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { formatNumberFr, formatValeurFr } from '../../../shared/utils/format.utils';
+import { downloadPilotageAgencyTxExcel } from '../pilotage-agency-tx.export';
 import {
   PILOTAGE_STATUT_OPTIONS,
   PilotageEcranOption,
@@ -151,19 +152,34 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
               <div>
                 <h3 id="agency-tx-title" class="sheet-kicker">Transactions</h3>
               </div>
-              <label class="tx-size">
-                <span class="visually-hidden">Lignes par page</span>
-                <select
-                  class="form-select form-select-sm"
-                  [ngModel]="pageSize()"
-                  (ngModelChange)="setPageSize($event)"
-                  [disabled]="txLoading()"
+              <div class="tx-head__actions">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-secondary"
+                  [disabled]="txLoading() || txExporting() || !(txPage()?.total)"
+                  (click)="exportExcel()"
                 >
-                  @for (size of pageSizes; track size) {
-                    <option [ngValue]="size">{{ size }} / page</option>
+                  @if (txExporting()) {
+                    Export…
+                  } @else {
+                    <i class="bi bi-file-earmark-excel" aria-hidden="true"></i>
+                    Excel
                   }
-                </select>
-              </label>
+                </button>
+                <label class="tx-size">
+                  <span class="visually-hidden">Lignes par page</span>
+                  <select
+                    class="form-select form-select-sm"
+                    [ngModel]="pageSize()"
+                    (ngModelChange)="setPageSize($event)"
+                    [disabled]="txLoading()"
+                  >
+                    @for (size of pageSizes; track size) {
+                      <option [ngValue]="size">{{ size }} / page</option>
+                    }
+                  </select>
+                </label>
+              </div>
             </div>
 
             <div class="tx-filters">
@@ -301,8 +317,25 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
               </div>
             </div>
 
+            @if (txPage() && !txError()) {
+              <div class="tx-totals" aria-live="polite">
+                <div class="tx-total">
+                  <span class="tx-total__label">Volume</span>
+                  <strong class="tx-total__value">{{ formatNumberFr(txPage()!.total) }}</strong>
+                </div>
+                <div class="tx-total">
+                  <span class="tx-total__label">Montant total</span>
+                  <strong class="tx-total__value">{{ formatValeurFr(txPage()!.montantTotal, appliedDevise) }}</strong>
+                </div>
+                <div class="tx-total">
+                  <span class="tx-total__label">Ticket moyen</span>
+                  <strong class="tx-total__value">{{ formatValeurFr(txPage()!.moyenne, appliedDevise) }}</strong>
+                </div>
+              </div>
+            }
+
             @if (txLoading() && !txPage()) {
-              <app-skeleton type="table" [rows]="5" [cols]="7" />
+              <app-skeleton type="table" [rows]="5" [cols]="8" />
             } @else if (txError()) {
               <p class="tx-empty">Transactions indisponibles.</p>
             } @else if (!txPage()?.lignes?.length) {
@@ -314,6 +347,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                     <tr>
                       <th>Date</th>
                       <th>Produit</th>
+                      <th>Opérateur</th>
                       <th>{{ partyFromLabel() }}</th>
                       <th>{{ partyToLabel() }}</th>
                       <th>ID</th>
@@ -331,6 +365,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                           }
                         </td>
                         <td class="clip" [title]="tx.produit || '—'">{{ tx.produit || '—' }}</td>
+                        <td class="clip" [title]="tx.operateur || '—'">{{ tx.operateur || '—' }}</td>
                         <td class="clip" [title]="tx.expediteur || '—'">{{ tx.expediteur || '—' }}</td>
                         <td class="clip" [title]="tx.beneficiaire || '—'">{{ tx.beneficiaire || '—' }}</td>
                         <td class="nowrap font-monospace tx-id">{{ tx.operationId }}</td>
@@ -537,6 +572,46 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
       gap: 0.75rem;
     }
 
+    .tx-head__actions {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .tx-totals {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.45rem;
+      margin: 0 0 0.75rem;
+    }
+
+    .tx-total {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      padding: 0.55rem 0.7rem;
+      border-radius: 0.55rem;
+      border: 1px solid color-mix(in srgb, #ffd500 55%, var(--card-border, #e5e7eb));
+      background: color-mix(in srgb, #ffd500 28%, var(--card-bg, #fff));
+    }
+
+    .tx-total__label {
+      font-size: 0.68rem;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-muted, #6b7280);
+    }
+
+    .tx-total__value {
+      font-size: 0.95rem;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+      color: var(--flash-black, #111);
+      line-height: 1.2;
+    }
+
     .tx-filters {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
@@ -715,6 +790,10 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
+      .tx-totals {
+        grid-template-columns: 1fr;
+      }
+
       .agency-modal {
         padding: 0.5rem;
         align-items: stretch;
@@ -751,6 +830,7 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
   readonly ficheLoading = signal(false);
   readonly txPage = signal<PilotageAgenceTransactionsPage | null>(null);
   readonly txLoading = signal(false);
+  readonly txExporting = signal(false);
   readonly txError = signal(false);
   readonly page = signal(1);
   readonly pageSize = signal(10);
@@ -1172,6 +1252,48 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
     this.loadTransactions();
   }
 
+  exportExcel(): void {
+    const current = this.txPage();
+    if (!current?.total || this.txExporting()) return;
+    const agenceId = this.agency.agenceId;
+    const criteria = this.txCriteria();
+    const party = this.appliedPartyQuery;
+    const devise = this.appliedDevise;
+    const limit = 5000;
+    this.txExporting.set(true);
+    this.pilotage.loadAgenceTransactions(agenceId, criteria, 1, limit, party, { export: true }).subscribe({
+      next: async (page) => {
+        try {
+          const truncated = page.total > page.lignes.length;
+          const safeName = (this.title() || 'agence').replace(/[^\w\-]+/g, '_').slice(0, 40);
+          await downloadPilotageAgencyTxExcel({
+            filename: `transactions_${safeName}_${this.appliedFrom}_${this.appliedTo}.xlsx`,
+            title: `Transactions — ${this.title()}`,
+            subtitle: `${this.formatJour(this.appliedFrom)} – ${this.formatJour(this.appliedTo)} · ${devise} · ${this.domainesSummary()} · ${formatNumberFr(page.total)} transaction(s)`,
+            devise,
+            total: page.total,
+            montantTotal: page.montantTotal,
+            rows: page.lignes,
+            truncated,
+          });
+          if (truncated) {
+            this.toast.warning(`Export limité à ${formatNumberFr(limit)} lignes sur ${formatNumberFr(page.total)}.`);
+          } else {
+            this.toast.success('Export Excel prêt.');
+          }
+        } catch {
+          this.toast.error('Export Excel impossible.');
+        } finally {
+          this.txExporting.set(false);
+        }
+      },
+      error: () => {
+        this.txExporting.set(false);
+        this.toast.error('Export Excel impossible.');
+      },
+    });
+  }
+
   private flashPaymentSelected(): boolean {
     const choice = this.productChoices().find((item) => item.module.trim().toUpperCase() === 'FLASHPAYMENT');
     return !!choice && this.draftProduitIds.includes(choice.id);
@@ -1363,7 +1485,7 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
       !!this.appliedModePaiement ||
       !!this.appliedSousProduit;
     if (productCascade && !produitIds.length) {
-      this.txPage.set({ total: 0, page: 1, size: this.pageSize(), moyenne: 0, lignes: [] });
+      this.txPage.set({ total: 0, page: 1, size: this.pageSize(), moyenne: 0, montantTotal: 0, lignes: [] });
       this.txLoading.set(false);
       this.txError.set(false);
       return;

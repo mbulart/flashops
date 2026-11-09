@@ -302,7 +302,8 @@ public class PilotageController {
       @RequestParam(value = "commune_id", required = false) List<Integer> communeId,
       @RequestParam(value = "partie", required = false) String partie,
       @RequestParam(value = "page", defaultValue = "1") int page,
-      @RequestParam(value = "size", defaultValue = "10") int size) {
+      @RequestParam(value = "size", defaultValue = "10") int size,
+      @RequestParam(value = "export", defaultValue = "false") boolean export) {
     int userId = AuthSupport.currentUserId();
     permissions.require(userId, "dashboard.voir");
     dataScope.requireAgenceAccess(userId, agenceId);
@@ -328,7 +329,8 @@ public class PilotageController {
             villeId,
             territoireId,
             communeId);
-    return Map.of("data", analyticsService.agenceTransactions(query, agenceId, page, size, partie));
+    return Map.of(
+        "data", analyticsService.agenceTransactions(query, agenceId, page, size, partie, export));
   }
 
   @GetMapping("/agences/geo-all")

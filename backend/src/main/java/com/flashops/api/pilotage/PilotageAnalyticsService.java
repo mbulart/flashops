@@ -170,12 +170,22 @@ public class PilotageAnalyticsService {
 
   public PilotageDtos.AgenceTransactionsPage agenceTransactions(
       PilotageBundleQuery q, int agenceId, int page, int size, String partyQuery) {
+    return agenceTransactions(q, agenceId, page, size, partyQuery, false);
+  }
+
+  public PilotageDtos.AgenceTransactionsPage agenceTransactions(
+      PilotageBundleQuery q,
+      int agenceId,
+      int page,
+      int size,
+      String partyQuery,
+      boolean export) {
     validate(q);
     if (agenceId <= 0) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "agence invalide");
     }
     try {
-      var pageData = repository.loadAgenceTransactions(q, agenceId, page, size, partyQuery);
+      var pageData = repository.loadAgenceTransactions(q, agenceId, page, size, partyQuery, export);
       var lignes =
           pageData.rows().stream()
               .map(
@@ -186,13 +196,19 @@ public class PilotageAnalyticsService {
                           r.heure(),
                           r.produit(),
                           r.ecran(),
+                          r.operateur(),
                           r.expediteur(),
                           r.beneficiaire(),
                           r.statut(),
                           r.montant()))
               .toList();
       return new PilotageDtos.AgenceTransactionsPage(
-          pageData.total(), pageData.page(), pageData.size(), pageData.moyenne(), lignes);
+          pageData.total(),
+          pageData.page(),
+          pageData.size(),
+          pageData.moyenne(),
+          pageData.montantTotal(),
+          lignes);
     } catch (DataAccessException ex) {
       throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "pilotage indisponible");
     }

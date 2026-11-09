@@ -242,6 +242,7 @@ export interface PilotageAgenceTransaction {
   heure: string;
   produit: string;
   ecran: string;
+  operateur: string;
   expediteur: string;
   beneficiaire: string;
   statut: string;
@@ -253,6 +254,7 @@ export interface PilotageAgenceTransactionsPage {
   page: number;
   size: number;
   moyenne: number;
+  montantTotal: number;
   lignes: PilotageAgenceTransaction[];
 }
 
