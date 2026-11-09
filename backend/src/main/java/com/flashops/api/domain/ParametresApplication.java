@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
@@ -59,6 +60,9 @@ public class ParametresApplication {
 
   @Column(name = "smtp_test_to", nullable = false)
   private String smtpTestTo;
+
+  @Column(name = "taux_change_usd_cdf", nullable = false, precision = 18, scale = 6)
+  private BigDecimal tauxChangeUsdCdf = BigDecimal.ZERO;
 
   @Column(name = "modifie_le", nullable = false)
   private Instant modifieLe;
@@ -193,6 +197,14 @@ public class ParametresApplication {
 
   public void setSmtpTestTo(String smtpTestTo) {
     this.smtpTestTo = smtpTestTo;
+  }
+
+  public BigDecimal getTauxChangeUsdCdf() {
+    return tauxChangeUsdCdf;
+  }
+
+  public void setTauxChangeUsdCdf(BigDecimal tauxChangeUsdCdf) {
+    this.tauxChangeUsdCdf = tauxChangeUsdCdf;
   }
 
   public Instant getModifieLe() {

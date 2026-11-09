@@ -11,7 +11,7 @@ import { SectionCardComponent } from '../../shared/components/section-card/secti
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 import { BrandingImageFieldComponent } from './components/branding-image-field.component';
 
-type SettingsTab = 'identity' | 'smtp' | 'datetime';
+type SettingsTab = 'identity' | 'smtp' | 'change' | 'datetime';
 
 @Component({
   selector: 'app-parametrages-system',
@@ -21,6 +21,7 @@ type SettingsTab = 'identity' | 'smtp' | 'datetime';
     <nav class="parametrages-inner-nav nav" aria-label="Réglages système">
       <button type="button" class="nav-link" [class.active]="tab() === 'identity'" (click)="tab.set('identity')">Identité</button>
       <button type="button" class="nav-link" [class.active]="tab() === 'smtp'" (click)="tab.set('smtp')">SMTP</button>
+      <button type="button" class="nav-link" [class.active]="tab() === 'change'" (click)="tab.set('change')">Taux de change</button>
       <button type="button" class="nav-link" [class.active]="tab() === 'datetime'" (click)="tab.set('datetime')">Heure et date</button>
     </nav>
 
@@ -139,6 +140,29 @@ type SettingsTab = 'identity' | 'smtp' | 'datetime';
           </app-section-card>
         }
 
+        @if (tab() === 'change') {
+          <app-section-card title="Taux de change">
+            <p class="text-muted small mb-3">
+              Ce taux sera utilisé pour les conversions monétaires dans les autres modules.
+            </p>
+            <div class="row g-3 parametrages-form-grid">
+              <div class="col-md-6">
+                <label class="form-label" for="sys-taux">1 USD = … CDF</label>
+                <input
+                  id="sys-taux"
+                  type="number"
+                  class="form-control"
+                  name="tauxChange"
+                  [(ngModel)]="form.taux_change_usd_cdf"
+                  min="0"
+                  step="0.000001"
+                  required
+                />
+              </div>
+            </div>
+          </app-section-card>
+        }
+
         @if (tab() === 'datetime') {
           <app-section-card title="Fuseau horaire">
             <div class="row g-3 parametrages-form-grid">
@@ -195,7 +219,7 @@ export class ParametragesSystemPageComponent {
         payload.smtp_password = this.smtpPassword.trim();
       }
       const res = await firstValueFrom(this.admin.updateSettings(payload));
-      this.form = { ...res.data, timezone: res.data.timezone || 'Africa/Kinshasa' };
+      this.form = this.normalizeForm(res.data);
       this.smtpPassword = '';
       this.appSettings.apply(res.data);
       this.toast.success('Paramètres enregistrés');
@@ -223,12 +247,20 @@ export class ParametragesSystemPageComponent {
     this.loading.set(true);
     try {
       const res = await firstValueFrom(this.admin.getSettings());
-      this.form = { ...res.data, timezone: res.data.timezone || 'Africa/Kinshasa' };
+      this.form = this.normalizeForm(res.data);
     } catch {
       this.toast.error('Chargement des paramètres impossible');
     } finally {
       this.loading.set(false);
     }
+  }
+
+  private normalizeForm(data: AppSettings): AppSettings {
+    return {
+      ...data,
+      timezone: data.timezone || 'Africa/Kinshasa',
+      taux_change_usd_cdf: Number(data.taux_change_usd_cdf ?? 0),
+    };
   }
 
   private emptySettings(): AppSettings {
@@ -249,6 +281,7 @@ export class ParametragesSystemPageComponent {
       smtp_from_email: '',
       smtp_from_name: '',
       smtp_test_to: '',
+      taux_change_usd_cdf: 0,
     };
   }
 }

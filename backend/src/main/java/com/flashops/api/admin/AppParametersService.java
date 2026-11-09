@@ -5,6 +5,7 @@ import com.flashops.api.repository.ParametresApplicationRepository;
 import com.flashops.api.web.dto.AdminDtos;
 import com.flashops.api.web.dto.AdminDtos.AppSettingsUpdate;
 import com.flashops.api.web.dto.AdminDtos.AppSettingsView;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
@@ -69,6 +70,10 @@ public class AppParametersService {
     if (tz.isBlank()) {
       tz = "Africa/Kinshasa";
     }
+    BigDecimal taux = input.tauxChangeUsdCdf() == null ? BigDecimal.ZERO : input.tauxChangeUsdCdf();
+    if (taux.compareTo(BigDecimal.ZERO) < 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid exchange rate");
+    }
 
     p.setAppName(name);
     p.setAppShortName(shortName);
@@ -88,6 +93,7 @@ public class AppParametersService {
     if (input.smtpPassword() != null && !input.smtpPassword().isBlank()) {
       p.setSmtpMotDePasse(input.smtpPassword().trim());
     }
+    p.setTauxChangeUsdCdf(taux);
     p.setModifieLe(Instant.now());
     repo.save(p);
     return toView(p);
@@ -107,6 +113,7 @@ public class AppParametersService {
   }
 
   private static AppSettingsView toView(ParametresApplication p) {
+    BigDecimal taux = p.getTauxChangeUsdCdf() == null ? BigDecimal.ZERO : p.getTauxChangeUsdCdf();
     return new AppSettingsView(
         p.getAppName(),
         p.getAppShortName(),
@@ -123,7 +130,8 @@ public class AppParametersService {
         p.getSmtpEncryption(),
         p.getSmtpFromEmail(),
         p.getSmtpFromName(),
-        p.getSmtpTestTo());
+        p.getSmtpTestTo(),
+        taux);
   }
 
   private static String trim(String v) {

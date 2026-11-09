@@ -2,6 +2,7 @@ package com.flashops.api.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -51,7 +52,8 @@ public final class AdminDtos {
       @JsonProperty("smtp_encryption") String smtpEncryption,
       @JsonProperty("smtp_from_email") String smtpFromEmail,
       @JsonProperty("smtp_from_name") String smtpFromName,
-      @JsonProperty("smtp_test_to") String smtpTestTo) {}
+      @JsonProperty("smtp_test_to") String smtpTestTo,
+      @JsonProperty("taux_change_usd_cdf") BigDecimal tauxChangeUsdCdf) {}
 
   public record AppSettingsUpdate(
       @JsonProperty("app_name") String appName,
@@ -69,7 +71,8 @@ public final class AdminDtos {
       @JsonProperty("smtp_encryption") String smtpEncryption,
       @JsonProperty("smtp_from_email") String smtpFromEmail,
       @JsonProperty("smtp_from_name") String smtpFromName,
-      @JsonProperty("smtp_test_to") String smtpTestTo) {}
+      @JsonProperty("smtp_test_to") String smtpTestTo,
+      @JsonProperty("taux_change_usd_cdf") BigDecimal tauxChangeUsdCdf) {}
 
   public record SmtpTestRequest(String to) {}
 

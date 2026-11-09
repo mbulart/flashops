@@ -57,6 +57,8 @@ export interface AppSettings extends PublicAppSettings {
   smtp_from_email: string;
   smtp_from_name: string;
   smtp_test_to: string;
+  /** 1 USD = N CDF — utilisé par les modules pour les conversions. */
+  taux_change_usd_cdf: number;
 }
 
 export interface ScheduledReport {
