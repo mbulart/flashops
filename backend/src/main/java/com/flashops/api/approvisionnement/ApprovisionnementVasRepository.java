@@ -109,6 +109,7 @@ public class ApprovisionnementVasRepository {
   }
 
   public List<DemandeListRow> listDemandes(String statut, int limit) {
+    // Filtre optionnel côté Java : Postgres ne peut pas typer "? IS NULL" si le bind est null.
     String sql =
         """
         SELECT d.id, d.date_reference, d.statut, d.cree_le, d.soumise_le,
@@ -118,27 +119,17 @@ public class ApprovisionnementVasRepository {
                coalesce((SELECT sum(l.montant_propose) FROM lignes_demande_approvisionnement_vas l
                          WHERE l.demande_id = d.id AND l.devise = 'CDF'), 0) AS total_propose_cdf
         FROM demandes_approvisionnement_vas d
-        WHERE (? IS NULL OR d.statut = ?)
+        """
+            + (statut == null ? "" : " WHERE d.statut = ? ")
+            + """
         ORDER BY d.date_reference DESC, d.id DESC
         LIMIT ?
         """;
-    return jdbc.query(
-        sql,
-        (rs, i) ->
-            new DemandeListRow(
-                rs.getLong("id"),
-                rs.getDate("date_reference").toLocalDate(),
-                rs.getString("statut"),
-                rs.getInt("nb_lignes"),
-                rs.getTimestamp("cree_le").toInstant(),
-                rs.getTimestamp("soumise_le") == null
-                    ? null
-                    : rs.getTimestamp("soumise_le").toInstant(),
-                scale(rs.getBigDecimal("total_propose_usd")),
-                scale(rs.getBigDecimal("total_propose_cdf"))),
-        statut,
-        statut,
-        Math.max(1, Math.min(limit, 500)));
+    int lim = Math.max(1, Math.min(limit, 500));
+    if (statut == null) {
+      return jdbc.query(sql, DEMANDE_LIST_ROW, lim);
+    }
+    return jdbc.query(sql, DEMANDE_LIST_ROW, statut, lim);
   }
 
   public Optional<DemandeHeaderRow> findDemande(long id) {
@@ -662,6 +653,20 @@ public class ApprovisionnementVasRepository {
       ps.setInt(idx, value);
     }
   }
+
+  private static final RowMapper<DemandeListRow> DEMANDE_LIST_ROW =
+      (rs, i) ->
+          new DemandeListRow(
+              rs.getLong("id"),
+              rs.getDate("date_reference").toLocalDate(),
+              rs.getString("statut"),
+              rs.getInt("nb_lignes"),
+              rs.getTimestamp("cree_le").toInstant(),
+              rs.getTimestamp("soumise_le") == null
+                  ? null
+                  : rs.getTimestamp("soumise_le").toInstant(),
+              scale(rs.getBigDecimal("total_propose_usd")),
+              scale(rs.getBigDecimal("total_propose_cdf")));
 
   private static final RowMapper<DemandeHeaderRow> DEMANDE_HEADER =
       (rs, i) ->
