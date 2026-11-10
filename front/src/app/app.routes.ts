@@ -29,6 +29,30 @@ export const routes: Routes = [
         canActivate: [permissionGuard('agences.lire')],
       },
       {
+        path: 'approvisionnement-vas',
+        loadComponent: () =>
+          import('./pages/approvisionnement-vas/approvisionnement-vas.page').then(
+            (m) => m.ApprovisionnementVasPageComponent
+          ),
+        canActivate: [permissionGuard('approvisionnement.vas.lire')],
+      },
+      {
+        path: 'approvisionnement-vas/nouvelle',
+        loadComponent: () =>
+          import('./pages/approvisionnement-vas/approvisionnement-vas.page').then(
+            (m) => m.ApprovisionnementVasPageComponent
+          ),
+        canActivate: [permissionGuard('approvisionnement.vas.ecrire')],
+      },
+      {
+        path: 'approvisionnement-vas/:id',
+        loadComponent: () =>
+          import('./pages/approvisionnement-vas/approvisionnement-vas.page').then(
+            (m) => m.ApprovisionnementVasPageComponent
+          ),
+        canActivate: [permissionGuard('approvisionnement.vas.lire')],
+      },
+      {
         path: 'profil',
         loadComponent: () => import('./pages/profile/profile.page').then((m) => m.ProfilePageComponent),
       },
