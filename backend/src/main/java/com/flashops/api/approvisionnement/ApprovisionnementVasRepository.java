@@ -86,7 +86,9 @@ public class ApprovisionnementVasRepository {
             (rs, i) -> {
               BigDecimal depots = scale(rs.getBigDecimal("depots"));
               BigDecimal retraits = scale(rs.getBigDecimal("retraits"));
-              return new TotauxPeriode(depots, retraits, depots.subtract(retraits));
+              // Consommation nette métier = retraits réussis − dépôts réussis
+              // (aligné sur le suivi ops : même signe que les tableaux de référence).
+              return new TotauxPeriode(depots, retraits, retraits.subtract(depots));
             },
             produitId,
             devise,
