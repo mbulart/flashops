@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
+import { Subscription, firstValueFrom } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import {
   ApprovisionnementVasDemandeInput,
   ApprovisionnementVasDemandeListItem,
@@ -286,7 +287,7 @@ import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
     }
   `,
 })
-export class ApprovisionnementVasPageComponent implements OnInit {
+export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApprovisionnementVasService);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
@@ -306,9 +307,17 @@ export class ApprovisionnementVasPageComponent implements OnInit {
   statut: ApprovisionnementVasStatut = 'brouillon';
   commentaire = '';
   private lineSeq = 0;
+  private navSub?: Subscription;
 
   ngOnInit(): void {
+    this.navSub = this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe(() => void this.bootstrap());
     void this.bootstrap();
+  }
+
+  ngOnDestroy(): void {
+    this.navSub?.unsubscribe();
   }
 
   canWrite(): boolean {
@@ -455,22 +464,23 @@ export class ApprovisionnementVasPageComponent implements OnInit {
   }
 
   private async bootstrap(): Promise<void> {
-    const path = this.route.snapshot.routeConfig?.path ?? '';
-    if (path === 'nouvelle') {
+    const url = this.router.url.split('?')[0];
+    if (url.endsWith('/approvisionnement-vas/nouvelle')) {
       this.mode.set('form');
       this.demandeId.set(null);
       await this.initNewForm();
       return;
     }
-    const idParam = this.route.snapshot.paramMap.get('id');
-    if (idParam) {
+    const idMatch = url.match(/\/approvisionnement-vas\/(\d+)$/);
+    if (idMatch) {
       this.mode.set('form');
-      const id = Number(idParam);
+      const id = Number(idMatch[1]);
       this.demandeId.set(id);
       await this.loadDemande(id);
       return;
     }
     this.mode.set('list');
+    this.demandeId.set(null);
     await this.loadList();
   }
 

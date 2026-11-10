@@ -25,16 +25,21 @@ public class ApprovisionnementVasRepository {
     this.jdbc = jdbc;
   }
 
+  private static final String SQL_PRODUIT_MM =
+      """
+      SELECT produit_id, module, produit, ecran, coalesce(partenaire, '') AS partenaire
+      FROM pilotage.dim_produit
+      WHERE produit_id <> 0
+        AND upper(btrim(module)) = 'TELCO'
+        AND btrim(ecran) = 'MobileMoney'
+        AND upper(regexp_replace(btrim(produit), '[\\s_-]+', '', 'g')) IN (
+          'MPESA', 'ORANGEMONEY', 'AIRTELMONEY', 'AFRIMONEY', 'MOMO'
+        )
+      """;
+
   public List<ProduitMmRow> listProduitsMobileMoney() {
     return jdbc.query(
-        """
-        SELECT produit_id, module, produit, ecran, coalesce(partenaire, '') AS partenaire
-        FROM pilotage.dim_produit
-        WHERE produit_id <> 0
-          AND upper(btrim(module)) = 'TELCO'
-          AND btrim(ecran) = 'MobileMoney'
-        ORDER BY produit, partenaire
-        """,
+        SQL_PRODUIT_MM + " ORDER BY produit, partenaire",
         (rs, i) ->
             new ProduitMmRow(
                 rs.getInt("produit_id"),
@@ -47,14 +52,7 @@ public class ApprovisionnementVasRepository {
   public Optional<ProduitMmRow> findProduitMobileMoney(int produitId) {
     var rows =
         jdbc.query(
-            """
-            SELECT produit_id, module, produit, ecran, coalesce(partenaire, '') AS partenaire
-            FROM pilotage.dim_produit
-            WHERE produit_id = ?
-              AND produit_id <> 0
-              AND upper(btrim(module)) = 'TELCO'
-              AND btrim(ecran) = 'MobileMoney'
-            """,
+            SQL_PRODUIT_MM + " AND produit_id = ?",
             (rs, i) ->
                 new ProduitMmRow(
                     rs.getInt("produit_id"),
