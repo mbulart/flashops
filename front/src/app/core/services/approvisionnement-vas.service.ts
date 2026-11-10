@@ -141,4 +141,12 @@ export class ApprovisionnementVasService {
       .put<{ data: ApprovisionnementVasSeuil }>(`${this.baseUrl}/seuils`, body)
       .pipe(map((r) => r.data));
   }
+
+  deleteSeuil(id: number) {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/seuils/${id}`);
+  }
+
+  deleteSolde(id: number) {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/soldes/${id}`);
+  }
 }

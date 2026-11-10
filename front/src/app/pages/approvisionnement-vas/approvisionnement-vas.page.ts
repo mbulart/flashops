@@ -13,19 +13,42 @@ import {
   ApprovisionnementVasModePaiement,
   ApprovisionnementVasPaiement,
   ApprovisionnementVasProduit,
+  ApprovisionnementVasReleve,
+  ApprovisionnementVasSeuil,
   ApprovisionnementVasSoldeAlerte,
   ApprovisionnementVasStatut,
 } from '../../core/models/approvisionnement-vas.models';
 import { ApprovisionnementVasService } from '../../core/services/approvisionnement-vas.service';
+import { AppSettingsService } from '../../core/services/app-settings.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { PdfPreviewModalComponent } from '../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
 import { SectionCardComponent } from '../../shared/components/section-card/section-card.component';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
-import { exportExcel, exportPdf } from '../../shared/utils/format.utils';
+import {
+  buildPdfBuffer,
+  exportBrandFromSettings,
+  exportExcel,
+  type PdfExportOptions,
+} from '../../shared/utils/format.utils';
 import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
+
+interface SoldeSeuilRow {
+  key: string;
+  produit_id: number;
+  produit_libelle: string;
+  devise: 'USD' | 'CDF';
+  solde: number | null;
+  solde_id: number | null;
+  releve_le: string | null;
+  seuil_id: number | null;
+  seuil_attention: number | null;
+  seuil_critique: number | null;
+  niveau: 'ok' | 'attention' | 'critique';
+}
 
 @Component({
   selector: 'app-approvisionnement-vas',
@@ -39,6 +62,7 @@ import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
     SkeletonComponent,
     StatusBadgeComponent,
     KpiCardComponent,
+    PdfPreviewModalComponent,
   ],
   template: `
     @if (mode() === 'list') {
@@ -60,41 +84,76 @@ import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
         </div>
       </app-page-header>
 
-      @if (loadingList()) {
-        <app-skeleton type="card" />
-      } @else {
-        @if (kpi(); as k) {
-          <div class="row g-3 mb-3">
-            <div class="col-6 col-lg-3"><app-kpi-card label="Proposé USD" [value]="formatAmount(k.total_propose_usd)" icon="bi bi-currency-dollar" /></div>
-            <div class="col-6 col-lg-3"><app-kpi-card label="Proposé CDF" [value]="formatAmount(k.total_propose_cdf)" icon="bi bi-cash-stack" /></div>
-            <div class="col-6 col-lg-3"><app-kpi-card label="Payé USD" [value]="formatAmount(k.total_paye_usd)" icon="bi bi-check2-circle" variant="primary" /></div>
-            <div class="col-6 col-lg-3"><app-kpi-card label="En retard" [value]="k.nb_en_retard" icon="bi bi-alarm" variant="secondary" [hint]="'Délai ' + k.delai_traitement_heures + ' h'" /></div>
-          </div>
-          <div class="row g-3 mb-3">
-            <div class="col-6 col-lg-3"><app-kpi-card label="Brouillons" [value]="k.nb_brouillon" icon="bi bi-pencil" /></div>
-            <div class="col-6 col-lg-3"><app-kpi-card label="En attente" [value]="k.nb_en_attente" icon="bi bi-hourglass-split" variant="secondary" /></div>
-            <div class="col-6 col-lg-3"><app-kpi-card label="Payées" [value]="k.nb_payees" icon="bi bi-badge-ad" variant="primary" /></div>
-            <div class="col-6 col-lg-3"><app-kpi-card label="Validé USD / CDF" [value]="formatAmount(k.total_valide_usd) + ' / ' + formatAmount(k.total_valide_cdf)" icon="bi bi-shield-check" /></div>
-          </div>
-        }
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3">
+          <app-kpi-card label="Proposé USD" [value]="formatAmount(kpi()?.total_propose_usd)" icon="bi bi-currency-dollar" [loading]="loadingList()" />
+        </div>
+        <div class="col-6 col-lg-3">
+          <app-kpi-card label="Proposé CDF" [value]="formatAmount(kpi()?.total_propose_cdf)" icon="bi bi-cash-stack" [loading]="loadingList()" />
+        </div>
+        <div class="col-6 col-lg-3">
+          <app-kpi-card label="Payé USD" [value]="formatAmount(kpi()?.total_paye_usd)" icon="bi bi-check2-circle" variant="primary" [loading]="loadingList()" />
+        </div>
+        <div class="col-6 col-lg-3">
+          <app-kpi-card
+            label="En retard"
+            [value]="kpi()?.nb_en_retard ?? '—'"
+            icon="bi bi-alarm"
+            variant="secondary"
+            [hint]="kpi() ? 'Délai ' + kpi()!.delai_traitement_heures + ' h' : ''"
+            [loading]="loadingList()"
+          />
+        </div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3">
+          <app-kpi-card label="Brouillons" [value]="kpi()?.nb_brouillon ?? '—'" icon="bi bi-pencil" [loading]="loadingList()" />
+        </div>
+        <div class="col-6 col-lg-3">
+          <app-kpi-card label="En attente" [value]="kpi()?.nb_en_attente ?? '—'" icon="bi bi-hourglass-split" variant="secondary" [loading]="loadingList()" />
+        </div>
+        <div class="col-6 col-lg-3">
+          <app-kpi-card label="Payées" [value]="kpi()?.nb_payees ?? '—'" icon="bi bi-badge-ad" variant="primary" [loading]="loadingList()" />
+        </div>
+        <div class="col-6 col-lg-3">
+          <app-kpi-card
+            label="Validé USD / CDF"
+            [value]="kpi() ? formatAmount(kpi()!.total_valide_usd) + ' / ' + formatAmount(kpi()!.total_valide_cdf) : '—'"
+            icon="bi bi-shield-check"
+            [loading]="loadingList()"
+          />
+        </div>
+      </div>
 
-        @if (alertes().length) {
-          <app-section-card title="Alertes soldes" class="mb-3">
-            <ul class="list-unstyled mb-0 small">
-              @for (a of alertes(); track a.produit_id + a.devise) {
-                <li class="mb-1">
-                  <span class="badge" [class.text-bg-danger]="a.niveau === 'critique'" [class.text-bg-warning]="a.niveau === 'attention'">
-                    {{ a.niveau }}
-                  </span>
-                  {{ a.produit_libelle }} ({{ a.devise }}) — solde {{ formatAmount(a.solde) }}
-                </li>
-              }
-            </ul>
-          </app-section-card>
+      <app-section-card title="Alertes soldes">
+        @if (loadingList()) {
+          <app-skeleton type="table" [rows]="2" [cols]="3" />
+        } @else if (alertes().length) {
+          <ul class="list-unstyled mb-0 small">
+            @for (a of alertes(); track a.produit_id + a.devise) {
+              <li class="mb-1">
+                <span class="badge" [class.text-bg-danger]="a.niveau === 'critique'" [class.text-bg-warning]="a.niveau === 'attention'">
+                  {{ a.niveau }}
+                </span>
+                {{ a.produit_libelle }} ({{ a.devise }}) — solde {{ formatAmount(a.solde) }}
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="text-muted small mb-0">Aucune alerte solde pour le moment.</p>
         }
+      </app-section-card>
 
-        @if (canSoldes()) {
-          <app-section-card title="Soldes & seuils" class="mb-3">
+      @if (canSoldes()) {
+        <app-section-card title="Soldes & seuils">
+          <div actions>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="openSoldesModal()" title="Voir soldes et seuils">
+              <i class="bi bi-table me-1"></i>Tableau
+            </button>
+          </div>
+          @if (loadingList()) {
+            <app-skeleton type="table" [rows]="2" [cols]="4" />
+          } @else {
             <div class="row g-2 align-items-end mb-2">
               <div class="col-md-3">
                 <label class="form-label form-label-sm">Produit</label>
@@ -133,25 +192,29 @@ import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
                 </div>
               }
             </div>
-          </app-section-card>
-        }
+          }
+        </app-section-card>
+      }
 
-        <app-section-card title="Demandes">
-          <div class="row g-2 mb-3 align-items-end">
-            <div class="col-md-4">
-              <label class="form-label form-label-sm" for="filtre-statut">Statut</label>
-              <select id="filtre-statut" class="form-select form-select-sm" [(ngModel)]="filtreStatut" (ngModelChange)="loadList()">
-                <option value="">Tous</option>
-                <option value="brouillon">Brouillon</option>
-                <option value="en_attente_validation">En attente validation</option>
-                <option value="en_attente_paiement">En attente paiement</option>
-                <option value="partiellement_payee">Partiellement payée</option>
-                <option value="payee">Payée</option>
-                <option value="rejetee">Rejetée</option>
-                <option value="annulee">Annulée</option>
-              </select>
-            </div>
+      <app-section-card title="Demandes">
+        <div class="row g-2 mb-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label form-label-sm" for="filtre-statut">Statut</label>
+            <select id="filtre-statut" class="form-select form-select-sm" [(ngModel)]="filtreStatut" (ngModelChange)="loadList()" [disabled]="loadingList()">
+              <option value="">Tous</option>
+              <option value="brouillon">Brouillon</option>
+              <option value="en_attente_validation">En attente validation</option>
+              <option value="en_attente_paiement">En attente paiement</option>
+              <option value="partiellement_payee">Partiellement payée</option>
+              <option value="payee">Payée</option>
+              <option value="rejetee">Rejetée</option>
+              <option value="annulee">Annulée</option>
+            </select>
           </div>
+        </div>
+        @if (loadingList()) {
+          <app-skeleton type="table" [rows]="6" [cols]="7" />
+        } @else {
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
               <thead>
@@ -191,7 +254,75 @@ import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
               </tbody>
             </table>
           </div>
-        </app-section-card>
+        }
+      </app-section-card>
+
+      @if (soldesModalOpen()) {
+        <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,.45)">
+          <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Soldes &amp; seuils en cours</h5>
+                <button type="button" class="btn-close" aria-label="Fermer" (click)="closeSoldesModal()"></button>
+              </div>
+              <div class="modal-body p-0">
+                @if (loadingSoldesModal()) {
+                  <div class="p-3"><app-skeleton type="table" [rows]="4" [cols]="6" /></div>
+                } @else {
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Produit</th>
+                          <th>Devise</th>
+                          <th class="text-end">Solde</th>
+                          <th class="text-end">Attention</th>
+                          <th class="text-end">Critique</th>
+                          <th>Niveau</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (row of soldesSeuilsRows(); track row.key) {
+                          <tr>
+                            <td>{{ row.produit_libelle }}</td>
+                            <td>{{ row.devise }}</td>
+                            <td class="text-end mono">{{ formatAmount(row.solde) }}</td>
+                            <td class="text-end mono">{{ formatAmount(row.seuil_attention) }}</td>
+                            <td class="text-end mono">{{ formatAmount(row.seuil_critique) }}</td>
+                            <td>
+                              <span
+                                class="badge"
+                                [class.text-bg-success-subtle]="row.niveau === 'ok'"
+                                [class.text-bg-warning-subtle]="row.niveau === 'attention'"
+                                [class.text-bg-danger-subtle]="row.niveau === 'critique'"
+                              >{{ row.niveau }}</span>
+                            </td>
+                            <td class="text-end text-nowrap">
+                              <button type="button" class="btn btn-outline-secondary btn-sm me-1" title="Modifier" (click)="editSoldeSeuil(row)">
+                                <i class="bi bi-pencil"></i>
+                              </button>
+                              @if (canSeuils()) {
+                                <button type="button" class="btn btn-outline-danger btn-sm" title="Supprimer" (click)="deleteSoldeSeuil(row)">
+                                  <i class="bi bi-trash"></i>
+                                </button>
+                              }
+                            </td>
+                          </tr>
+                        } @empty {
+                          <tr><td colspan="7" class="text-muted text-center py-4">Aucun solde ni seuil enregistré.</td></tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" (click)="closeSoldesModal()">Fermer</button>
+              </div>
+            </div>
+          </div>
+        </div>
       }
     } @else {
       <app-page-header
@@ -203,17 +334,17 @@ import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
         </div>
       </app-page-header>
 
-      @if (loadingForm()) {
-        <app-skeleton type="card" />
-      } @else {
-        @if (demandeId() && enRetard()) {
-          <div class="alert alert-warning py-2 small">
-            Délai de traitement dépassé ({{ delaiHeures() }} h).
-          </div>
-        }
+      @if (demandeId() && enRetard() && !loadingForm()) {
+        <div class="alert alert-warning py-2 small">
+          Délai de traitement dépassé ({{ delaiHeures() }} h).
+        </div>
+      }
 
-        <form (ngSubmit)="save()">
-          <app-section-card title="En-tête">
+      <form (ngSubmit)="save()">
+        <app-section-card title="En-tête">
+          @if (loadingForm()) {
+            <app-skeleton type="table" [rows]="2" [cols]="3" />
+          } @else {
             <div class="row g-3">
               <div class="col-md-4">
                 <label class="form-label" for="date-ref">Date de référence</label>
@@ -263,10 +394,14 @@ import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
                 }
               </div>
             }
-          </app-section-card>
+          }
+        </app-section-card>
 
           <div class="mt-3">
             <app-section-card title="Lignes produits">
+              @if (loadingForm()) {
+                <app-skeleton type="table" [rows]="4" [cols]="8" />
+              } @else {
               <div class="table-responsive">
                 <table class="table table-sm align-middle appro-table">
                   <thead>
@@ -384,10 +519,11 @@ import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
                   <i class="bi bi-plus-lg me-1"></i>Ajouter un produit
                 </button>
               }
+              }
             </app-section-card>
           </div>
 
-          @if (canEditContent()) {
+          @if (canEditContent() && !loadingForm()) {
             <div class="text-end mt-3">
               <button type="submit" class="btn btn-primary btn-sm" [disabled]="saving() || !canSubmit()">
                 @if (saving()) {
@@ -402,106 +538,124 @@ import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
         @if (demandeId()) {
           <div class="mt-3">
             <app-section-card title="Paiements">
-              @if (canPayer()) {
-                <div class="row g-2 align-items-end mb-3">
-                  <div class="col-md-3">
-                    <label class="form-label form-label-sm">Ligne</label>
-                    <select class="form-select form-select-sm" [(ngModel)]="payLigneId">
-                      <option [ngValue]="null">Choisir…</option>
-                      @for (l of lignes(); track l.key) {
-                        @if (l.id) {
-                          <option [ngValue]="l.id">{{ l.produit_libelle }} {{ l.devise }} (reste {{ formatAmount(l.reste_a_payer) }})</option>
+              @if (loadingForm()) {
+                <app-skeleton type="table" [rows]="3" [cols]="5" />
+              } @else {
+                @if (canPayer()) {
+                  <div class="row g-2 align-items-end mb-3">
+                    <div class="col-md-3">
+                      <label class="form-label form-label-sm">Ligne</label>
+                      <select class="form-select form-select-sm" [(ngModel)]="payLigneId">
+                        <option [ngValue]="null">Choisir…</option>
+                        @for (l of lignes(); track l.key) {
+                          @if (l.id) {
+                            <option [ngValue]="l.id">{{ l.produit_libelle }} {{ l.devise }} (reste {{ formatAmount(l.reste_a_payer) }})</option>
+                          }
                         }
-                      }
-                    </select>
+                      </select>
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label form-label-sm">Montant</label>
+                      <input type="number" class="form-control form-control-sm" [(ngModel)]="payMontant" step="0.01" />
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label form-label-sm">Date</label>
+                      <input type="date" class="form-control form-control-sm" [(ngModel)]="payDate" />
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label form-label-sm">Mode</label>
+                      <select class="form-select form-select-sm" [(ngModel)]="payMode">
+                        <option value="banque">Banque</option>
+                        <option value="transfert_interne">Transfert interne</option>
+                        <option value="autre">Autre</option>
+                      </select>
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label form-label-sm">Référence</label>
+                      <input class="form-control form-control-sm" [(ngModel)]="payReference" />
+                    </div>
+                    <div class="col-md-1">
+                      <button type="button" class="btn btn-primary btn-sm w-100" (click)="ajouterPaiement()" [disabled]="paying()">Payer</button>
+                    </div>
                   </div>
-                  <div class="col-md-2">
-                    <label class="form-label form-label-sm">Montant</label>
-                    <input type="number" class="form-control form-control-sm" [(ngModel)]="payMontant" step="0.01" />
-                  </div>
-                  <div class="col-md-2">
-                    <label class="form-label form-label-sm">Date</label>
-                    <input type="date" class="form-control form-control-sm" [(ngModel)]="payDate" />
-                  </div>
-                  <div class="col-md-2">
-                    <label class="form-label form-label-sm">Mode</label>
-                    <select class="form-select form-select-sm" [(ngModel)]="payMode">
-                      <option value="banque">Banque</option>
-                      <option value="transfert_interne">Transfert interne</option>
-                      <option value="autre">Autre</option>
-                    </select>
-                  </div>
-                  <div class="col-md-2">
-                    <label class="form-label form-label-sm">Référence</label>
-                    <input class="form-control form-control-sm" [(ngModel)]="payReference" />
-                  </div>
-                  <div class="col-md-1">
-                    <button type="button" class="btn btn-primary btn-sm w-100" (click)="ajouterPaiement()" [disabled]="paying()">Payer</button>
-                  </div>
-                </div>
-              }
-              <div class="table-responsive">
-                <table class="table table-sm mb-0">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Ligne</th>
-                      <th>Mode</th>
-                      <th class="text-end">Montant</th>
-                      <th>Référence</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (p of paiements(); track p.id) {
+                }
+                <div class="table-responsive">
+                  <table class="table table-sm mb-0">
+                    <thead>
                       <tr>
-                        <td>{{ p.date_paiement | date: 'dd/MM/yyyy' }}</td>
-                        <td>#{{ p.ligne_id }}</td>
-                        <td>{{ p.mode_paiement }}</td>
-                        <td class="text-end mono">{{ formatAmount(p.montant) }} {{ p.devise }}</td>
-                        <td>{{ p.reference_paiement || '—' }}</td>
+                        <th>Date</th>
+                        <th>Ligne</th>
+                        <th>Mode</th>
+                        <th class="text-end">Montant</th>
+                        <th>Référence</th>
                       </tr>
-                    } @empty {
-                      <tr><td colspan="5" class="text-muted text-center py-3">Aucun paiement.</td></tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-              @if (canExport() && paiements().length) {
-                <div class="mt-2">
-                  <button type="button" class="btn btn-outline-secondary btn-sm me-2" (click)="exportPaiementsExcel()">Export paiements Excel</button>
-                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="exportPaiementsPdf()">Export paiements PDF</button>
+                    </thead>
+                    <tbody>
+                      @for (p of paiements(); track p.id) {
+                        <tr>
+                          <td>{{ p.date_paiement | date: 'dd/MM/yyyy' }}</td>
+                          <td>#{{ p.ligne_id }}</td>
+                          <td>{{ p.mode_paiement }}</td>
+                          <td class="text-end mono">{{ formatAmount(p.montant) }} {{ p.devise }}</td>
+                          <td>{{ p.reference_paiement || '—' }}</td>
+                        </tr>
+                      } @empty {
+                        <tr><td colspan="5" class="text-muted text-center py-3">Aucun paiement.</td></tr>
+                      }
+                    </tbody>
+                  </table>
                 </div>
+                @if (canExport() && paiements().length) {
+                  <div class="mt-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm me-2" (click)="exportPaiementsExcel()">Export paiements Excel</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" (click)="exportPaiementsPdf()">Export paiements PDF</button>
+                  </div>
+                }
               }
             </app-section-card>
           </div>
 
           <div class="mt-3">
             <app-section-card title="Historique des statuts">
-              <ul class="timeline list-unstyled mb-0">
-                @for (h of historique(); track h.id) {
-                  <li class="timeline-item">
-                    <div class="timeline-dot"></div>
-                    <div>
-                      <div class="fw-semibold small">
-                        {{ statutLabel(h.ancien_statut || '') }}
-                        <i class="bi bi-arrow-right mx-1"></i>
-                        {{ statutLabel(h.nouveau_statut) }}
+              @if (loadingForm()) {
+                <app-skeleton type="table" [rows]="4" [cols]="2" />
+              } @else {
+                <ul class="timeline list-unstyled mb-0">
+                  @for (h of historique(); track h.id) {
+                    <li class="timeline-item" [ngClass]="historiqueItemClass(h.nouveau_statut)">
+                      <div class="timeline-dot" [ngClass]="historiqueDotClass(h.nouveau_statut)"></div>
+                      <div>
+                        <div class="fw-semibold small d-flex flex-wrap align-items-center gap-1">
+                          @if (h.ancien_statut) {
+                            <span class="badge hist-badge" [ngClass]="historiqueBadgeClass(h.ancien_statut)">{{ statutLabel(h.ancien_statut) }}</span>
+                            <i class="bi bi-arrow-right text-muted"></i>
+                          }
+                          <span class="badge hist-badge" [ngClass]="historiqueBadgeClass(h.nouveau_statut)">{{ statutLabel(h.nouveau_statut) }}</span>
+                        </div>
+                        <div class="text-muted small mt-1">{{ h.cree_le | date: 'dd/MM/yyyy HH:mm' }}</div>
+                        @if (h.commentaire) {
+                          <div class="small mt-1">{{ h.commentaire }}</div>
+                        }
                       </div>
-                      <div class="text-muted small">{{ h.cree_le | date: 'dd/MM/yyyy HH:mm' }}</div>
-                      @if (h.commentaire) {
-                        <div class="small">{{ h.commentaire }}</div>
-                      }
-                    </div>
-                  </li>
-                } @empty {
-                  <li class="text-muted small">Aucun historique.</li>
-                }
-              </ul>
+                    </li>
+                  } @empty {
+                    <li class="text-muted small">Aucun historique.</li>
+                  }
+                </ul>
+              }
             </app-section-card>
           </div>
         }
       }
-    }
+
+    <app-pdf-preview-modal
+      [open]="pdfPreviewOpen()"
+      [title]="pdfPreviewTitle()"
+      [pdfUrl]="pdfPreviewUrl()"
+      [filename]="pdfPreviewFilename()"
+      [buffer]="pdfPreviewBuffer()"
+      (closed)="closePdfPreview()"
+    />
   `,
   styles: `
     .appro-table th,
@@ -548,6 +702,11 @@ import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
       border-left: 2px solid var(--bs-border-color);
       margin-left: 0.35rem;
     }
+    .timeline-item.hist-success { border-left-color: #198754; background: rgba(25, 135, 84, 0.06); border-radius: 0 0.4rem 0.4rem 0; }
+    .timeline-item.hist-warning { border-left-color: #fd7e14; background: rgba(253, 126, 20, 0.07); border-radius: 0 0.4rem 0.4rem 0; }
+    .timeline-item.hist-danger { border-left-color: #dc3545; background: rgba(220, 53, 69, 0.07); border-radius: 0 0.4rem 0.4rem 0; }
+    .timeline-item.hist-info { border-left-color: #0d6efd; background: rgba(13, 110, 253, 0.06); border-radius: 0 0.4rem 0.4rem 0; }
+    .timeline-item.hist-muted { border-left-color: #6c757d; background: rgba(108, 117, 125, 0.06); border-radius: 0 0.4rem 0.4rem 0; }
     .timeline-dot {
       position: absolute;
       left: -0.4rem;
@@ -557,12 +716,25 @@ import { pilotagePartenaireLabel } from '../pilotage/pilotage-filtres.config';
       border-radius: 50%;
       background: var(--bs-primary);
     }
+    .timeline-dot.hist-success { background: #198754; }
+    .timeline-dot.hist-warning { background: #fd7e14; }
+    .timeline-dot.hist-danger { background: #dc3545; }
+    .timeline-dot.hist-info { background: #0d6efd; }
+    .timeline-dot.hist-muted { background: #6c757d; }
+    .hist-badge.text-bg-success-subtle,
+    .hist-badge.text-bg-warning-subtle,
+    .hist-badge.text-bg-danger-subtle,
+    .hist-badge.text-bg-primary-subtle,
+    .hist-badge.text-bg-secondary-subtle {
+      font-weight: 600;
+    }
   `,
 })
 export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApprovisionnementVasService);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+  private readonly appSettings = inject(AppSettingsService);
   private readonly router = inject(Router);
 
   readonly mode = signal<'list' | 'form'>('list');
@@ -580,8 +752,18 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   readonly kpi = signal<ApprovisionnementVasDashboard | null>(null);
   readonly alertes = signal<ApprovisionnementVasSoldeAlerte[]>([]);
   readonly produitsList = signal<ApprovisionnementVasProduit[]>([]);
+  readonly soldes = signal<ApprovisionnementVasReleve[]>([]);
+  readonly seuils = signal<ApprovisionnementVasSeuil[]>([]);
+  readonly soldesSeuilsRows = signal<SoldeSeuilRow[]>([]);
+  readonly soldesModalOpen = signal(false);
+  readonly loadingSoldesModal = signal(false);
   readonly enRetard = signal(false);
   readonly delaiHeures = signal(2);
+  readonly pdfPreviewOpen = signal(false);
+  readonly pdfPreviewTitle = signal('Aperçu PDF');
+  readonly pdfPreviewFilename = signal('export.pdf');
+  readonly pdfPreviewUrl = signal<string | null>(null);
+  readonly pdfPreviewBuffer = signal<ArrayBuffer | null>(null);
 
   dateReference = this.todayIso();
   statut: ApprovisionnementVasStatut = 'brouillon';
@@ -599,6 +781,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   seuilCritique: number | null = null;
   private lineSeq = 0;
   private navSub?: Subscription;
+  private pdfObjectUrl: string | null = null;
 
   ngOnInit(): void {
     this.navSub = this.router.events
@@ -609,6 +792,198 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.navSub?.unsubscribe();
+    this.revokePdfUrl();
+  }
+
+  historiqueTone(statut: string): 'success' | 'warning' | 'danger' | 'info' | 'muted' {
+    switch (statut) {
+      case 'payee':
+      case 'validee':
+        return 'success';
+      case 'partiellement_payee':
+      case 'en_attente_paiement':
+      case 'en_attente_validation':
+      case 'soumise':
+        return 'warning';
+      case 'rejetee':
+      case 'annulee':
+        return 'danger';
+      case 'brouillon':
+        return 'muted';
+      default:
+        return 'info';
+    }
+  }
+
+  historiqueItemClass(statut: string): string {
+    return `hist-${this.historiqueTone(statut)}`;
+  }
+
+  historiqueDotClass(statut: string): string {
+    return `hist-${this.historiqueTone(statut)}`;
+  }
+
+  historiqueBadgeClass(statut: string): string {
+    switch (this.historiqueTone(statut)) {
+      case 'success':
+        return 'text-bg-success-subtle';
+      case 'warning':
+        return 'text-bg-warning-subtle';
+      case 'danger':
+        return 'text-bg-danger-subtle';
+      case 'muted':
+        return 'text-bg-secondary-subtle';
+      default:
+        return 'text-bg-primary-subtle';
+    }
+  }
+
+  async openSoldesModal(): Promise<void> {
+    this.soldesModalOpen.set(true);
+    this.loadingSoldesModal.set(true);
+    try {
+      await this.refreshSoldesSeuils();
+    } finally {
+      this.loadingSoldesModal.set(false);
+    }
+  }
+
+  closeSoldesModal(): void {
+    this.soldesModalOpen.set(false);
+  }
+
+  editSoldeSeuil(row: SoldeSeuilRow): void {
+    this.soldeProduitId = row.produit_id;
+    this.soldeDevise = row.devise;
+    this.soldeMontant = row.solde;
+    this.seuilAttention = row.seuil_attention;
+    this.seuilCritique = row.seuil_critique;
+    this.closeSoldesModal();
+    this.toast.success('Ligne chargée dans le formulaire Soldes & seuils');
+  }
+
+  async deleteSoldeSeuil(row: SoldeSeuilRow): Promise<void> {
+    if (!window.confirm(`Supprimer solde/seuil pour ${row.produit_libelle} (${row.devise}) ?`)) {
+      return;
+    }
+    try {
+      if (row.seuil_id != null) {
+        await firstValueFrom(this.api.deleteSeuil(row.seuil_id));
+      }
+      if (row.solde_id != null) {
+        await firstValueFrom(this.api.deleteSolde(row.solde_id));
+      }
+      this.toast.success('Supprimé');
+      await this.refreshSoldesSeuils();
+      this.alertes.set(await firstValueFrom(this.api.alertesSoldes()).catch(() => []));
+    } catch {
+      this.toast.error('Suppression impossible');
+    }
+  }
+
+  private async refreshSoldesSeuils(): Promise<void> {
+    const [soldes, seuils] = await Promise.all([
+      firstValueFrom(this.api.soldes()).catch(() => [] as ApprovisionnementVasReleve[]),
+      firstValueFrom(this.api.seuils()).catch(() => [] as ApprovisionnementVasSeuil[]),
+    ]);
+    this.soldes.set(soldes);
+    this.seuils.set(seuils);
+    this.soldesSeuilsRows.set(this.buildSoldesSeuilsRows(soldes, seuils));
+  }
+
+  private buildSoldesSeuilsRows(
+    soldes: ApprovisionnementVasReleve[],
+    seuils: ApprovisionnementVasSeuil[]
+  ): SoldeSeuilRow[] {
+    const map = new Map<string, SoldeSeuilRow>();
+    for (const s of soldes) {
+      const key = `${s.produit_id}|${s.devise}`;
+      map.set(key, {
+        key,
+        produit_id: s.produit_id,
+        produit_libelle: s.produit_libelle,
+        devise: s.devise,
+        solde: s.solde,
+        solde_id: s.id,
+        releve_le: s.releve_le,
+        seuil_id: null,
+        seuil_attention: null,
+        seuil_critique: null,
+        niveau: 'ok',
+      });
+    }
+    for (const s of seuils) {
+      const key = `${s.produit_id}|${s.devise}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.seuil_id = s.id;
+        existing.seuil_attention = s.seuil_attention;
+        existing.seuil_critique = s.seuil_critique;
+      } else {
+        map.set(key, {
+          key,
+          produit_id: s.produit_id,
+          produit_libelle: s.produit_libelle,
+          devise: s.devise,
+          solde: null,
+          solde_id: null,
+          releve_le: null,
+          seuil_id: s.id,
+          seuil_attention: s.seuil_attention,
+          seuil_critique: s.seuil_critique,
+          niveau: 'ok',
+        });
+      }
+    }
+    return [...map.values()]
+      .map((row) => {
+        let niveau: SoldeSeuilRow['niveau'] = 'ok';
+        if (row.solde != null && row.seuil_critique != null && row.solde <= row.seuil_critique) {
+          niveau = 'critique';
+        } else if (row.solde != null && row.seuil_attention != null && row.solde <= row.seuil_attention) {
+          niveau = 'attention';
+        }
+        return { ...row, niveau };
+      })
+      .sort((a, b) => a.produit_libelle.localeCompare(b.produit_libelle) || a.devise.localeCompare(b.devise));
+  }
+
+  private exportBrand() {
+    return exportBrandFromSettings(this.appSettings.settings());
+  }
+
+  private revokePdfUrl(): void {
+    if (this.pdfObjectUrl) {
+      URL.revokeObjectURL(this.pdfObjectUrl);
+      this.pdfObjectUrl = null;
+    }
+  }
+
+  closePdfPreview(): void {
+    this.pdfPreviewOpen.set(false);
+    this.pdfPreviewBuffer.set(null);
+    this.pdfPreviewUrl.set(null);
+    this.revokePdfUrl();
+  }
+
+  private async openPdfPreview(options: PdfExportOptions): Promise<void> {
+    this.exporting.set(true);
+    try {
+      const buffer = await buildPdfBuffer({
+        ...options,
+        brand: options.brand ?? this.exportBrand(),
+      });
+      this.revokePdfUrl();
+      const blob = new Blob([buffer], { type: 'application/pdf' });
+      this.pdfObjectUrl = URL.createObjectURL(blob);
+      this.pdfPreviewBuffer.set(buffer);
+      this.pdfPreviewUrl.set(this.pdfObjectUrl);
+      this.pdfPreviewTitle.set(options.title);
+      this.pdfPreviewFilename.set(options.filename);
+      this.pdfPreviewOpen.set(true);
+    } finally {
+      this.exporting.set(false);
+    }
   }
 
   canCreate(): boolean {
@@ -673,6 +1048,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
       this.toast.success('Solde relevé');
       this.soldeMontant = null;
       this.alertes.set(await firstValueFrom(this.api.alertesSoldes()));
+      await this.refreshSoldesSeuils();
     } catch {
       this.toast.error('Relevé impossible');
     }
@@ -694,6 +1070,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
       );
       this.toast.success('Seuil enregistré');
       this.alertes.set(await firstValueFrom(this.api.alertesSoldes()));
+      await this.refreshSoldesSeuils();
     } catch {
       this.toast.error('Seuil impossible');
     }
@@ -907,6 +1284,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
       await exportExcel({
         filename: `approvisionnement-vas-${this.todayIso()}.xlsx`,
         title: 'Approvisionnement VAS — Demandes',
+        brand: this.exportBrand(),
         sheets: [
           {
             name: 'Demandes',
@@ -933,12 +1311,12 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   }
 
   async exportDemandesPdf(): Promise<void> {
-    this.exporting.set(true);
     try {
-      await exportPdf({
+      await this.openPdfPreview({
         title: 'Approvisionnement VAS — Demandes',
         filename: `approvisionnement-vas-${this.todayIso()}.pdf`,
         orientation: 'landscape',
+        brand: this.exportBrand(),
         sections: [
           {
             title: 'Demandes',
@@ -963,10 +1341,8 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
           },
         ],
       });
-      this.toast.success('Export PDF généré');
     } catch {
-      this.toast.error('Export PDF impossible');
-    } finally {
+      this.toast.error('Aperçu PDF impossible');
       this.exporting.set(false);
     }
   }
@@ -976,6 +1352,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
       await exportExcel({
         filename: `paiements-demande-${this.demandeId()}.xlsx`,
         title: `Paiements demande #${this.demandeId()}`,
+        brand: this.exportBrand(),
         sheets: [
           {
             name: 'Paiements',
@@ -1000,9 +1377,10 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
 
   async exportPaiementsPdf(): Promise<void> {
     try {
-      await exportPdf({
+      await this.openPdfPreview({
         title: `Paiements demande #${this.demandeId()}`,
         filename: `paiements-demande-${this.demandeId()}.pdf`,
+        brand: this.exportBrand(),
         sections: [
           {
             title: 'Paiements',
@@ -1025,9 +1403,9 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
           },
         ],
       });
-      this.toast.success('Export paiements PDF généré');
     } catch {
-      this.toast.error('Export impossible');
+      this.toast.error('Aperçu PDF impossible');
+      this.exporting.set(false);
     }
   }
 
@@ -1044,6 +1422,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
       this.kpi.set(kpi);
       this.alertes.set(alertes);
       this.produitsList.set(produits);
+      void this.refreshSoldesSeuils().catch(() => undefined);
     } catch {
       this.toast.error('Chargement des demandes impossible');
     } finally {

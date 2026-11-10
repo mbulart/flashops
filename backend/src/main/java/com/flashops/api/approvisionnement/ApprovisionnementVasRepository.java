@@ -565,6 +565,51 @@ public class ApprovisionnementVasRepository {
                 rs.getTimestamp("modifie_le").toInstant()));
   }
 
+  public boolean deleteSeuil(long id) {
+    return jdbc.update("DELETE FROM seuils_alerte_soldes_vas WHERE id = ?", id) > 0;
+  }
+
+  public boolean deleteReleve(long id) {
+    return jdbc.update("DELETE FROM releves_soldes_vas WHERE id = ?", id) > 0;
+  }
+
+  public Optional<ReleveRow> findReleve(long id) {
+    var rows =
+        jdbc.query(
+            """
+            SELECT id, produit_id, operateur, produit_libelle, devise, solde,
+                   releve_le, utilisateur_id, commentaire, cree_le
+            FROM releves_soldes_vas
+            WHERE id = ?
+            """,
+            RELEVE_ROW,
+            id);
+    return rows.stream().findFirst();
+  }
+
+  public Optional<SeuilRow> findSeuil(long id) {
+    var rows =
+        jdbc.query(
+            """
+            SELECT id, produit_id, operateur, produit_libelle, devise,
+                   seuil_attention, seuil_critique, modifie_le
+            FROM seuils_alerte_soldes_vas
+            WHERE id = ?
+            """,
+            (rs, i) ->
+                new SeuilRow(
+                    rs.getLong("id"),
+                    rs.getInt("produit_id"),
+                    rs.getString("operateur"),
+                    rs.getString("produit_libelle"),
+                    rs.getString("devise"),
+                    scale(rs.getBigDecimal("seuil_attention")),
+                    scale(rs.getBigDecimal("seuil_critique")),
+                    rs.getTimestamp("modifie_le").toInstant()),
+            id);
+    return rows.stream().findFirst();
+  }
+
   public DashboardAggRow dashboardAgg() {
     return jdbc.query(
             """

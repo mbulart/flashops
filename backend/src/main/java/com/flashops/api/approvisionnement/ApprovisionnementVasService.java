@@ -439,6 +439,20 @@ public class ApprovisionnementVasService {
         .toList();
   }
 
+  @Transactional
+  public void deleteSeuil(long id) {
+    repo.findSeuil(id)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "seuil introuvable"));
+    repo.deleteSeuil(id);
+  }
+
+  @Transactional
+  public void deleteReleve(long id) {
+    repo.findReleve(id)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "relevé introuvable"));
+    repo.deleteReleve(id);
+  }
+
   @Transactional(readOnly = true)
   public List<SoldeAlerteView> alertesSoldes() {
     Map<String, ApprovisionnementVasRepository.SeuilRow> seuils = new HashMap<>();

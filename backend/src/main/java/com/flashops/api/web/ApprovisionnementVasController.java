@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -105,6 +106,22 @@ public class ApprovisionnementVasController {
     int userId = AuthSupport.currentUserId();
     requireAny(userId, "approvisionnement.vas.seuils.ecrire", "approvisionnement.vas.ecrire");
     return Map.of("data", service.upsertSeuil(userId, body));
+  }
+
+  @DeleteMapping("/seuils/{id}")
+  public Map<String, Object> deleteSeuil(@PathVariable long id) {
+    int userId = AuthSupport.currentUserId();
+    requireAny(userId, "approvisionnement.vas.seuils.ecrire", "approvisionnement.vas.ecrire");
+    service.deleteSeuil(id);
+    return Map.of("ok", true);
+  }
+
+  @DeleteMapping("/soldes/{id}")
+  public Map<String, Object> deleteSolde(@PathVariable long id) {
+    int userId = AuthSupport.currentUserId();
+    requireAny(userId, "approvisionnement.vas.seuils.ecrire", "approvisionnement.vas.ecrire");
+    service.deleteReleve(id);
+    return Map.of("ok", true);
   }
 
   @GetMapping
