@@ -171,11 +171,12 @@ public class ApprovisionnementVasRepository {
           return ps;
         },
         keys);
-    Number key = keys.getKey();
-    if (key == null) {
+    // PostgreSQL renvoie toutes les colonnes : getKey() échoue s'il y en a plusieurs.
+    var map = keys.getKeys();
+    if (map == null || map.get("id") == null) {
       throw new IllegalStateException("demande id manquant");
     }
-    return key.longValue();
+    return ((Number) map.get("id")).longValue();
   }
 
   public void updateDemande(
