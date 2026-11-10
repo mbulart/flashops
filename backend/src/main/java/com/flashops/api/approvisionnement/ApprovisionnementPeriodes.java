@@ -23,19 +23,28 @@ public final class ApprovisionnementPeriodes {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, "aucune demande opérationnelle le week-end");
     }
+    // Colonnes UI : en-têtes J-1 / J-2 inchangés ; les périodes ci-dessous
+    // sont déjà dans l’ordre affiché (pivot métier demandé).
     return switch (dow) {
       case MONDAY ->
-          // J-1 = jeudi ; J-2 = vendredi + samedi + dimanche
-          new Periodes(single(dateReference.minusDays(4)), range(dateReference.minusDays(3), dateReference.minusDays(1)));
+          // J-1 = vendredi + samedi + dimanche ; J-2 = jeudi
+          new Periodes(
+              range(dateReference.minusDays(3), dateReference.minusDays(1)),
+              single(dateReference.minusDays(4)));
       case TUESDAY ->
-          // J-1 = lundi ; J-2 = vendredi + samedi + dimanche
-          new Periodes(single(dateReference.minusDays(1)), range(dateReference.minusDays(4), dateReference.minusDays(2)));
+          // J-1 = vendredi + samedi + dimanche ; J-2 = lundi
+          new Periodes(
+              range(dateReference.minusDays(4), dateReference.minusDays(2)),
+              single(dateReference.minusDays(1)));
       case WEDNESDAY ->
-          new Periodes(single(dateReference.minusDays(1)), single(dateReference.minusDays(2)));
+          // J-1 = lundi ; J-2 = mardi
+          new Periodes(single(dateReference.minusDays(2)), single(dateReference.minusDays(1)));
       case THURSDAY ->
-          new Periodes(single(dateReference.minusDays(1)), single(dateReference.minusDays(2)));
+          // J-1 = mardi ; J-2 = mercredi
+          new Periodes(single(dateReference.minusDays(2)), single(dateReference.minusDays(1)));
       case FRIDAY ->
-          new Periodes(single(dateReference.minusDays(1)), single(dateReference.minusDays(2)));
+          // J-1 = mercredi ; J-2 = jeudi
+          new Periodes(single(dateReference.minusDays(2)), single(dateReference.minusDays(1)));
       default ->
           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "jour de référence invalide");
     };
