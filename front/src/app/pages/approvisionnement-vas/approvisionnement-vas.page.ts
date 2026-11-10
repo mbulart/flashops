@@ -702,11 +702,11 @@ interface SoldeSeuilRow {
       border-left: 2px solid var(--bs-border-color);
       margin-left: 0.35rem;
     }
-    .timeline-item.hist-success { border-left-color: #198754; background: rgba(25, 135, 84, 0.06); border-radius: 0 0.4rem 0.4rem 0; }
-    .timeline-item.hist-warning { border-left-color: #fd7e14; background: rgba(253, 126, 20, 0.07); border-radius: 0 0.4rem 0.4rem 0; }
-    .timeline-item.hist-danger { border-left-color: #dc3545; background: rgba(220, 53, 69, 0.07); border-radius: 0 0.4rem 0.4rem 0; }
-    .timeline-item.hist-info { border-left-color: #0d6efd; background: rgba(13, 110, 253, 0.06); border-radius: 0 0.4rem 0.4rem 0; }
-    .timeline-item.hist-muted { border-left-color: #6c757d; background: rgba(108, 117, 125, 0.06); border-radius: 0 0.4rem 0.4rem 0; }
+    .timeline-item.hist-success { border-left-color: #198754; }
+    .timeline-item.hist-warning { border-left-color: #fd7e14; }
+    .timeline-item.hist-danger { border-left-color: #dc3545; }
+    .timeline-item.hist-info { border-left-color: #0d6efd; }
+    .timeline-item.hist-muted { border-left-color: #6c757d; }
     .timeline-dot {
       position: absolute;
       left: -0.4rem;
