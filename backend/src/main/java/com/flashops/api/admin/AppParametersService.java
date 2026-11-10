@@ -74,6 +74,11 @@ public class AppParametersService {
     if (taux.compareTo(BigDecimal.ZERO) < 0) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid exchange rate");
     }
+    BigDecimal delai =
+        input.delaiTraitementHeures() == null ? BigDecimal.valueOf(2) : input.delaiTraitementHeures();
+    if (delai.compareTo(BigDecimal.ZERO) <= 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid processing delay");
+    }
 
     p.setAppName(name);
     p.setAppShortName(shortName);
@@ -94,6 +99,7 @@ public class AppParametersService {
       p.setSmtpMotDePasse(input.smtpPassword().trim());
     }
     p.setTauxChangeUsdCdf(taux);
+    p.setDelaiTraitementHeures(delai);
     p.setModifieLe(Instant.now());
     repo.save(p);
     return toView(p);
@@ -114,6 +120,8 @@ public class AppParametersService {
 
   private static AppSettingsView toView(ParametresApplication p) {
     BigDecimal taux = p.getTauxChangeUsdCdf() == null ? BigDecimal.ZERO : p.getTauxChangeUsdCdf();
+    BigDecimal delai =
+        p.getDelaiTraitementHeures() == null ? BigDecimal.valueOf(2) : p.getDelaiTraitementHeures();
     return new AppSettingsView(
         p.getAppName(),
         p.getAppShortName(),
@@ -131,7 +139,8 @@ public class AppParametersService {
         p.getSmtpFromEmail(),
         p.getSmtpFromName(),
         p.getSmtpTestTo(),
-        taux);
+        taux,
+        delai);
   }
 
   private static String trim(String v) {

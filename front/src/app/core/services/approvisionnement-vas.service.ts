@@ -3,10 +3,17 @@ import { Injectable, inject } from '@angular/core';
 import { map } from 'rxjs';
 import {
   ApprovisionnementVasConsommation,
+  ApprovisionnementVasDashboard,
   ApprovisionnementVasDemande,
   ApprovisionnementVasDemandeInput,
   ApprovisionnementVasDemandeListItem,
+  ApprovisionnementVasPaiement,
+  ApprovisionnementVasPaiementInput,
   ApprovisionnementVasProduit,
+  ApprovisionnementVasReleve,
+  ApprovisionnementVasSeuil,
+  ApprovisionnementVasSoldeAlerte,
+  ApprovisionnementVasStatut,
 } from '../models/approvisionnement-vas.models';
 import { RuntimeConfigService } from './runtime-config.service';
 
@@ -35,11 +42,17 @@ export class ApprovisionnementVasService {
       .pipe(map((r) => r.data));
   }
 
-  list(limit = 100) {
+  dashboard() {
     return this.http
-      .get<{ data: ApprovisionnementVasDemandeListItem[] }>(this.baseUrl, {
-        params: new HttpParams().set('limit', String(limit)),
-      })
+      .get<{ data: ApprovisionnementVasDashboard }>(`${this.baseUrl}/dashboard`)
+      .pipe(map((r) => r.data));
+  }
+
+  list(limit = 100, statut?: string) {
+    let params = new HttpParams().set('limit', String(limit));
+    if (statut) params = params.set('statut', statut);
+    return this.http
+      .get<{ data: ApprovisionnementVasDemandeListItem[] }>(this.baseUrl, { params })
       .pipe(map((r) => r.data ?? []));
   }
 
@@ -58,6 +71,74 @@ export class ApprovisionnementVasService {
   update(id: number, body: ApprovisionnementVasDemandeInput) {
     return this.http
       .put<{ data: ApprovisionnementVasDemande }>(`${this.baseUrl}/${id}`, body)
+      .pipe(map((r) => r.data));
+  }
+
+  transition(id: number, statut: ApprovisionnementVasStatut, commentaire?: string, motifRejet?: string) {
+    return this.http
+      .post<{ data: ApprovisionnementVasDemande }>(`${this.baseUrl}/${id}/transition`, {
+        statut,
+        commentaire: commentaire ?? null,
+        motif_rejet: motifRejet ?? null,
+      })
+      .pipe(map((r) => r.data));
+  }
+
+  paiementsDemande(id: number) {
+    return this.http
+      .get<{ data: ApprovisionnementVasPaiement[] }>(`${this.baseUrl}/${id}/paiements`)
+      .pipe(map((r) => r.data ?? []));
+  }
+
+  paiementsLigne(ligneId: number) {
+    return this.http
+      .get<{ data: ApprovisionnementVasPaiement[] }>(`${this.baseUrl}/lignes/${ligneId}/paiements`)
+      .pipe(map((r) => r.data ?? []));
+  }
+
+  createPaiement(ligneId: number, body: ApprovisionnementVasPaiementInput) {
+    return this.http
+      .post<{ data: ApprovisionnementVasPaiement }>(`${this.baseUrl}/lignes/${ligneId}/paiements`, body)
+      .pipe(map((r) => r.data));
+  }
+
+  soldes() {
+    return this.http
+      .get<{ data: ApprovisionnementVasReleve[] }>(`${this.baseUrl}/soldes`)
+      .pipe(map((r) => r.data ?? []));
+  }
+
+  createSolde(body: {
+    produit_id: number;
+    devise: string;
+    solde: number;
+    commentaire?: string | null;
+  }) {
+    return this.http
+      .post<{ data: ApprovisionnementVasReleve }>(`${this.baseUrl}/soldes`, body)
+      .pipe(map((r) => r.data));
+  }
+
+  alertesSoldes() {
+    return this.http
+      .get<{ data: ApprovisionnementVasSoldeAlerte[] }>(`${this.baseUrl}/soldes/alertes`)
+      .pipe(map((r) => r.data ?? []));
+  }
+
+  seuils() {
+    return this.http
+      .get<{ data: ApprovisionnementVasSeuil[] }>(`${this.baseUrl}/seuils`)
+      .pipe(map((r) => r.data ?? []));
+  }
+
+  upsertSeuil(body: {
+    produit_id: number;
+    devise: string;
+    seuil_attention: number;
+    seuil_critique: number;
+  }) {
+    return this.http
+      .put<{ data: ApprovisionnementVasSeuil }>(`${this.baseUrl}/seuils`, body)
       .pipe(map((r) => r.data));
   }
 }

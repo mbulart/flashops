@@ -159,6 +159,19 @@ type SettingsTab = 'identity' | 'smtp' | 'change' | 'datetime';
                   required
                 />
               </div>
+              <div class="col-md-6">
+                <label class="form-label" for="sys-delai">Délai traitement Approvisionnement VAS (heures)</label>
+                <input
+                  id="sys-delai"
+                  type="number"
+                  class="form-control"
+                  name="delaiTraitement"
+                  [(ngModel)]="form.delai_traitement_heures"
+                  min="0.25"
+                  step="0.25"
+                  required
+                />
+              </div>
             </div>
           </app-section-card>
         }
@@ -260,6 +273,7 @@ export class ParametragesSystemPageComponent {
       ...data,
       timezone: data.timezone || 'Africa/Kinshasa',
       taux_change_usd_cdf: Number(data.taux_change_usd_cdf ?? 0),
+      delai_traitement_heures: Number(data.delai_traitement_heures ?? 2),
     };
   }
 
@@ -282,6 +296,7 @@ export class ParametragesSystemPageComponent {
       smtp_from_name: '',
       smtp_test_to: '',
       taux_change_usd_cdf: 0,
+      delai_traitement_heures: 2,
     };
   }
 }
