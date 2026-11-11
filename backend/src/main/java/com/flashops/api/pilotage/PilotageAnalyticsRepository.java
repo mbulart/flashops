@@ -768,12 +768,17 @@ public class PilotageAnalyticsRepository {
 
   /** Bundle / export : LIMIT seul, sans count (peut aller jusqu’à 5 000). */
   public List<AgenceRankRow> loadTopAgences(PilotageBundleQuery q, int limit, boolean worst) {
+    return loadTopAgences(q, limit, worst, false);
+  }
+
+  public List<AgenceRankRow> loadTopAgences(
+      PilotageBundleQuery q, int limit, boolean worst, boolean byVolume) {
     int cap = Math.min(Math.max(limit, 1), 5000);
     try {
       if (q.couloirOnFact()) {
-        return loadFaitTopAgences(q, cap, 0, worst, false).rows();
+        return loadFaitTopAgences(q, cap, 0, worst, false, byVolume).rows();
       }
-      return loadGrainTopAgences(q, cap, 0, worst, false).rows();
+      return loadGrainTopAgences(q, cap, 0, worst, false, byVolume).rows();
     } catch (DataAccessException ex) {
       log.error("Top agences pilotage indisponible", ex);
       return List.of();
@@ -783,6 +788,11 @@ public class PilotageAnalyticsRepository {
   /** Classement UI : page SQL + total (size plafonné à 50). */
   public AgenceClassement loadTopAgencesPage(
       PilotageBundleQuery q, int page, int size, boolean worst) {
+    return loadTopAgencesPage(q, page, size, worst, false);
+  }
+
+  public AgenceClassement loadTopAgencesPage(
+      PilotageBundleQuery q, int page, int size, boolean worst, boolean byVolume) {
     int safeSize = Math.min(Math.max(size, 1), 50);
     int safePage = Math.max(page, 1);
     long offset = (long) (safePage - 1) * safeSize;
@@ -792,10 +802,10 @@ public class PilotageAnalyticsRepository {
     }
     try {
       if (q.couloirOnFact()) {
-        return loadFaitTopAgences(q, safeSize, (int) offset, worst, true)
+        return loadFaitTopAgences(q, safeSize, (int) offset, worst, true, byVolume)
             .withPage(safePage, safeSize);
       }
-      return loadGrainTopAgences(q, safeSize, (int) offset, worst, true)
+      return loadGrainTopAgences(q, safeSize, (int) offset, worst, true, byVolume)
           .withPage(safePage, safeSize);
     } catch (DataAccessException ex) {
       log.error("Top agences pilotage indisponible", ex);
@@ -803,12 +813,26 @@ public class PilotageAnalyticsRepository {
     }
   }
 
+  private static String orderByMontantVolume(
+      String montantExpr, String volumeExpr, boolean worst, boolean byVolume) {
+    if (byVolume) {
+      return worst
+          ? " ORDER BY " + volumeExpr + " ASC, " + montantExpr + " ASC "
+          : " ORDER BY " + volumeExpr + " DESC, " + montantExpr + " DESC ";
+    }
+    return worst
+        ? " ORDER BY " + montantExpr + " ASC, " + volumeExpr + " ASC "
+        : " ORDER BY " + montantExpr + " DESC, " + volumeExpr + " DESC ";
+  }
+
   private AgenceClassement loadGrainTopAgences(
-      PilotageBundleQuery q, int limit, int offset, boolean worst, boolean withTotal) {
-    String order =
-        worst
-            ? " ORDER BY sum(g.montant) ASC, sum(g.nb) ASC "
-            : " ORDER BY sum(g.montant) DESC, sum(g.nb) DESC ";
+      PilotageBundleQuery q,
+      int limit,
+      int offset,
+      boolean worst,
+      boolean withTotal,
+      boolean byVolume) {
+    String order = orderByMontantVolume("sum(g.montant)", "sum(g.nb)", worst, byVolume);
     Grain grain = resolveAgenceRankGrain(q);
     var scoped =
         PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
@@ -854,11 +878,13 @@ public class PilotageAnalyticsRepository {
   }
 
   private AgenceClassement loadFaitTopAgences(
-      PilotageBundleQuery q, int limit, int offset, boolean worst, boolean withTotal) {
-    String order =
-        worst
-            ? " ORDER BY sum(f.montant) ASC, count(*) ASC "
-            : " ORDER BY sum(f.montant) DESC, count(*) DESC ";
+      PilotageBundleQuery q,
+      int limit,
+      int offset,
+      boolean worst,
+      boolean withTotal,
+      boolean byVolume) {
+    String order = orderByMontantVolume("sum(f.montant)", "count(*)", worst, byVolume);
     var scoped = PilotageSqlScope.buildFait(jdbc, q);
     String from = scoped.fromAndWhere();
     if (scoped.agenceAlias() == null) {
@@ -907,6 +933,151 @@ public class PilotageAnalyticsRepository {
     args.add(offset);
     var rows = jdbc.query(sql, this::mapAgenceRank, args.toArray());
     return new AgenceClassement(total, 1, limit, rows);
+  }
+
+  /** Classement corridors (par volume = requêtes). */
+  public CouloirClassement loadTopCorridorsPage(
+      PilotageBundleQuery q, int page, int size, boolean worst) {
+    int safeSize = Math.min(Math.max(size, 1), 50);
+    int safePage = Math.max(page, 1);
+    long offset = (long) (safePage - 1) * safeSize;
+    if (offset > 200_000L) {
+      safePage = (int) (200_000L / safeSize) + 1;
+      offset = (long) (safePage - 1) * safeSize;
+    }
+    try {
+      if (q.usesAgentGrain()
+          || (q.typeOperationIds() != null && !q.typeOperationIds().isEmpty())) {
+        return loadFaitTopCorridors(q, safeSize, (int) offset, worst, true)
+            .withPage(safePage, safeSize);
+      }
+      return loadGrainTopCorridors(q, safeSize, (int) offset, worst, true)
+          .withPage(safePage, safeSize);
+    } catch (DataAccessException ex) {
+      log.error("Top corridors pilotage indisponible", ex);
+      return new CouloirClassement(0, safePage, safeSize, List.of());
+    }
+  }
+
+  private CouloirClassement loadGrainTopCorridors(
+      PilotageBundleQuery q, int limit, int offset, boolean worst, boolean withTotal) {
+    String order = orderByMontantVolume("sum(g.montant)", "sum(g.nb)", worst, true);
+    var scoped =
+        PilotageSqlScope.build(jdbc, q, "pilotage.agg_couloir_jour", "g", q.usesAgenceGrain(), false);
+    String base = withCorridorPaysJoins(scoped.fromAndWhere());
+    String groupSql =
+        base
+            + """
+             AND g.pays_origine_id <> 0
+             AND g.pays_destination_id <> 0
+             GROUP BY g.pays_origine_id, g.pays_destination_id, po.libelle, pd.libelle
+            """;
+    long total = 0L;
+    if (withTotal) {
+      Long counted =
+          jdbc.queryForObject(
+              "SELECT count(*)::bigint FROM (SELECT g.pays_origine_id "
+                  + groupSql
+                  + ") t",
+              Long.class,
+              scoped.args().toArray());
+      total = counted == null ? 0L : counted;
+    }
+    var sql =
+        """
+        SELECT g.pays_origine_id::text || '|' || g.pays_destination_id::text AS code,
+               coalesce(nullif(btrim(po.libelle), ''), 'Pays ' || g.pays_origine_id::text)
+                 || ' → '
+                 || coalesce(nullif(btrim(pd.libelle), ''), 'Pays ' || g.pays_destination_id::text) AS label,
+               coalesce(sum(g.nb), 0)::bigint AS nb,
+               coalesce(sum(g.montant), 0) AS montant
+        """
+            + groupSql
+            + order
+            + """
+             LIMIT ? OFFSET ?
+            """;
+    var args = new ArrayList<>(scoped.args());
+    args.add(limit);
+    args.add(offset);
+    var rows = jdbc.query(sql, this::mapCouloirRank, args.toArray());
+    return new CouloirClassement(total, 1, limit, rows);
+  }
+
+  private CouloirClassement loadFaitTopCorridors(
+      PilotageBundleQuery q, int limit, int offset, boolean worst, boolean withTotal) {
+    String order = orderByMontantVolume("sum(f.montant)", "count(*)", worst, true);
+    var scoped = PilotageSqlScope.buildFait(jdbc, q);
+    String base = withCorridorPaysJoinsFait(scoped.fromAndWhere());
+    String groupSql =
+        base
+            + """
+             AND f.pays_origine_id <> 0
+             AND f.pays_destination_id <> 0
+             GROUP BY f.pays_origine_id, f.pays_destination_id, po.libelle, pd.libelle
+            """;
+    long total = 0L;
+    if (withTotal) {
+      Long counted =
+          jdbc.queryForObject(
+              "SELECT count(*)::bigint FROM (SELECT f.pays_origine_id "
+                  + groupSql
+                  + ") t",
+              Long.class,
+              scoped.args().toArray());
+      total = counted == null ? 0L : counted;
+    }
+    var sql =
+        """
+        SELECT f.pays_origine_id::text || '|' || f.pays_destination_id::text AS code,
+               coalesce(nullif(btrim(po.libelle), ''), 'Pays ' || f.pays_origine_id::text)
+                 || ' → '
+                 || coalesce(nullif(btrim(pd.libelle), ''), 'Pays ' || f.pays_destination_id::text) AS label,
+               count(*)::bigint AS nb,
+               coalesce(sum(f.montant), 0) AS montant
+        """
+            + groupSql
+            + order
+            + """
+             LIMIT ? OFFSET ?
+            """;
+    var args = new ArrayList<>(scoped.args());
+    args.add(limit);
+    args.add(offset);
+    var rows = jdbc.query(sql, this::mapCouloirRank, args.toArray());
+    return new CouloirClassement(total, 1, limit, rows);
+  }
+
+  private static String withCorridorPaysJoins(String fromAndWhere) {
+    String joins =
+        " INNER JOIN pilotage.dim_pays AS po ON po.pays_id = g.pays_origine_id"
+            + " INNER JOIN pilotage.dim_pays AS pd ON pd.pays_id = g.pays_destination_id";
+    if (fromAndWhere.contains(" WHERE 1=1")) {
+      return fromAndWhere.replace(" WHERE 1=1", joins + " WHERE 1=1");
+    }
+    if (fromAndWhere.contains(" WHERE p.produit_id <> 0")) {
+      return fromAndWhere.replace(" WHERE p.produit_id <> 0", joins + " WHERE p.produit_id <> 0");
+    }
+    return fromAndWhere.replaceFirst(" WHERE ", joins + " WHERE ");
+  }
+
+  private static String withCorridorPaysJoinsFait(String fromAndWhere) {
+    String joins =
+        " INNER JOIN pilotage.dim_pays AS po ON po.pays_id = f.pays_origine_id"
+            + " INNER JOIN pilotage.dim_pays AS pd ON pd.pays_id = f.pays_destination_id";
+    if (fromAndWhere.contains(" WHERE p.produit_id <> 0")) {
+      return fromAndWhere.replace(" WHERE p.produit_id <> 0", joins + " WHERE p.produit_id <> 0");
+    }
+    return fromAndWhere.replaceFirst(" WHERE ", joins + " WHERE ");
+  }
+
+  private CouloirRankRow mapCouloirRank(java.sql.ResultSet rs, int rowNum)
+      throws java.sql.SQLException {
+    return new CouloirRankRow(
+        rs.getString("code"),
+        rs.getString("label"),
+        rs.getLong("nb"),
+        rs.getBigDecimal("montant"));
   }
 
   private LigneExportRow mapLigne(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
@@ -1271,6 +1442,14 @@ public class PilotageAnalyticsRepository {
       double longitude,
       long nb,
       BigDecimal montant) {}
+
+  public record CouloirRankRow(String code, String label, long nb, BigDecimal montant) {}
+
+  public record CouloirClassement(long total, int page, int size, List<CouloirRankRow> rows) {
+    CouloirClassement withPage(int page, int size) {
+      return new CouloirClassement(total, page, size, rows);
+    }
+  }
 
   public record AgenceClassement(long total, int page, int size, List<AgenceRankRow> rows) {
     AgenceClassement withPage(int page, int size) {

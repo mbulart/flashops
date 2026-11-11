@@ -130,6 +130,15 @@ public final class PilotageDtos {
   public record AgenceClassementPage(
       long total, int page, int size, java.util.List<AgenceRank> items) {}
 
+  public record CouloirRank(
+      String code,
+      String label,
+      long volume,
+      java.math.BigDecimal montant) {}
+
+  public record CouloirClassementPage(
+      long total, int page, int size, java.util.List<CouloirRank> items) {}
+
   public record AgenceGeoPoint(
       int agenceId,
       @JsonProperty("code_agence") String codeAgence,

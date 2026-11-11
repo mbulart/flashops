@@ -34,6 +34,7 @@ import {
   PilotageAgenceRank,
   PilotageAgenceScope,
   PilotageBundle,
+  PilotageCouloirRank,
   PilotageCriteria,
   PilotageDomaine,
   PilotageDomaineOption,
@@ -794,7 +795,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
             </app-section-card>
           </div>
 
-          <app-section-card [title]="agencyOrder() === 'top' ? 'Top agences' : 'Dernières agences'" [subtitle]="agencySubtitle()">
+          <app-section-card [title]="rankingTitle()" [subtitle]="rankingSubtitle()">
             <div actions class="pilotage-chart-toolbar">
               <div class="btn-group btn-group-sm pilotage-chart-toggle" role="group" aria-label="Sens du classement">
                 <button
@@ -816,9 +817,31 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                   Dernières
                 </button>
               </div>
+              @if (rankingPane() === 'agences') {
+                <div class="btn-group btn-group-sm pilotage-chart-toggle" role="group" aria-label="Critère de classement">
+                  <button
+                    type="button"
+                    class="btn"
+                    [class.btn-primary]="agencyTri() === 'montant'"
+                    [class.btn-outline-secondary]="agencyTri() !== 'montant'"
+                    (click)="setAgencyTri('montant')"
+                  >
+                    Montant
+                  </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    [class.btn-primary]="agencyTri() === 'volume'"
+                    [class.btn-outline-secondary]="agencyTri() !== 'volume'"
+                    (click)="setAgencyTri('volume')"
+                  >
+                    Volume
+                  </button>
+                </div>
+              }
               <select
                 class="form-select form-select-sm pilotage-agency-page-size"
-                aria-label="Agences par page"
+                [attr.aria-label]="rankingPane() === 'agences' ? 'Agences par page' : 'Corridors par page'"
                 [ngModel]="agencyPageSize()"
                 (ngModelChange)="setAgencyPageSize($event)"
               >
@@ -826,134 +849,221 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                   <option [ngValue]="size">{{ size }} / page</option>
                 }
               </select>
-              <div class="pilotage-export-collapse" [class.is-open]="exportMenuOpen()">
+              @if (rankingPane() === 'agences') {
+                <div class="pilotage-export-collapse" [class.is-open]="exportMenuOpen()">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-dark"
+                    [disabled]="exportingExcel()"
+                    [attr.aria-expanded]="exportMenuOpen()"
+                    aria-controls="pilotage-export-panel"
+                    (click)="toggleExportMenu($event)"
+                  >
+                    <i class="bi bi-download me-1"></i>
+                    {{ exportingExcel() ? 'Export…' : 'Exporter' }}
+                    <i
+                      class="bi ms-1"
+                      [class.bi-chevron-up]="exportMenuOpen()"
+                      [class.bi-chevron-down]="!exportMenuOpen()"
+                      aria-hidden="true"
+                    ></i>
+                  </button>
+                  @if (exportMenuOpen()) {
+                    <div
+                      id="pilotage-export-panel"
+                      class="pilotage-export-collapse__panel shadow-sm"
+                      role="menu"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <button
+                        type="button"
+                        class="pilotage-export-collapse__item"
+                        role="menuitem"
+                        [disabled]="exportingExcel()"
+                        (click)="exportAgences()"
+                      >
+                        <span class="pilotage-export-collapse__item-title">
+                          <i class="bi bi-building me-2" aria-hidden="true"></i>
+                          Agences et opérations
+                        </span>
+                        <span class="pilotage-export-collapse__item-desc">
+                          Classement agences, détail des opérations et analyses.
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        class="pilotage-export-collapse__item"
+                        role="menuitem"
+                        [disabled]="exportingExcel()"
+                        (click)="exportProduitsMensuel()"
+                      >
+                        <span class="pilotage-export-collapse__item-title">
+                          <i class="bi bi-calendar3 me-2" aria-hidden="true"></i>
+                          Produits par mois
+                        </span>
+                        <span class="pilotage-export-collapse__item-desc">
+                          Volume et valeur mensuels par produit, totaux et graphique Flash.
+                        </span>
+                      </button>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+            <ul class="nav nav-tabs nav-tabs-ranking mb-3" role="tablist">
+              <li class="nav-item" role="presentation">
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-dark"
-                  [disabled]="exportingExcel()"
-                  [attr.aria-expanded]="exportMenuOpen()"
-                  aria-controls="pilotage-export-panel"
-                  (click)="toggleExportMenu($event)"
+                  class="nav-link"
+                  role="tab"
+                  [class.active]="rankingPane() === 'agences'"
+                  [attr.aria-selected]="rankingPane() === 'agences'"
+                  (click)="setRankingPane('agences')"
                 >
-                  <i class="bi bi-download me-1"></i>
-                  {{ exportingExcel() ? 'Export…' : 'Exporter' }}
-                  <i
-                    class="bi ms-1"
-                    [class.bi-chevron-up]="exportMenuOpen()"
-                    [class.bi-chevron-down]="!exportMenuOpen()"
-                    aria-hidden="true"
-                  ></i>
+                  Agences
                 </button>
-                @if (exportMenuOpen()) {
-                  <div
-                    id="pilotage-export-panel"
-                    class="pilotage-export-collapse__panel shadow-sm"
-                    role="menu"
-                    (click)="$event.stopPropagation()"
-                  >
-                    <button
-                      type="button"
-                      class="pilotage-export-collapse__item"
-                      role="menuitem"
-                      [disabled]="exportingExcel()"
-                      (click)="exportAgences()"
-                    >
-                      <span class="pilotage-export-collapse__item-title">
-                        <i class="bi bi-building me-2" aria-hidden="true"></i>
-                        Agences et opérations
-                      </span>
-                      <span class="pilotage-export-collapse__item-desc">
-                        Classement agences, détail des opérations et analyses.
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      class="pilotage-export-collapse__item"
-                      role="menuitem"
-                      [disabled]="exportingExcel()"
-                      (click)="exportProduitsMensuel()"
-                    >
-                      <span class="pilotage-export-collapse__item-title">
-                        <i class="bi bi-calendar3 me-2" aria-hidden="true"></i>
-                        Produits par mois
-                      </span>
-                      <span class="pilotage-export-collapse__item-desc">
-                        Volume et valeur mensuels par produit, totaux et graphique Flash.
-                      </span>
-                    </button>
-                  </div>
-                }
-              </div>
-            </div>
-            @if (agencyLoading() || bundleLoading()) {
-              <app-skeleton type="table" [rows]="6" [cols]="4" />
-            } @else if (agencyPageRows().length) {
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0 pilotage-top-agences">
-                  <thead>
-                    <tr>
-                      <th style="width: 3rem">#</th>
-                      <th>Agence</th>
-                      <th class="text-end">Volume</th>
-                      <th class="text-end">Montant</th>
-                      @if (hasSagWuCommission(bundle())) {
-                        <th class="text-end">Commission</th>
-                      }
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (item of agencyPageRows(); track item.row.agenceId) {
-                      <tr
-                        class="pilotage-agency-row"
-                        [ngClass]="agencyRankClass(item.rank)"
-                        tabindex="0"
-                        (click)="openAgency(item.row)"
-                        (keydown.enter)="openAgency(item.row)"
-                      >
-                        <td>
-                          <span class="agency-rank-badge" [ngClass]="agencyBadgeClass(item.rank)">{{ item.rank + 1 }}</span>
-                        </td>
-                        <td>
-                          <span class="d-block fw-semibold">{{ item.row.nom || item.row.codeAgence }}</span>
-                          @if (agencyCodeLine(item.row); as codeLine) {
-                            <small class="text-muted font-monospace">{{ codeLine }}</small>
-                          }
-                        </td>
-                        <td class="text-end text-nowrap">{{ formatPilotageNumber(item.row.volume) }}</td>
-                        <td class="text-end text-nowrap" [title]="formatValeurFr(item.row.montant, bundle()?.devise ?? 'USD')">
-                          {{ formatPilotageMontant(item.row.montant, bundle()?.devise ?? 'USD') }}
-                        </td>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  type="button"
+                  class="nav-link"
+                  role="tab"
+                  [class.active]="rankingPane() === 'couloirs'"
+                  [attr.aria-selected]="rankingPane() === 'couloirs'"
+                  (click)="setRankingPane('couloirs')"
+                >
+                  Corridors
+                </button>
+              </li>
+            </ul>
+            @if (rankingPane() === 'agences') {
+              @if (agencyLoading() || bundleLoading()) {
+                <app-skeleton type="table" [rows]="6" [cols]="4" />
+              } @else if (agencyPageRows().length) {
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0 pilotage-top-agences">
+                    <thead>
+                      <tr>
+                        <th style="width: 3rem">#</th>
+                        <th>Agence</th>
+                        <th class="text-end">Volume</th>
+                        <th class="text-end">Montant</th>
                         @if (hasSagWuCommission(bundle())) {
-                          <td class="text-end text-nowrap" [title]="formatValeurFr(item.row.commission, bundle()?.devise ?? 'USD')">
-                            {{ formatPilotageMontant(item.row.commission, bundle()?.devise ?? 'USD') }}
-                          </td>
+                          <th class="text-end">Commission</th>
                         }
                       </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-              <div class="pilotage-agency-pager">
-                <button
-                  type="button"
-                  class="btn btn-sm btn-outline-secondary"
-                  [disabled]="currentAgencyPage() <= 1"
-                  (click)="setAgencyPage(currentAgencyPage() - 1)"
-                >
-                  Précédent
-                </button>
-                <span>{{ agencyRangeLabel() }}</span>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-outline-secondary"
-                  [disabled]="currentAgencyPage() >= agencyPageCount()"
-                  (click)="setAgencyPage(currentAgencyPage() + 1)"
-                >
-                  Suivant
-                </button>
-              </div>
+                    </thead>
+                    <tbody>
+                      @for (item of agencyPageRows(); track item.row.agenceId) {
+                        <tr
+                          class="pilotage-agency-row"
+                          [ngClass]="agencyRankClass(item.rank)"
+                          tabindex="0"
+                          (click)="openAgency(item.row)"
+                          (keydown.enter)="openAgency(item.row)"
+                        >
+                          <td>
+                            <span class="agency-rank-badge" [ngClass]="agencyBadgeClass(item.rank)">{{ item.rank + 1 }}</span>
+                          </td>
+                          <td>
+                            <span class="d-block fw-semibold">{{ item.row.nom || item.row.codeAgence }}</span>
+                            @if (agencyCodeLine(item.row); as codeLine) {
+                              <small class="text-muted font-monospace">{{ codeLine }}</small>
+                            }
+                          </td>
+                          <td class="text-end text-nowrap">{{ formatPilotageNumber(item.row.volume) }}</td>
+                          <td class="text-end text-nowrap" [title]="formatValeurFr(item.row.montant, bundle()?.devise ?? 'USD')">
+                            {{ formatPilotageMontant(item.row.montant, bundle()?.devise ?? 'USD') }}
+                          </td>
+                          @if (hasSagWuCommission(bundle())) {
+                            <td class="text-end text-nowrap" [title]="formatValeurFr(item.row.commission, bundle()?.devise ?? 'USD')">
+                              {{ formatPilotageMontant(item.row.commission, bundle()?.devise ?? 'USD') }}
+                            </td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <div class="pilotage-agency-pager">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    [disabled]="currentAgencyPage() <= 1"
+                    (click)="setAgencyPage(currentAgencyPage() - 1)"
+                  >
+                    Précédent
+                  </button>
+                  <span>{{ agencyRangeLabel() }}</span>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    [disabled]="currentAgencyPage() >= agencyPageCount()"
+                    (click)="setAgencyPage(currentAgencyPage() + 1)"
+                  >
+                    Suivant
+                  </button>
+                </div>
+              } @else {
+                <app-empty-state title="Aucune agence" message="Pas de volume agence sur ce périmètre." />
+              }
             } @else {
-              <app-empty-state title="Aucune agence" message="Pas de volume agence sur ce périmètre." />
+              @if (corridorLoading() || bundleLoading()) {
+                <app-skeleton type="table" [rows]="6" [cols]="4" />
+              } @else if (corridorPageRows().length) {
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0 pilotage-top-agences">
+                    <thead>
+                      <tr>
+                        <th style="width: 3rem">#</th>
+                        <th>Corridor</th>
+                        <th class="text-end">Requêtes</th>
+                        <th class="text-end">Montant</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (item of corridorPageRows(); track item.row.code) {
+                        <tr class="pilotage-agency-row" [ngClass]="agencyRankClass(item.rank)">
+                          <td>
+                            <span class="agency-rank-badge" [ngClass]="agencyBadgeClass(item.rank)">{{ item.rank + 1 }}</span>
+                          </td>
+                          <td>
+                            <span class="d-block fw-semibold">{{ item.row.label || item.row.code }}</span>
+                            @if (item.row.code) {
+                              <small class="text-muted font-monospace">{{ item.row.code }}</small>
+                            }
+                          </td>
+                          <td class="text-end text-nowrap">{{ formatPilotageNumber(item.row.volume) }}</td>
+                          <td class="text-end text-nowrap" [title]="formatValeurFr(item.row.montant, bundle()?.devise ?? 'USD')">
+                            {{ formatPilotageMontant(item.row.montant, bundle()?.devise ?? 'USD') }}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <div class="pilotage-agency-pager">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    [disabled]="currentCorridorPage() <= 1"
+                    (click)="setCorridorPage(currentCorridorPage() - 1)"
+                  >
+                    Précédent
+                  </button>
+                  <span>{{ corridorRangeLabel() }}</span>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    [disabled]="currentCorridorPage() >= corridorPageCount()"
+                    (click)="setCorridorPage(currentCorridorPage() + 1)"
+                  >
+                    Suivant
+                  </button>
+                </div>
+              } @else {
+                <app-empty-state title="Aucun corridor" message="Pas de requêtes corridor sur ce périmètre." />
+              }
             }
           </app-section-card>
         } @else if (criteria() && bundleError()) {
@@ -1172,13 +1282,19 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   readonly exportingExcel = signal(false);
   readonly exportMenuOpen = signal(false);
   readonly agencyPageSizes = [5, 10, 20, 50];
+  readonly rankingPane = signal<'agences' | 'couloirs'>('agences');
   readonly agencyOrder = signal<'top' | 'pire'>('top');
+  readonly agencyTri = signal<'montant' | 'volume'>('montant');
   readonly agencyPageSize = signal(10);
   readonly agencyPage = signal(1);
   readonly agencyTotal = signal(0);
   readonly agencyRows = signal<PilotageAgenceRank[]>([]);
   readonly openedAgency = signal<PilotageAgenceRank | null>(null);
   readonly agencyLoading = signal(false);
+  readonly corridorPage = signal(1);
+  readonly corridorTotal = signal(0);
+  readonly corridorRows = signal<PilotageCouloirRank[]>([]);
+  readonly corridorLoading = signal(false);
   readonly agencyPageCount = computed(() =>
     Math.max(1, Math.ceil(this.agencyTotal() / this.agencyPageSize()))
   );
@@ -1187,6 +1303,18 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     const page = this.currentAgencyPage();
     const start = (page - 1) * size;
     return this.agencyRows().map((row, index) => ({
+      row,
+      rank: start + index,
+    }));
+  });
+  readonly corridorPageCount = computed(() =>
+    Math.max(1, Math.ceil(this.corridorTotal() / this.agencyPageSize()))
+  );
+  readonly corridorPageRows = computed(() => {
+    const size = this.agencyPageSize();
+    const page = this.currentCorridorPage();
+    const start = (page - 1) * size;
+    return this.corridorRows().map((row, index) => ({
       row,
       rank: start + index,
     }));
@@ -2079,11 +2207,34 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.exportProgress.set(0);
   }
 
+  rankingTitle(): string {
+    const top = this.agencyOrder() === 'top';
+    if (this.rankingPane() === 'couloirs') {
+      return top ? 'Top corridors' : 'Derniers corridors';
+    }
+    return top ? 'Top agences' : 'Dernières agences';
+  }
+
+  rankingSubtitle(): string {
+    if (this.rankingPane() === 'couloirs') {
+      return this.corridorSubtitle();
+    }
+    return this.agencySubtitle();
+  }
+
   agencySubtitle(): string {
+    const triLabel = this.agencyTri() === 'volume' ? 'Volume' : 'Montant';
     const total = this.agencyTotal();
-    if (!total) return 'Montant';
+    if (!total) return triLabel;
     const sens = this.agencyOrder() === 'top' ? 'meilleures en tête' : 'plus faibles en tête';
-    return `Montant — ${total.toLocaleString('fr-FR')} agence(s), ${sens}`;
+    return `${triLabel} — ${total.toLocaleString('fr-FR')} agence(s), ${sens}`;
+  }
+
+  corridorSubtitle(): string {
+    const total = this.corridorTotal();
+    if (!total) return 'Requêtes';
+    const sens = this.agencyOrder() === 'top' ? 'meilleurs en tête' : 'plus faibles en tête';
+    return `Requêtes — ${total.toLocaleString('fr-FR')} corridor(s), ${sens}`;
   }
 
   agencyRangeLabel(): string {
@@ -2096,8 +2247,31 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     return `${from}–${to} sur ${total.toLocaleString('fr-FR')}`;
   }
 
+  corridorRangeLabel(): string {
+    const total = this.corridorTotal();
+    if (!total) return '0';
+    const size = this.agencyPageSize();
+    const page = this.currentCorridorPage();
+    const from = (page - 1) * size + 1;
+    const to = Math.min(page * size, total);
+    return `${from}–${to} sur ${total.toLocaleString('fr-FR')}`;
+  }
+
   currentAgencyPage(): number {
     return Math.min(this.agencyPage(), this.agencyPageCount());
+  }
+
+  currentCorridorPage(): number {
+    return Math.min(this.corridorPage(), this.corridorPageCount());
+  }
+
+  setRankingPane(pane: 'agences' | 'couloirs'): void {
+    if (this.rankingPane() === pane) return;
+    this.exportMenuOpen.set(false);
+    this.rankingPane.set(pane);
+    if (pane === 'couloirs' && !this.corridorRows().length && !this.corridorLoading()) {
+      this.reloadCorridorClassement({ resetPage: false });
+    }
   }
 
   setAgencyPage(page: number): void {
@@ -2107,12 +2281,21 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.reloadClassement({ resetPage: false });
   }
 
+  setCorridorPage(page: number): void {
+    const next = Math.min(Math.max(1, page), this.corridorPageCount());
+    if (next === this.corridorPage()) return;
+    this.corridorPage.set(next);
+    this.reloadCorridorClassement({ resetPage: false });
+  }
+
   setAgencyPageSize(size: number): void {
     const next = Number(size);
     if (!this.agencyPageSizes.includes(next) || next === this.agencyPageSize()) return;
     this.agencyPageSize.set(next);
     this.agencyPage.set(1);
+    this.corridorPage.set(1);
     this.reloadClassement({ resetPage: false });
+    this.reloadCorridorClassement({ resetPage: false });
   }
 
   setAgencyOrder(order: 'top' | 'pire'): void {
@@ -2120,6 +2303,14 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.openedAgency.set(null);
     this.agencyOrder.set(order);
     this.patchAgencyOrderInUrl(order);
+    this.reloadClassement({ resetPage: true });
+    this.reloadCorridorClassement({ resetPage: true });
+  }
+
+  setAgencyTri(tri: 'montant' | 'volume'): void {
+    if (this.agencyTri() === tri) return;
+    this.openedAgency.set(null);
+    this.agencyTri.set(tri);
     this.reloadClassement({ resetPage: true });
   }
 
@@ -2192,7 +2383,13 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     }
     this.agencyLoading.set(true);
     this.pilotage
-      .loadClassementAgences(c, this.agencyOrder(), this.agencyPage(), this.agencyPageSize())
+      .loadClassementAgences(
+        c,
+        this.agencyOrder(),
+        this.agencyPage(),
+        this.agencyPageSize(),
+        this.agencyTri()
+      )
       .subscribe({
         next: (page) => {
           this.agencyRows.set(page.items);
@@ -2208,17 +2405,52 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
       });
   }
 
+  private reloadCorridorClassement(options?: { resetPage?: boolean }): void {
+    const resetPage = options?.resetPage !== false;
+    const c = this.criteria();
+    if (!c || !this.metaReady()) {
+      this.corridorRows.set([]);
+      this.corridorTotal.set(0);
+      this.corridorLoading.set(false);
+      return;
+    }
+    if (resetPage) {
+      this.corridorPage.set(1);
+      this.corridorRows.set([]);
+      this.corridorTotal.set(0);
+    }
+    this.corridorLoading.set(true);
+    this.pilotage
+      .loadClassementCouloirs(c, this.agencyOrder(), this.corridorPage(), this.agencyPageSize())
+      .subscribe({
+        next: (page) => {
+          this.corridorRows.set(page.items);
+          this.corridorTotal.set(page.total);
+          if (page.page > 0) this.corridorPage.set(page.page);
+          this.corridorLoading.set(false);
+        },
+        error: () => {
+          this.corridorRows.set([]);
+          this.corridorTotal.set(0);
+          this.corridorLoading.set(false);
+        },
+      });
+  }
+
   private refreshBundle(): void {
     const c = this.criteria();
     if (!c || !this.metaReady()) {
       this.bundle.set(null);
       this.agencyRows.set([]);
       this.agencyTotal.set(0);
+      this.corridorRows.set([]);
+      this.corridorTotal.set(0);
       return;
     }
     this.bundleLoading.set(true);
     this.bundleError.set(false);
     this.reloadClassement({ resetPage: true });
+    this.reloadCorridorClassement({ resetPage: true });
     this.pilotage.loadBundle(c).subscribe({
       next: (data) => {
         this.bundle.set(data);
@@ -2254,7 +2486,10 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.resetDraftDates();
     this.resetOptionalDraft();
     this.agencyOrder.set('top');
+    this.agencyTri.set('montant');
+    this.rankingPane.set('agences');
     this.agencyPage.set(1);
+    this.corridorPage.set(1);
     this.detailFiltresOpen.set(false);
     this.onDomaineIdsChange(this.draftDomaineIds);
     this.applySearch(false);

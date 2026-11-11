@@ -220,6 +220,20 @@ export interface PilotageAgenceClassementPage {
   items: PilotageAgenceRank[];
 }
 
+export interface PilotageCouloirRank {
+  code: string;
+  label: string;
+  volume: number;
+  montant: number;
+}
+
+export interface PilotageCouloirClassementPage {
+  total: number;
+  page: number;
+  size: number;
+  items: PilotageCouloirRank[];
+}
+
 export interface PilotageAgenceFiche {
   agenceId: number;
   codeAgence: string;

@@ -10,6 +10,8 @@ import {
   PilotageAgenceFiche,
   PilotageAgenceGeoPoint,
   PilotageAgenceRank,
+  PilotageCouloirClassementPage,
+  PilotageCouloirRank,
   PilotageAgenceTransaction,
   PilotageAgenceTransactionsPage,
   PilotageAgenceScope,
@@ -231,6 +233,23 @@ export class PilotageService {
     criteria: PilotageCriteria,
     ordre: 'top' | 'pire' = 'top',
     page = 1,
+    size = 10,
+    tri: 'montant' | 'volume' = 'montant'
+  ) {
+    const params = this.criteriaParams(criteria)
+      .set('ordre', ordre)
+      .set('tri', tri)
+      .set('page', String(page))
+      .set('size', String(size));
+    return this.http
+      .get<{ data: PilotageAgenceClassementPage }>(`${this.baseUrl}/agences/classement`, { params })
+      .pipe(map((r) => normalizeAgenceClassement(r.data)));
+  }
+
+  loadClassementCouloirs(
+    criteria: PilotageCriteria,
+    ordre: 'top' | 'pire' = 'top',
+    page = 1,
     size = 10
   ) {
     const params = this.criteriaParams(criteria)
@@ -238,8 +257,8 @@ export class PilotageService {
       .set('page', String(page))
       .set('size', String(size));
     return this.http
-      .get<{ data: PilotageAgenceClassementPage }>(`${this.baseUrl}/agences/classement`, { params })
-      .pipe(map((r) => normalizeAgenceClassement(r.data)));
+      .get<{ data: PilotageCouloirClassementPage }>(`${this.baseUrl}/couloirs/classement`, { params })
+      .pipe(map((r) => normalizeCouloirClassement(r.data)));
   }
 
   loadBundle(criteria: PilotageCriteria) {
@@ -551,6 +570,26 @@ function normalizeAgenceClassement(raw: PilotageAgenceClassementPage | null | un
     page: Number(raw?.page ?? 1),
     size: Number(raw?.size ?? 10),
     items: (raw?.items ?? []).map((row) => normalizeAgenceRank(row)),
+  };
+}
+
+function normalizeCouloirRank(row: PilotageCouloirRank): PilotageCouloirRank {
+  return {
+    code: row.code ?? '',
+    label: row.label ?? '',
+    volume: Number(row.volume ?? 0),
+    montant: Number(row.montant ?? 0),
+  };
+}
+
+function normalizeCouloirClassement(
+  raw: PilotageCouloirClassementPage | null | undefined
+): PilotageCouloirClassementPage {
+  return {
+    total: Number(raw?.total ?? 0),
+    page: Number(raw?.page ?? 1),
+    size: Number(raw?.size ?? 10),
+    items: (raw?.items ?? []).map((row) => normalizeCouloirRank(row)),
   };
 }
 

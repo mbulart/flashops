@@ -216,10 +216,29 @@ public class PilotageAnalyticsService {
 
   public PilotageDtos.AgenceClassementPage classementAgences(
       PilotageBundleQuery q, boolean worst, int page, int size) {
+    return classementAgences(q, worst, page, size, false);
+  }
+
+  public PilotageDtos.AgenceClassementPage classementAgences(
+      PilotageBundleQuery q, boolean worst, int page, int size, boolean byVolume) {
     validate(q);
-    var raw = repository.loadTopAgencesPage(q, page, size, worst);
+    var raw = repository.loadTopAgencesPage(q, page, size, worst, byVolume);
     return new PilotageDtos.AgenceClassementPage(
         raw.total(), raw.page(), raw.size(), toAgenceRanks(raw.rows()));
+  }
+
+  public PilotageDtos.CouloirClassementPage classementCouloirs(
+      PilotageBundleQuery q, boolean worst, int page, int size) {
+    validate(q);
+    var raw = repository.loadTopCorridorsPage(q, page, size, worst);
+    var items =
+        raw.rows().stream()
+            .map(
+                r ->
+                    new PilotageDtos.CouloirRank(
+                        r.code(), r.label(), r.nb(), r.montant() == null ? BigDecimal.ZERO : r.montant()))
+            .toList();
+    return new PilotageDtos.CouloirClassementPage(raw.total(), raw.page(), raw.size(), items);
   }
 
   public PilotageDtos.ExportResponse export(PilotageBundleQuery q) {
