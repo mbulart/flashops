@@ -1,6 +1,5 @@
 package com.flashops.api.pilotage;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 public final class PilotageBundleParams {
@@ -33,11 +32,13 @@ public final class PilotageBundleParams {
             reseauRegions, zoneIds, paysId, provinceId, villeIds, territoireId, communeIds);
     var clean = PilotageProductRules.cleanDomaines(domaines);
     String primary = clean.isEmpty() ? "" : String.join(",", clean);
-    List<String> deviseList = PilotageMoneySql.mergeParam(devises);
-    String display = deviseList.isEmpty() ? "" : deviseList.get(0);
+    List<String> cleanDevises = PilotageMoneySql.mergeParam(devises);
+    String display = cleanDevises.isEmpty() ? "" : cleanDevises.get(0);
     return new PilotageBundleQuery(
         primary,
         display,
+        cleanDevises,
+        null,
         from,
         to,
         nullToEmpty(produitIds),
@@ -52,54 +53,7 @@ public final class PilotageBundleParams {
         scope,
         clean,
         List.of(),
-        false,
-        deviseList,
-        BigDecimal.ZERO);
-  }
-
-  /** Compat : une seule devise. */
-  public static PilotageBundleQuery toQuery(
-      List<String> domaines,
-      String devise,
-      String from,
-      String to,
-      List<Integer> produitIds,
-      String ecran,
-      List<String> statutUniformes,
-      List<String> categories,
-      List<Integer> agenceIds,
-      List<Integer> agentIds,
-      List<Integer> typeOperationIds,
-      String jourFiltre,
-      List<String> couloirCodes,
-      List<String> reseauRegions,
-      List<Integer> zoneIds,
-      Integer paysId,
-      Integer provinceId,
-      List<Integer> villeIds,
-      Integer territoireId,
-      List<Integer> communeIds) {
-    return toQuery(
-        domaines,
-        devise == null || devise.isBlank() ? List.of() : List.of(devise),
-        from,
-        to,
-        produitIds,
-        ecran,
-        statutUniformes,
-        categories,
-        agenceIds,
-        agentIds,
-        typeOperationIds,
-        jourFiltre,
-        couloirCodes,
-        reseauRegions,
-        zoneIds,
-        paysId,
-        provinceId,
-        villeIds,
-        territoireId,
-        communeIds);
+        false);
   }
 
   private static <T> List<T> nullToEmpty(List<T> list) {

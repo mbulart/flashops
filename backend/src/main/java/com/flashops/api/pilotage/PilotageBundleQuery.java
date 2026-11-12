@@ -7,6 +7,8 @@ import java.util.List;
 public record PilotageBundleQuery(
     String domaine,
     String devise,
+    List<String> devises,
+    BigDecimal tauxUsdCdf,
     String from,
     String to,
     List<Integer> produitIds,
@@ -21,14 +23,7 @@ public record PilotageBundleQuery(
     PilotageAgenceFilterScope geoScope,
     List<String> domaines,
     List<String> extraProductKeys,
-    boolean transfertRestrictedToExtras,
-    List<String> devises,
-    BigDecimal tauxUsdCdf) {
-
-  public PilotageBundleQuery {
-    devises = devises == null ? List.of() : List.copyOf(devises);
-    tauxUsdCdf = tauxUsdCdf == null ? BigDecimal.ZERO : tauxUsdCdf;
-  }
+    boolean transfertRestrictedToExtras) {
 
   public PilotageBundleQuery(
       String domaine,
@@ -49,6 +44,8 @@ public record PilotageBundleQuery(
     this(
         domaine,
         devise,
+        List.of(),
+        null,
         from,
         to,
         produitIds,
@@ -63,9 +60,7 @@ public record PilotageBundleQuery(
         geoScope,
         domaines,
         List.of(),
-        false,
-        PilotageMoneySql.ensureNonEmpty(List.of(), devise),
-        BigDecimal.ZERO);
+        false);
   }
 
   public List<String> resolvedDomaines() {
@@ -118,79 +113,118 @@ public record PilotageBundleQuery(
     return hasCouloir() && !couloirOnAggregate();
   }
 
-  public PilotageBundleQuery withPeriod(String from, String to) {
-    return copy(from, to, agenceIds, geoScope, extraProductKeys, transfertRestrictedToExtras, devises, tauxUsdCdf, devise);
-  }
-
-  public PilotageBundleQuery withAgenceIds(List<Integer> nextAgenceIds) {
-    return copy(
-        from,
-        to,
-        nextAgenceIds == null ? List.of() : List.copyOf(nextAgenceIds),
-        geoScope,
-        extraProductKeys,
-        transfertRestrictedToExtras,
-        devises,
-        tauxUsdCdf,
-        devise);
-  }
-
-  public PilotageBundleQuery withGeoScope(PilotageAgenceFilterScope nextGeoScope) {
-    return copy(from, to, agenceIds, nextGeoScope, extraProductKeys, transfertRestrictedToExtras, devises, tauxUsdCdf, devise);
-  }
-
-  public PilotageBundleQuery withProductAccess(List<String> keys, boolean restrictTransfert) {
-    return copy(
-        from,
-        to,
-        agenceIds,
-        geoScope,
-        keys == null ? List.of() : List.copyOf(keys),
-        restrictTransfert,
-        devises,
-        tauxUsdCdf,
-        devise);
-  }
-
-  public PilotageBundleQuery withDevisesAndTaux(List<String> nextDevises, BigDecimal nextTaux) {
-    List<String> clean = PilotageMoneySql.cleanDevises(nextDevises);
-    BigDecimal taux = nextTaux == null ? BigDecimal.ZERO : nextTaux;
-    String display = PilotageMoneySql.displayDevise(clean, taux);
-    if (display.isBlank() && !clean.isEmpty()) {
-      display = clean.get(0);
-    }
-    return copy(from, to, agenceIds, geoScope, extraProductKeys, transfertRestrictedToExtras, clean, taux, display);
-  }
-
-  private PilotageBundleQuery copy(
-      String nextFrom,
-      String nextTo,
-      List<Integer> nextAgenceIds,
-      PilotageAgenceFilterScope nextGeo,
-      List<String> nextExtras,
-      boolean nextRestrict,
-      List<String> nextDevises,
-      BigDecimal nextTaux,
-      String nextDevise) {
+  public PilotageBundleQuery withMoney(List<String> nextDevises, String displayDevise, BigDecimal taux) {
     return new PilotageBundleQuery(
         domaine,
-        nextDevise,
-        nextFrom,
-        nextTo,
+        displayDevise,
+        nextDevises == null ? List.of() : List.copyOf(nextDevises),
+        taux,
+        from,
+        to,
         produitIds,
         ecran,
         statutUniformes,
         categories,
-        nextAgenceIds,
+        agenceIds,
         agentIds,
         typeOperationIds,
         jourFiltre,
         couloirCodes,
-        nextGeo,
+        geoScope,
         domaines,
-        nextExtras,
-        nextRestrict,
-        nextDevises,
-        nextTaux);
+        extraProductKeys,
+        transfertRestrictedToExtras);
+  }
+
+  public PilotageBundleQuery withPeriod(String from, String to) {
+    return new PilotageBundleQuery(
+        domaine,
+        devise,
+        devises,
+        tauxUsdCdf,
+        from,
+        to,
+        produitIds,
+        ecran,
+        statutUniformes,
+        categories,
+        agenceIds,
+        agentIds,
+        typeOperationIds,
+        jourFiltre,
+        couloirCodes,
+        geoScope,
+        domaines,
+        extraProductKeys,
+        transfertRestrictedToExtras);
+  }
+
+  public PilotageBundleQuery withAgenceIds(List<Integer> nextAgenceIds) {
+    return new PilotageBundleQuery(
+        domaine,
+        devise,
+        devises,
+        tauxUsdCdf,
+        from,
+        to,
+        produitIds,
+        ecran,
+        statutUniformes,
+        categories,
+        nextAgenceIds == null ? List.of() : List.copyOf(nextAgenceIds),
+        agentIds,
+        typeOperationIds,
+        jourFiltre,
+        couloirCodes,
+        geoScope,
+        domaines,
+        extraProductKeys,
+        transfertRestrictedToExtras);
+  }
+
+  public PilotageBundleQuery withGeoScope(PilotageAgenceFilterScope nextGeoScope) {
+    return new PilotageBundleQuery(
+        domaine,
+        devise,
+        devises,
+        tauxUsdCdf,
+        from,
+        to,
+        produitIds,
+        ecran,
+        statutUniformes,
+        categories,
+        agenceIds,
+        agentIds,
+        typeOperationIds,
+        jourFiltre,
+        couloirCodes,
+        nextGeoScope,
+        domaines,
+        extraProductKeys,
+        transfertRestrictedToExtras);
+  }
+
+  public PilotageBundleQuery withProductAccess(List<String> keys, boolean restrictTransfert) {
+    return new PilotageBundleQuery(
+        domaine,
+        devise,
+        devises,
+        tauxUsdCdf,
+        from,
+        to,
+        produitIds,
+        ecran,
+        statutUniformes,
+        categories,
+        agenceIds,
+        agentIds,
+        typeOperationIds,
+        jourFiltre,
+        couloirCodes,
+        geoScope,
+        domaines,
+        keys == null ? List.of() : List.copyOf(keys),
+        restrictTransfert);
   }
 }

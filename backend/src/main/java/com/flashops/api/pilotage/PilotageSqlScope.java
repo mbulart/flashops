@@ -22,8 +22,7 @@ final class PilotageSqlScope {
 
     sql.append(" FROM ").append(table).append(" AS ").append(alias);
     sql.append(" INNER JOIN pilotage.dim_devise AS dv ON dv.devise_id = ").append(alias).append(".devise_id");
-    sql.append(" AND upper(btrim(dv.code)) = ANY(?)");
-    args.add(PilotageMoneySql.toSqlArray(q.resolvedDevises()));
+    appendDeviseMatch(q, sql, args);
 
     if (joinDate) {
       sql.append(" INNER JOIN pilotage.dim_date AS dd ON dd.jour = ").append(alias).append(".jour");
@@ -107,8 +106,7 @@ final class PilotageSqlScope {
     sql.append(" INNER JOIN pilotage.dim_produit AS p ON p.produit_id = f.produit_id");
     sql.append(" INNER JOIN pilotage.dim_statut AS s ON s.statut_id = f.statut_id AND s.inclure_agregat");
     sql.append(" INNER JOIN pilotage.dim_devise AS dv ON dv.devise_id = f.devise_id");
-    sql.append(" AND upper(btrim(dv.code)) = ANY(?)");
-    args.add(PilotageMoneySql.toSqlArray(q.resolvedDevises()));
+    appendDeviseMatch(q, sql, args);
 
     boolean joinAgence = q.usesAgenceGrain();
     if (joinAgence) {
@@ -196,6 +194,12 @@ final class PilotageSqlScope {
     return new ScopedSql(fromSql, scoped.args(), scoped.joinDate(), scoped.agenceAlias());
   }
 
+  private static void appendDeviseMatch(
+      PilotageBundleQuery q, StringBuilder sql, java.util.ArrayList<Object> args) {
+    sql.append(" AND upper(btrim(dv.code)) = ANY(?)");
+    args.add(PilotageMoneySql.toSqlArray(q.resolvedDevises()));
+  }
+
   private static boolean needsDateJoin(String jourFiltre) {
     if (jourFiltre == null || jourFiltre.isBlank()) {
       return false;
@@ -209,8 +213,7 @@ final class PilotageSqlScope {
     var args = new ArrayList<Object>();
     sql.append(" FROM pilotage.agg_operation_mois AS g");
     sql.append(" INNER JOIN pilotage.dim_devise AS dv ON dv.devise_id = g.devise_id");
-    sql.append(" AND upper(btrim(dv.code)) = ANY(?)");
-    args.add(PilotageMoneySql.toSqlArray(q.resolvedDevises()));
+    appendDeviseMatch(q, sql, args);
     sql.append(" WHERE g.mois = ?::date");
     args.add(moisIso);
     PilotageProductRules.appendAggregateDomaines(

@@ -44,6 +44,10 @@ export function pilotageDomaineOptionId(code: string): number {
   return pilotageCategoryOptionId(`domaine:${code}`);
 }
 
+export function pilotageDeviseOptionId(code: string): number {
+  return pilotageCategoryOptionId(`devise:${(code || '').trim().toUpperCase()}`);
+}
+
 export interface PilotageProduitVue extends PilotageProduitLite {
   domaine: PilotageDomaine;
 }

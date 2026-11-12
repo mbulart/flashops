@@ -1324,7 +1324,7 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
     this.draftDomaineIds = this.domaineIdsFromCriteria();
     this.draftFrom = this.criteria.from;
     this.draftTo = this.criteria.to;
-    this.draftDevise = this.criteria.devise || 'USD';
+    this.draftDevise = this.criteria.devise;
     this.appliedDomaineIds = [...this.draftDomaineIds];
     this.appliedFrom = this.draftFrom;
     this.appliedTo = this.draftTo;
@@ -1426,19 +1426,6 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
     return resolvePilotageProduitIds(choices, picked, partner, mode, sous);
   }
 
-  /** Conserve USD+CDF (conversion) du parent si la modal n'a pas changé de devise d'affichage. */
-  private devisesForApi(): string[] {
-    const one = (this.appliedDevise || this.criteria.devise || 'USD').trim().toUpperCase();
-    const parent = (this.criteria.devises?.length ? this.criteria.devises : [])
-      .map((d) => d.trim().toUpperCase())
-      .filter(Boolean);
-    const parentDisplay = (this.criteria.devise || '').trim().toUpperCase();
-    if (parent.length > 1 && one === parentDisplay) {
-      return parent;
-    }
-    return [one];
-  }
-
   /** Critères parent + filtres appliqués de la modal (domaine / dates / devise inclus). */
   private txCriteria(): PilotageCriteria {
     const domaines = this.resolveDomaineCodes(this.appliedDomaineIds);
@@ -1453,8 +1440,7 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
       domaine: domaines[0] ?? this.criteria.domaine,
       domaines: domaines.length ? domaines : this.criteria.domaines,
       devise: this.appliedDevise || this.criteria.devise,
-      // KPI parent multi-devises : garder la conversion tant que la modal n'a pas changé de devise.
-      devises: this.devisesForApi(),
+      devises: [(this.appliedDevise || this.criteria.devise || 'USD').trim().toUpperCase()].filter(Boolean),
       from: this.appliedFrom || this.criteria.from,
       to: this.appliedTo || this.criteria.to,
       produitIds: this.resolvedAppliedProduitIds(),

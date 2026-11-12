@@ -277,14 +277,11 @@ export class PilotageService {
           ? [criteria.devise]
           : [];
     let params = new HttpParams().set('from', criteria.from).set('to', criteria.to);
-    for (const devise of devises) {
-      params = params.append('devise', devise);
-    }
-    if (!devises.length && criteria.devise) {
-      params = params.set('devise', criteria.devise);
-    }
     for (const domaine of domaines) {
       params = params.append('domaine', domaine);
+    }
+    for (const devise of devises) {
+      params = params.append('devise', devise);
     }
 
     for (const id of criteria.produitIds) {

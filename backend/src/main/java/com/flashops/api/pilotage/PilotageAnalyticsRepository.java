@@ -38,9 +38,11 @@ public class PilotageAnalyticsRepository {
               SELECT coalesce(sum(g.nb), 0)::bigint AS nb,
                      """
               + nbMontantExpr
-              + " AS nb_montant,"
-              + PilotageMoneySql.sum("g", "montant", q)
-              + " AS montant,"
+              + """
+               AS nb_montant,
+                     """
+                  + PilotageMoneySql.sum("g", "montant", q)
+                  + " AS montant, "
                   + commissionSelect(grain.table(), "g", q)
                   + """
                      ,
@@ -76,9 +78,8 @@ public class PilotageAnalyticsRepository {
               """
               SELECT g.jour::text AS jour,
                      coalesce(sum(g.nb), 0)::bigint AS nb,
-                     """
-              + PilotageMoneySql.sum("g", "montant", q)
-              + " AS montant");
+                     coalesce(sum(g.montant), 0) AS montant
+              """);
       sql.append(scoped.fromAndWhere());
       sql.append(" GROUP BY g.jour ORDER BY g.jour");
       return jdbc.query(
@@ -133,13 +134,14 @@ public class PilotageAnalyticsRepository {
                      coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
                      coalesce(nullif(btrim(p.partenaire), ''), '') AS partenaire,
                      coalesce(sum(g.nb), 0)::bigint AS nb,
-                     """
-              + PilotageMoneySql.sum("g", "montant", q)
-              + " AS montant");
+                     coalesce(sum(g.montant), 0) AS montant
+              """);
       sql.append(body);
       sql.append(
-          " GROUP BY g.jour, g.produit_id, p.module, p.produit, p.ecran, p.partenaire"
-              + " ORDER BY g.jour, g.produit_id");
+          """
+           GROUP BY g.jour, g.produit_id, p.module, p.produit, p.ecran, p.partenaire
+           ORDER BY g.jour, g.produit_id
+          """);
       var args = new ArrayList<>(scoped.args());
       args.add(produitIds.toArray(new Integer[0]));
       return jdbc.query(
@@ -198,15 +200,15 @@ public class PilotageAnalyticsRepository {
                      coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
                      coalesce(nullif(btrim(p.partenaire), ''), '') AS partenaire,
                      coalesce(sum(g.nb), 0)::bigint AS nb,
-                     """
-              + PilotageMoneySql.sum("g", "montant", q)
-              + " AS montant");
+                     coalesce(sum(g.montant), 0) AS montant
+              """);
       sql.append(body);
       sql.append(
-          " GROUP BY g.produit_id, p.module, p.produit, p.ecran, p.partenaire"
-              + " ORDER BY "
-              + PilotageMoneySql.sumRaw("g", "montant", q)
-              + " DESC, sum(g.nb) DESC LIMIT 24");
+          """
+           GROUP BY g.produit_id, p.module, p.produit, p.ecran, p.partenaire
+           ORDER BY sum(g.montant) DESC, sum(g.nb) DESC
+           LIMIT 24
+          """);
       return jdbc.query(
           sql.toString(),
           (rs, rowNum) ->
@@ -262,15 +264,14 @@ public class PilotageAnalyticsRepository {
                      coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
                      coalesce(nullif(btrim(p.partenaire), ''), '') AS partenaire,
                      coalesce(sum(g.nb), 0)::bigint AS nb,
-                     """
-              + PilotageMoneySql.sum("g", "montant", q)
-              + " AS montant");
+                     coalesce(sum(g.montant), 0) AS montant
+              """);
       sql.append(body);
       sql.append(
-          " GROUP BY 1, g.produit_id, p.module, p.produit, p.ecran, p.partenaire"
-              + " ORDER BY 1, "
-              + PilotageMoneySql.sumRaw("g", "montant", q)
-              + " DESC, sum(g.nb) DESC");
+          """
+           GROUP BY 1, g.produit_id, p.module, p.produit, p.ecran, p.partenaire
+           ORDER BY 1, sum(g.montant) DESC, sum(g.nb) DESC
+          """);
       return jdbc.query(
           sql.toString(),
           (rs, rowNum) ->
@@ -304,8 +305,8 @@ public class PilotageAnalyticsRepository {
               """
               SELECT coalesce(sum(g.nb), 0)::bigint AS nb,
                      """
-              + PilotageMoneySql.sum("g", "montant", q)
-              + " AS montant");
+                  + PilotageMoneySql.sum("g", "montant", q)
+                  + " AS montant ");
       sql.append(scoped.fromAndWhere());
       var args = new ArrayList<>(scoped.args());
       return Optional.ofNullable(
@@ -330,8 +331,8 @@ public class PilotageAnalyticsRepository {
         SELECT count(*)::bigint AS nb,
                count(*) FILTER (WHERE f.montant IS NOT NULL)::bigint AS nb_montant,
                """
-              + PilotageMoneySql.sum("f", "montant", q)
-              + " AS montant,"
+            + PilotageMoneySql.sum("f", "montant", q)
+            + " AS montant, "
             + commissionSelect("pilotage.fait_operation", "f", q)
             + """
                ,
@@ -356,9 +357,8 @@ public class PilotageAnalyticsRepository {
         """
         SELECT d.jour::text AS jour,
                count(*)::bigint AS nb,
-               """
-              + PilotageMoneySql.sum("f", "montant", q)
-              + " AS montant"
+               coalesce(sum(f.montant), 0) AS montant
+        """
             + scoped.fromAndWhere()
             + " GROUP BY d.jour ORDER BY d.jour";
     return jdbc.query(
@@ -380,13 +380,14 @@ public class PilotageAnalyticsRepository {
                coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
                coalesce(nullif(btrim(p.partenaire), ''), '') AS partenaire,
                count(*)::bigint AS nb,
-               """
-              + PilotageMoneySql.sum("f", "montant", q)
-              + " AS montant"
+               coalesce(sum(f.montant), 0) AS montant
+        """
             + scoped.fromAndWhere()
-            + " AND f.produit_id = ANY(?)"
-            + " GROUP BY d.jour, f.produit_id, p.module, p.produit, p.ecran, p.partenaire"
-            + " ORDER BY d.jour, f.produit_id";
+            + """
+             AND f.produit_id = ANY(?)
+             GROUP BY d.jour, f.produit_id, p.module, p.produit, p.ecran, p.partenaire
+             ORDER BY d.jour, f.produit_id
+            """;
     var args = new ArrayList<>(scoped.args());
     args.add(produitIds.toArray(new Integer[0]));
     return jdbc.query(
@@ -415,14 +416,13 @@ public class PilotageAnalyticsRepository {
                coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
                coalesce(nullif(btrim(p.partenaire), ''), '') AS partenaire,
                count(*)::bigint AS nb,
-               """
-              + PilotageMoneySql.sum("f", "montant", q)
-              + " AS montant"
+               coalesce(sum(f.montant), 0) AS montant
+        """
             + scoped.fromAndWhere()
-            + " GROUP BY 1, f.produit_id, p.module, p.produit, p.ecran, p.partenaire"
-            + " ORDER BY 1, "
-              + PilotageMoneySql.sumRaw("f", "montant", q)
-              + " DESC, count(*) DESC";
+            + """
+             GROUP BY 1, f.produit_id, p.module, p.produit, p.ecran, p.partenaire
+             ORDER BY 1, sum(f.montant) DESC, count(*) DESC
+            """;
     return jdbc.query(
         sql,
         (rs, rowNum) ->
@@ -448,14 +448,14 @@ public class PilotageAnalyticsRepository {
                coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
                coalesce(nullif(btrim(p.partenaire), ''), '') AS partenaire,
                count(*)::bigint AS nb,
-               """
-              + PilotageMoneySql.sum("f", "montant", q)
-              + " AS montant"
+               coalesce(sum(f.montant), 0) AS montant
+        """
             + scoped.fromAndWhere()
-            + " GROUP BY f.produit_id, p.module, p.produit, p.ecran, p.partenaire"
-            + " ORDER BY "
-              + PilotageMoneySql.sumRaw("f", "montant", q)
-              + " DESC, count(*) DESC LIMIT 24";
+            + """
+             GROUP BY f.produit_id, p.module, p.produit, p.ecran, p.partenaire
+             ORDER BY sum(f.montant) DESC, count(*) DESC
+             LIMIT 24
+            """;
     return jdbc.query(
         sql,
         (rs, rowNum) ->
@@ -489,9 +489,11 @@ public class PilotageAnalyticsRepository {
                  coalesce(s.statut_uniforme, '') AS statut
           """
               + scoped.fromAndWhere()
-              + " AND f.agence_id <> 0"
-            + " ORDER BY ag.nom, ag.code_agence, d.jour, f.operation_id"
-            + " LIMIT ?";
+              + """
+               AND f.agence_id <> 0
+               ORDER BY ag.nom, ag.code_agence, d.jour, f.operation_id
+               LIMIT ?
+              """;
       var args = new ArrayList<>(scoped.args());
       args.add(cap + 1);
       var rows = jdbc.query(sql, this::mapLigne, args.toArray());
@@ -568,8 +570,8 @@ public class PilotageAnalyticsRepository {
     var stats =
         jdbc.queryForObject(
             "SELECT count(*)::bigint AS total,"
-                + " " + PilotageMoneySql.avg("f", "montant", q) + " AS moyenne,"
-                + " " + PilotageMoneySql.sum("f", "montant", q) + " AS montant_total "
+                + " coalesce(avg(f.montant), 0) AS moyenne,"
+                + " coalesce(sum(f.montant), 0) AS montant_total "
                 + scope,
             (rs, rowNum) ->
                 new AgenceTxStats(
@@ -592,15 +594,16 @@ public class PilotageAnalyticsRepository {
                coalesce(nullif(btrim(f.expediteur), ''), '') AS expediteur,
                coalesce(nullif(btrim(f.beneficiaire), ''), '') AS beneficiaire,
                coalesce(s.statut_uniforme, '') AS statut,
-               """
-              + PilotageMoneySql.value("f", "montant", q)
-              + " AS montant"
+               f.montant
+        """
             + scope.replace(
                 " FROM pilotage.fait_operation AS f",
                 " FROM pilotage.fait_operation AS f"
                     + " LEFT JOIN pilotage.dim_agent AS agent ON agent.agent_id = f.agent_id")
-            + " ORDER BY d.jour DESC, coalesce(f.date_operation, d.jour::timestamp) DESC, f.operation_id DESC"
-            + " LIMIT ? OFFSET ?";
+            + """
+             ORDER BY d.jour DESC, coalesce(f.date_operation, d.jour::timestamp) DESC, f.operation_id DESC
+             LIMIT ? OFFSET ?
+            """;
     var pageArgs = new ArrayList<>(args);
     pageArgs.add(safeSize);
     pageArgs.add((int) offset);
@@ -672,10 +675,12 @@ public class PilotageAnalyticsRepository {
         PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
     String grouped =
         withAgenceGeo(scoped.fromAndWhere(), "d")
-            + " AND g.agence_id <> 0"
-            + " AND d.latitude IS NOT NULL AND d.longitude IS NOT NULL"
-            + " AND d.latitude <> 0 AND d.longitude <> 0"
-            + " GROUP BY g.agence_id, d.code_agence, d.nom, d.latitude, d.longitude";
+            + """
+             AND g.agence_id <> 0
+             AND d.latitude IS NOT NULL AND d.longitude IS NOT NULL
+             AND d.latitude <> 0 AND d.longitude <> 0
+             GROUP BY g.agence_id, d.code_agence, d.nom, d.latitude, d.longitude
+            """;
     var sql =
         """
         SELECT g.agence_id,
@@ -684,13 +689,13 @@ public class PilotageAnalyticsRepository {
                d.latitude,
                d.longitude,
                coalesce(sum(g.nb), 0)::bigint AS nb,
-               """
-              + PilotageMoneySql.sum("g", "montant", q)
-              + " AS montant"
+               coalesce(sum(g.montant), 0) AS montant
+        """
             + grouped
-            + " ORDER BY "
-              + PilotageMoneySql.sumRaw("g", "montant", q)
-              + " DESC, sum(g.nb) DESC LIMIT ?";
+            + """
+             ORDER BY sum(g.montant) DESC, sum(g.nb) DESC
+             LIMIT ?
+            """;
     var args = new ArrayList<>(scoped.args());
     args.add(limit);
     return jdbc.query(sql, this::mapAgenceGeo, args.toArray());
@@ -743,9 +748,9 @@ public class PilotageAnalyticsRepository {
             + ag
             + ".longitude,"
             + " count(*)::bigint AS nb,"
-            + " " + PilotageMoneySql.sum("f", "montant", q) + " AS montant"
+            + " coalesce(sum(f.montant), 0) AS montant"
             + grouped
-            + " ORDER BY " + PilotageMoneySql.sumRaw("f", "montant", q) + " DESC, count(*) DESC LIMIT ?";
+            + " ORDER BY sum(f.montant) DESC, count(*) DESC LIMIT ?";
     var args = new ArrayList<>(scoped.args());
     args.add(limit);
     return jdbc.query(sql, this::mapAgenceGeo, args.toArray());
@@ -830,14 +835,16 @@ public class PilotageAnalyticsRepository {
       boolean worst,
       boolean withTotal,
       boolean byVolume) {
-    String order = orderByMontantVolume(PilotageMoneySql.sumRaw("g", "montant", q), "sum(g.nb)", worst, byVolume);
+    String order = orderByMontantVolume("sum(g.montant)", "sum(g.nb)", worst, byVolume);
     Grain grain = resolveAgenceRankGrain(q);
     var scoped =
         PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
     String grouped =
         withAgenceGeo(scoped.fromAndWhere(), "d")
-            + " AND g.agence_id <> 0"
-            + " GROUP BY g.agence_id, d.code_agence, d.nom, d.categorie, d.pos_id, rg.libelle, zn.libelle";
+            + """
+             AND g.agence_id <> 0
+             GROUP BY g.agence_id, d.code_agence, d.nom, d.categorie, d.pos_id, rg.libelle, zn.libelle
+            """;
     long total = 0L;
     if (withTotal) {
       Long counted =
@@ -858,13 +865,14 @@ public class PilotageAnalyticsRepository {
             + AGENCE_GEO_SELECT
             + """
                coalesce(sum(g.nb), 0)::bigint AS nb,
-               """
-              + PilotageMoneySql.sum("g", "montant", q)
-              + " AS montant,"
+               coalesce(sum(g.montant), 0) AS montant,
+        """
             + commissionSelect(grain.table(), "g", q)
             + grouped
             + order
-            + " LIMIT ? OFFSET ?";
+            + """
+             LIMIT ? OFFSET ?
+            """;
     var args = new ArrayList<>(scoped.args());
     args.add(limit);
     args.add(offset);
@@ -879,7 +887,7 @@ public class PilotageAnalyticsRepository {
       boolean worst,
       boolean withTotal,
       boolean byVolume) {
-    String order = orderByMontantVolume(PilotageMoneySql.sumRaw("f", "montant", q), "count(*)", worst, byVolume);
+    String order = orderByMontantVolume("sum(f.montant)", "count(*)", worst, byVolume);
     var scoped = PilotageSqlScope.buildFait(jdbc, q);
     String from = scoped.fromAndWhere();
     if (scoped.agenceAlias() == null) {
@@ -891,8 +899,10 @@ public class PilotageAnalyticsRepository {
     from = withAgenceGeo(from, "ag");
     String grouped =
         from
-            + " AND f.agence_id <> 0"
-            + " GROUP BY f.agence_id, ag.code_agence, ag.nom, ag.categorie, ag.pos_id, rg.libelle, zn.libelle";
+            + """
+             AND f.agence_id <> 0
+             GROUP BY f.agence_id, ag.code_agence, ag.nom, ag.categorie, ag.pos_id, rg.libelle, zn.libelle
+            """;
     long total = 0L;
     if (withTotal) {
       Long counted =
@@ -913,13 +923,14 @@ public class PilotageAnalyticsRepository {
             + AGENCE_GEO_SELECT
             + """
                count(*)::bigint AS nb,
-               """
-              + PilotageMoneySql.sum("f", "montant", q)
-              + " AS montant,"
+               coalesce(sum(f.montant), 0) AS montant,
+        """
             + commissionSelect("pilotage.fait_operation", "f", q)
             + grouped
             + order
-            + " LIMIT ? OFFSET ?";
+            + """
+             LIMIT ? OFFSET ?
+            """;
     var args = new ArrayList<>(scoped.args());
     args.add(limit);
     args.add(offset);
@@ -953,15 +964,17 @@ public class PilotageAnalyticsRepository {
 
   private CouloirClassement loadGrainTopCorridors(
       PilotageBundleQuery q, int limit, int offset, boolean worst, boolean withTotal) {
-    String order = orderByMontantVolume(PilotageMoneySql.sumRaw("g", "montant", q), "sum(g.nb)", worst, true);
+    String order = orderByMontantVolume("sum(g.montant)", "sum(g.nb)", worst, true);
     var scoped =
         PilotageSqlScope.build(jdbc, q, "pilotage.agg_couloir_jour", "g", q.usesAgenceGrain(), false);
     String base = withCorridorPaysJoins(scoped.fromAndWhere());
     String groupSql =
         base
-            + " AND g.pays_origine_id <> 0"
-            + " AND g.pays_destination_id <> 0"
-            + " GROUP BY g.pays_origine_id, g.pays_destination_id, po.libelle, pd.libelle";
+            + """
+             AND g.pays_origine_id <> 0
+             AND g.pays_destination_id <> 0
+             GROUP BY g.pays_origine_id, g.pays_destination_id, po.libelle, pd.libelle
+            """;
     long total = 0L;
     if (withTotal) {
       Long counted =
@@ -980,12 +993,13 @@ public class PilotageAnalyticsRepository {
                  || ' → '
                  || coalesce(nullif(btrim(pd.libelle), ''), 'Pays ' || g.pays_destination_id::text) AS label,
                coalesce(sum(g.nb), 0)::bigint AS nb,
-               """
-              + PilotageMoneySql.sum("g", "montant", q)
-              + " AS montant"
+               coalesce(sum(g.montant), 0) AS montant
+        """
             + groupSql
             + order
-            + " LIMIT ? OFFSET ?";
+            + """
+             LIMIT ? OFFSET ?
+            """;
     var args = new ArrayList<>(scoped.args());
     args.add(limit);
     args.add(offset);
@@ -995,14 +1009,16 @@ public class PilotageAnalyticsRepository {
 
   private CouloirClassement loadFaitTopCorridors(
       PilotageBundleQuery q, int limit, int offset, boolean worst, boolean withTotal) {
-    String order = orderByMontantVolume(PilotageMoneySql.sumRaw("f", "montant", q), "count(*)", worst, true);
+    String order = orderByMontantVolume("sum(f.montant)", "count(*)", worst, true);
     var scoped = PilotageSqlScope.buildFait(jdbc, q);
     String base = withCorridorPaysJoinsFait(scoped.fromAndWhere());
     String groupSql =
         base
-            + " AND f.pays_origine_id <> 0"
-            + " AND f.pays_destination_id <> 0"
-            + " GROUP BY f.pays_origine_id, f.pays_destination_id, po.libelle, pd.libelle";
+            + """
+             AND f.pays_origine_id <> 0
+             AND f.pays_destination_id <> 0
+             GROUP BY f.pays_origine_id, f.pays_destination_id, po.libelle, pd.libelle
+            """;
     long total = 0L;
     if (withTotal) {
       Long counted =
@@ -1021,12 +1037,13 @@ public class PilotageAnalyticsRepository {
                  || ' → '
                  || coalesce(nullif(btrim(pd.libelle), ''), 'Pays ' || f.pays_destination_id::text) AS label,
                count(*)::bigint AS nb,
-               """
-              + PilotageMoneySql.sum("f", "montant", q)
-              + " AS montant"
+               coalesce(sum(f.montant), 0) AS montant
+        """
             + groupSql
             + order
-            + " LIMIT ? OFFSET ?";
+            + """
+             LIMIT ? OFFSET ?
+            """;
     var args = new ArrayList<>(scoped.args());
     args.add(limit);
     args.add(offset);
@@ -1170,30 +1187,34 @@ public class PilotageAnalyticsRepository {
       return """
           0::numeric AS commission,
           0::numeric AS commission_fcn,
-          """
-          + PilotageMoneySql.sum(alias, "commission_agent", q)
-          + " AS commission_agent," + """
+          %s AS commission_agent,
           0::numeric AS commission_fcn_agent
-          """;
+          """
+          .formatted(PilotageMoneySql.sum(alias, "commission_agent", q));
     }
     if (t.contains("agg_couloir_jour")) {
-      return PilotageMoneySql.sum(alias, "commission", q)
-          + " AS commission, "
-          + PilotageMoneySql.sum(alias, "commission_fcn", q)
-          + " AS commission_fcn, "
-          + PilotageMoneySql.sum(alias, "commission_agent", q)
-          + " AS commission_agent," + """
+      return """
+          %s AS commission,
+          %s AS commission_fcn,
+          %s AS commission_agent,
           0::numeric AS commission_fcn_agent
-          """;
+          """
+          .formatted(
+              PilotageMoneySql.sum(alias, "commission", q),
+              PilotageMoneySql.sum(alias, "commission_fcn", q),
+              PilotageMoneySql.sum(alias, "commission_agent", q));
     }
-    return PilotageMoneySql.sum(alias, "commission", q)
-        + " AS commission, "
-        + PilotageMoneySql.sum(alias, "commission_fcn", q)
-        + " AS commission_fcn, "
-        + PilotageMoneySql.sum(alias, "commission_agent", q)
-        + " AS commission_agent, "
-        + PilotageMoneySql.sum(alias, "commission_fcn_agent", q)
-        + " AS commission_fcn_agent";
+    return """
+        %s AS commission,
+        %s AS commission_fcn,
+        %s AS commission_agent,
+        %s AS commission_fcn_agent
+        """
+        .formatted(
+            PilotageMoneySql.sum(alias, "commission", q),
+            PilotageMoneySql.sum(alias, "commission_fcn", q),
+            PilotageMoneySql.sum(alias, "commission_agent", q),
+            PilotageMoneySql.sum(alias, "commission_fcn_agent", q));
   }
 
   private static BigDecimal money(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
