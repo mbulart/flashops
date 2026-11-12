@@ -338,13 +338,33 @@ export function buildPilotageSeriesChart(
   };
 }
 
+export type PilotageProductMetric = 'montant' | 'volume';
+
+function productMetricValue(
+  p: Pick<PilotageProductSlice, 'montant' | 'volume'>,
+  metric: PilotageProductMetric
+): number {
+  return metric === 'volume' ? Number(p.volume) || 0 : Number(p.montant) || 0;
+}
+
+function topProductsByMetric(
+  products: PilotageProductSlice[],
+  metric: PilotageProductMetric,
+  limit: number
+): PilotageProductSlice[] {
+  return [...products]
+    .sort((a, b) => productMetricValue(b, metric) - productMetricValue(a, metric))
+    .slice(0, limit);
+}
+
 export function buildPilotageProductDonut(
   products: PilotageProductSlice[],
-  theme: ThemeMode
+  theme: ThemeMode,
+  metric: PilotageProductMetric = 'montant'
 ): ChartConfiguration {
-  const top = products.slice(0, 8);
+  const top = topProductsByMetric(products, metric, 8);
   const labels = top.map((p) => productLabel(p));
-  const values = top.map((p) => Number(p.montant) || 0);
+  const values = top.map((p) => productMetricValue(p, metric));
   const dark = theme === 'dark';
 
   return {
@@ -379,12 +399,14 @@ export function buildPilotageProductDonut(
 
 export function buildPilotageProductBar(
   products: PilotageProductSlice[],
-  theme: ThemeMode
+  theme: ThemeMode,
+  metric: PilotageProductMetric = 'montant'
 ): ChartConfiguration {
-  const top = products.slice(0, 10);
+  const top = topProductsByMetric(products, metric, 10);
   const dark = theme === 'dark';
   const palette = dark ? BAR_DARK : BAR_LIGHT;
   const colors = top.map((_, i) => palette[i % palette.length]!);
+  const label = metric === 'volume' ? 'Volume' : 'Montant';
 
   return {
     type: 'bar',
@@ -392,8 +414,8 @@ export function buildPilotageProductBar(
       labels: top.map((p) => productLabel(p)),
       datasets: [
         {
-          label: 'Montant',
-          data: top.map((p) => Number(p.montant) || 0),
+          label,
+          data: top.map((p) => productMetricValue(p, metric)),
           backgroundColor: colors,
           borderColor: dark ? colors.map((c) => c) : colors.map((c) => (c === FLASH_YELLOW ? FLASH_BLACK : c)),
           borderWidth: 1,
@@ -420,22 +442,32 @@ export function buildPilotageProductBar(
 }
 
 /**
- * Courbes montant par produit (top 8), style proche de l’évolution globale.
+ * Courbes montant/volume par produit (top 8), style proche de l’évolution globale.
  * Légende Chart.js : clic pour activer / désactiver une série.
  */
 export function buildPilotageProductLinesChart(
   points: PilotageProductTimeseriesPoint[],
   devise: string,
   theme: ThemeMode,
-  granularity: PilotageSeriesGranularity = 'day'
+  granularity: PilotageSeriesGranularity = 'day',
+  metric: PilotageProductMetric = 'montant'
 ): ChartConfiguration | null {
   if (!points.length) return null;
 
-  const metaById = new Map<number, PilotageProductTimeseriesPoint>();
+  const totals = new Map<number, { meta: PilotageProductTimeseriesPoint; value: number }>();
   for (const p of points) {
-    if (!metaById.has(p.produitId)) metaById.set(p.produitId, p);
+    const add = metric === 'volume' ? Number(p.volume) || 0 : Number(p.montant) || 0;
+    const cur = totals.get(p.produitId);
+    if (cur) {
+      cur.value += add;
+    } else {
+      totals.set(p.produitId, { meta: p, value: add });
+    }
   }
-  const productIds = [...metaById.keys()];
+  const productIds = [...totals.entries()]
+    .sort((a, b) => b[1].value - a[1].value)
+    .slice(0, 8)
+    .map(([id]) => id);
   if (!productIds.length) return null;
 
   const buckets = new Map<string, Map<number, number>>();
@@ -448,12 +480,15 @@ export function buildPilotageProductLinesChart(
     return m;
   };
 
+  const idSet = new Set(productIds);
   for (const p of points) {
+    if (!idSet.has(p.produitId)) continue;
     let key = p.jour;
     if (granularity === 'week') key = isoWeekKey(p.jour) || p.jour;
     else if (granularity === 'month') key = (p.jour || '').slice(0, 7) || p.jour;
     const m = ensureBucket(key);
-    m.set(p.produitId, (m.get(p.produitId) ?? 0) + (Number(p.montant) || 0));
+    const add = metric === 'volume' ? Number(p.volume) || 0 : Number(p.montant) || 0;
+    m.set(p.produitId, (m.get(p.produitId) ?? 0) + add);
   }
 
   const keys = [...buckets.keys()].sort();
@@ -463,9 +498,10 @@ export function buildPilotageProductLinesChart(
   const gridColor = dark ? 'rgba(255, 213, 0, 0.08)' : GRID_LIGHT;
   const tickColor = dark ? '#d1d5db' : '#374151';
   const pointRadius = keys.length > 45 ? 0 : keys.length > 20 ? 1 : 2;
+  const axisTitle = metric === 'volume' ? 'Volume' : `Montant (${devise})`;
 
   const datasets: ChartDataset<'line'>[] = productIds.map((id, i) => {
-    const meta = metaById.get(id)!;
+    const meta = totals.get(id)!.meta;
     const color = palette[i % palette.length]!;
     return {
       label: productLabel(meta),
@@ -512,7 +548,9 @@ export function buildPilotageProductLinesChart(
             label(item: TooltipItem<'line'>) {
               const raw = Number(item.parsed.y);
               if (!Number.isFinite(raw)) return `${item.dataset.label} : —`;
-              return `${item.dataset.label} : ${formatValeurFr(raw, devise)}`;
+              const formatted =
+                metric === 'volume' ? formatNumberFr(raw) : formatValeurFr(raw, devise);
+              return `${item.dataset.label} : ${formatted}`;
             },
           },
         },
@@ -545,7 +583,7 @@ export function buildPilotageProductLinesChart(
           },
           title: {
             display: true,
-            text: `Montant (${devise})`,
+            text: axisTitle,
             color: tickColor,
             font: { size: 10, weight: 500 },
           },

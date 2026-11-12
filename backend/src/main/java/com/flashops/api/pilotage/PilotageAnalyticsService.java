@@ -69,8 +69,19 @@ public class PilotageAnalyticsService {
                         r.nb(),
                         r.montant()))
             .toList();
+    // Top montant + top volume pour que le toggle Volume/Montant côté front ait les bonnes séries.
+    var topByMontant =
+        products.stream().limit(8).map(PilotageDtos.ProductSlice::produitId).toList();
+    var topByVolume =
+        products.stream()
+            .sorted((a, b) -> Long.compare(b.volume(), a.volume()))
+            .limit(8)
+            .map(PilotageDtos.ProductSlice::produitId)
+            .toList();
     var topProduitIds =
-        products.stream().limit(8).map(PilotageDtos.ProductSlice::produitId).distinct().toList();
+        java.util.stream.Stream.concat(topByMontant.stream(), topByVolume.stream())
+            .distinct()
+            .toList();
     var productTimeseries =
         repository.loadProductTimeseries(q, topProduitIds).stream()
             .map(

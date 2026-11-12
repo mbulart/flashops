@@ -641,6 +641,28 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
 
             <app-section-card title="Produits" [subtitle]="productChartSubtitle()">
               <div actions class="pilotage-chart-toolbar">
+                <div class="btn-group btn-group-sm pilotage-chart-toggle" role="group" aria-label="Métrique produits">
+                  <button
+                    type="button"
+                    class="btn"
+                    [class.btn-primary]="productMetric() === 'montant'"
+                    [class.btn-outline-secondary]="productMetric() !== 'montant'"
+                    [disabled]="bundleLoading()"
+                    (click)="productMetric.set('montant')"
+                  >
+                    Montant
+                  </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    [class.btn-primary]="productMetric() === 'volume'"
+                    [class.btn-outline-secondary]="productMetric() !== 'volume'"
+                    [disabled]="bundleLoading()"
+                    (click)="productMetric.set('volume')"
+                  >
+                    Volume
+                  </button>
+                </div>
                 <div class="btn-group btn-group-sm pilotage-chart-toggle" role="group" aria-label="Vue produits">
                   <button
                     type="button"
@@ -1328,6 +1350,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   readonly seriesShowVolume = signal(true);
   readonly seriesGranularity = signal<PilotageSeriesGranularity>('day');
   readonly productView = signal<'donut' | 'bar' | 'lines'>('donut');
+  readonly productMetric = signal<'montant' | 'volume'>('montant');
   readonly heatmapMetric = signal<HeatMetric>('value');
   readonly mapMetric = signal<MapMetric>('value');
   readonly mapHeatMetric = computed((): HeatMetric => {
@@ -1395,14 +1418,21 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     const b = this.bundle();
     const theme = this.theme.mode();
     const view = this.productView();
+    const metric = this.productMetric();
     if (view === 'lines') {
       if (!b?.productTimeseries?.length) return null;
-      return buildPilotageProductLinesChart(b.productTimeseries, b.devise, theme, this.seriesGranularity());
+      return buildPilotageProductLinesChart(
+        b.productTimeseries,
+        b.devise,
+        theme,
+        this.seriesGranularity(),
+        metric
+      );
     }
     if (!b?.products?.length) return null;
     return view === 'donut'
-      ? buildPilotageProductDonut(b.products, theme)
-      : buildPilotageProductBar(b.products, theme);
+      ? buildPilotageProductDonut(b.products, theme, metric)
+      : buildPilotageProductBar(b.products, theme, metric);
   });
 
   formatNumberFr = formatNumberFr;
@@ -2103,12 +2133,13 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
 
   productChartSubtitle(): string {
     const view = this.productView();
+    const metric = this.productMetric() === 'volume' ? 'volume' : 'montant';
     const base =
       view === 'donut'
-        ? 'Par montant (top 8)'
+        ? `Par ${metric} (top 8)`
         : view === 'lines'
-          ? 'Évolution montant par produit (top 8) — clic légende pour masquer'
-          : 'Montant — top 10';
+          ? `Évolution ${metric} par produit (top 8) — clic légende pour masquer`
+          : `${metric === 'volume' ? 'Volume' : 'Montant'} — top 10`;
     const sens = this.chartSensOptions().find((e) => e.id === this.chartSens())?.label;
     return sens ? `${base} · ${sens}` : base;
   }
