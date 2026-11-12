@@ -34,20 +34,13 @@ public class PilotageAnalyticsRepository {
               : "coalesce(sum(g.nb), 0)::bigint";
       var sql =
           new StringBuilder(
-              """
-              SELECT coalesce(sum(g.nb), 0)::bigint AS nb,
-                     """
-              + nbMontantExpr
-              + """
-               AS nb_montant,
-                     """
+              "SELECT coalesce(sum(g.nb), 0)::bigint AS nb, "
+                  + nbMontantExpr
+                  + " AS nb_montant, "
                   + PilotageMoneySql.sum("g", "montant", q)
                   + " AS montant, "
                   + commissionSelect(grain.table(), "g", q)
-                  + """
-                     ,
-                     coalesce(sum(g.nb) FILTER (WHERE g.statut_uniforme = 'Succès'), 0)::bigint AS nb_succes
-              """);
+                  + ", coalesce(sum(g.nb) FILTER (WHERE g.statut_uniforme = 'Succès'), 0)::bigint AS nb_succes");
       sql.append(scoped.fromAndWhere());
       return Optional.ofNullable(
           jdbc.query(
