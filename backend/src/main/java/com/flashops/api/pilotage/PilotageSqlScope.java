@@ -42,7 +42,8 @@ final class PilotageSqlScope {
         args.add(q.agenceIds().toArray(new Integer[0]));
       }
       if (q.geoScope() != null && q.geoScope().isActive()) {
-        PilotageGeoMatchSupport.appendDimAgenceScope(jdbc, q.geoScope(), "d", sql, args);
+        // Match geo une fois sur dim_agence, puis filtre indexable sur le grain.
+        PilotageGeoMatchSupport.appendAgenceIdFilter(jdbc, q.geoScope(), alias, sql, args);
       }
     }
 
@@ -120,7 +121,7 @@ final class PilotageSqlScope {
         args.add(q.agenceIds().toArray(new Integer[0]));
       }
       if (q.geoScope() != null && q.geoScope().isActive()) {
-        PilotageGeoMatchSupport.appendDimAgenceScope(jdbc, q.geoScope(), "ag", sql, args);
+        PilotageGeoMatchSupport.appendAgenceIdFilter(jdbc, q.geoScope(), "f", sql, args);
       }
     }
 

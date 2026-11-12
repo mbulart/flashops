@@ -1,15 +1,57 @@
 package com.flashops.api.pilotage;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Résout les IDs référentiel geo en prédicats sur pilotage.dim_agence (champs texte). */
+/**
+ * Résout les IDs référentiel geo en prédicats sur pilotage.dim_agence (champs texte).
+ *
+ * <p>Sur les agrégats / faits, préférer {@link #appendAgenceIdFilter} : le match texte (folded /
+ * regexp) est calculé une fois sur {@code dim_agence}, puis filtré par {@code agence_id = ANY(?)} —
+ * même logique, sans rejouer le folded sur chaque ligne d’agrégat.
+ */
 final class PilotageGeoMatchSupport {
 
   private PilotageGeoMatchSupport() {}
+
+  /**
+   * Filtre le grain opération ({@code g}/{@code f}) par les agences du scope geo, sans appliquer
+   * folded() sur le join des agrégats.
+   */
+  static void appendAgenceIdFilter(
+      JdbcTemplate jdbc,
+      PilotageAgenceFilterScope scope,
+      String operationAlias,
+      StringBuilder sql,
+      List<Object> args) {
+    if (scope == null || !scope.isActive()) {
+      return;
+    }
+    Integer[] ids = resolveAgenceIds(jdbc, scope);
+    if (ids.length == 0) {
+      sql.append(" AND 1 = 0");
+      return;
+    }
+    sql.append(" AND ").append(operationAlias).append(".agence_id = ANY(?)");
+    args.add(ids);
+  }
+
+  /** IDs {@code dim_agence} correspondant au scope (même règles que {@link #appendDimAgenceScope}). */
+  static Integer[] resolveAgenceIds(JdbcTemplate jdbc, PilotageAgenceFilterScope scope) {
+    var sql = new StringBuilder("SELECT a.agence_id FROM pilotage.dim_agence AS a WHERE a.agence_id <> 0");
+    var args = new ArrayList<Object>();
+    appendDimAgenceScope(jdbc, scope, "a", sql, args);
+    try {
+      List<Integer> ids = jdbc.query(sql.toString(), (rs, rowNum) -> rs.getInt(1), args.toArray());
+      return ids.toArray(Integer[]::new);
+    } catch (DataAccessException ex) {
+      return new Integer[0];
+    }
+  }
 
   static void appendDimAgenceScope(
       JdbcTemplate jdbc,
