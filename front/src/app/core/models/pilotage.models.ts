@@ -87,7 +87,10 @@ export interface PilotageCriteria {
   /** Premier domaine, conservé pour l’affichage d’un seul métier. */
   domaine: PilotageDomaine;
   domaines: PilotageDomaine[];
+  /** Devise d’affichage (USD si USD+CDF convertis). */
   devise: string;
+  /** Devises sélectionnées dans le filtre (multi). */
+  devises: string[];
   from: string;
   to: string;
   produitIds: number[];

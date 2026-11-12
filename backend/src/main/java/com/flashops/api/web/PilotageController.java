@@ -62,7 +62,7 @@ public class PilotageController {
   @GetMapping("/bundle")
   public Map<String, PilotageDtos.BundleResponse> bundle(
       @RequestParam("domaine") java.util.List<String> domaine,
-      @RequestParam("devise") String devise,
+      @RequestParam("devise") List<String> devise,
       @RequestParam("from") String from,
       @RequestParam("to") String to,
       @RequestParam(value = "produit_id", required = false) List<Integer> produitIds,
@@ -110,7 +110,7 @@ public class PilotageController {
   @GetMapping("/agences/classement")
   public Map<String, PilotageDtos.AgenceClassementPage> classementAgences(
       @RequestParam("domaine") java.util.List<String> domaine,
-      @RequestParam("devise") String devise,
+      @RequestParam("devise") List<String> devise,
       @RequestParam("from") String from,
       @RequestParam("to") String to,
       @RequestParam(value = "produit_id", required = false) List<Integer> produitIds,
@@ -166,7 +166,7 @@ public class PilotageController {
   @GetMapping("/couloirs/classement")
   public Map<String, PilotageDtos.CouloirClassementPage> classementCouloirs(
       @RequestParam("domaine") java.util.List<String> domaine,
-      @RequestParam("devise") String devise,
+      @RequestParam("devise") List<String> devise,
       @RequestParam("from") String from,
       @RequestParam("to") String to,
       @RequestParam(value = "produit_id", required = false) List<Integer> produitIds,
@@ -219,7 +219,7 @@ public class PilotageController {
   @GetMapping("/export")
   public Map<String, PilotageDtos.ExportResponse> export(
       @RequestParam("domaine") java.util.List<String> domaine,
-      @RequestParam("devise") String devise,
+      @RequestParam("devise") List<String> devise,
       @RequestParam("from") String from,
       @RequestParam("to") String to,
       @RequestParam(value = "produit_id", required = false) List<Integer> produitIds,
@@ -267,7 +267,7 @@ public class PilotageController {
   @GetMapping("/export/produits-mensuel")
   public Map<String, PilotageDtos.ProduitsMensuelExport> exportProduitsMensuel(
       @RequestParam("domaine") java.util.List<String> domaine,
-      @RequestParam("devise") String devise,
+      @RequestParam("devise") List<String> devise,
       @RequestParam("from") String from,
       @RequestParam("to") String to,
       @RequestParam(value = "produit_id", required = false) List<Integer> produitIds,
@@ -337,7 +337,7 @@ public class PilotageController {
   public Map<String, PilotageDtos.AgenceTransactionsPage> agenceTransactions(
       @PathVariable("agenceId") int agenceId,
       @RequestParam("domaine") java.util.List<String> domaine,
-      @RequestParam("devise") String devise,
+      @RequestParam("devise") List<String> devise,
       @RequestParam("from") String from,
       @RequestParam("to") String to,
       @RequestParam(value = "produit_id", required = false) List<Integer> produitIds,
@@ -534,7 +534,7 @@ public class PilotageController {
 
   private PilotageBundleQuery scopedQuery(
       List<String> domaines,
-      String devise,
+      List<String> devise,
       String from,
       String to,
       List<Integer> produitIds,

@@ -270,10 +270,19 @@ export class PilotageService {
 
   private criteriaParams(criteria: PilotageCriteria): HttpParams {
     const domaines = criteria.domaines?.length ? criteria.domaines : [criteria.domaine];
-    let params = new HttpParams()
-      .set('devise', criteria.devise)
-      .set('from', criteria.from)
-      .set('to', criteria.to);
+    const devises =
+      criteria.devises?.length > 0
+        ? criteria.devises
+        : criteria.devise
+          ? [criteria.devise]
+          : [];
+    let params = new HttpParams().set('from', criteria.from).set('to', criteria.to);
+    for (const devise of devises) {
+      params = params.append('devise', devise);
+    }
+    if (!devises.length && criteria.devise) {
+      params = params.set('devise', criteria.devise);
+    }
     for (const domaine of domaines) {
       params = params.append('domaine', domaine);
     }

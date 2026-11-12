@@ -192,11 +192,12 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
               </div>
               <div class="filter-field">
                 <label class="form-label">Devise</label>
-                <select class="form-select" [(ngModel)]="draftDevise">
-                  @for (c of devises(); track c) {
-                    <option [value]="c">{{ c }}</option>
-                  }
-                </select>
+                <app-multi-select
+                  [options]="deviseOptions()"
+                  [selectedIds]="draftDeviseIds"
+                  (selectedIdsChange)="onDeviseIdsChange($event)"
+                  placeholder="Devises"
+                />
               </div>
               <div class="filter-field">
                 <label class="form-label">Du</label>
@@ -479,7 +480,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
           </span>
           <span class="pilotage-scope-chip">
             <i class="bi bi-currency-exchange"></i>
-            {{ c.devise }}
+            {{ deviseScopeLabel(c) }}
           </span>
           <span class="pilotage-scope-chip pilotage-scope-chip--period">
             <i class="bi bi-calendar3"></i>
@@ -1273,6 +1274,9 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   readonly filtresLoading = signal(false);
   readonly domaines = signal<PilotageDomaineOption[]>(DEFAULT_DOMAINES);
   readonly devises = signal<string[]>(['CDF', 'USD']);
+  readonly deviseOptions = computed((): MultiSelectOption[] =>
+    this.devises().map((code, index) => ({ id: index + 1, label: code }))
+  );
   readonly dataFrom = signal<string | null>(null);
   readonly dataTo = signal<string | null>(null);
   readonly criteria = signal<PilotageCriteria | null>(null);
@@ -1484,6 +1488,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   draftModePaiement: '' | 'cash' | 'momo' = '';
   draftSousProduit = '';
   draftDevise = 'USD';
+  draftDeviseIds: number[] = [];
   draftFrom = '';
   draftTo = '';
 
@@ -1520,6 +1525,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
         this.dataTo.set(meta.dataTo);
         this.metaReady.set(meta.pilotageSchemaReady);
         this.draftDevise = this.devises().includes('USD') ? 'USD' : this.devises()[0];
+        this.syncDeviseIdsFromCodes([this.draftDevise]);
         this.restoreDraftFromUrl();
         this.clampDraftDomaines();
         this.metaLoading.set(false);
@@ -1543,6 +1549,44 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     if (opening) {
       this.loadLocationAndReseauRefs(true);
     }
+  }
+
+  onDeviseIdsChange(ids: number[]): void {
+    this.draftDeviseIds = ids;
+    const codes = this.selectedDraftDevises();
+    this.draftDevise = this.displayDeviseFrom(codes);
+  }
+
+  selectedDraftDevises(): string[] {
+    const opts = this.deviseOptions();
+    return opts.filter((o) => this.draftDeviseIds.includes(o.id)).map((o) => o.label);
+  }
+
+  private syncDeviseIdsFromCodes(codes: string[]): void {
+    const wanted = new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean));
+    this.draftDeviseIds = this.deviseOptions()
+      .filter((o) => wanted.has(o.label.toUpperCase()))
+      .map((o) => o.id);
+    if (!this.draftDeviseIds.length && this.deviseOptions().length) {
+      const usd = this.deviseOptions().find((o) => o.label === 'USD');
+      this.draftDeviseIds = [usd?.id ?? this.deviseOptions()[0].id];
+    }
+    this.draftDevise = this.displayDeviseFrom(this.selectedDraftDevises());
+  }
+
+  private displayDeviseFrom(codes: string[]): string {
+    const set = new Set(codes.map((c) => c.toUpperCase()));
+    if (set.has('USD') && set.has('CDF')) return 'USD';
+    return codes[0] || 'USD';
+  }
+
+  deviseScopeLabel(c: PilotageCriteria): string {
+    const list = c.devises?.length ? c.devises : c.devise ? [c.devise] : [];
+    const set = new Set(list.map((x) => x.toUpperCase()));
+    if (set.has('USD') && set.has('CDF')) {
+      return list.length > 2 ? `${list.join(' · ')} → USD` : 'USD + CDF → USD';
+    }
+    return list.join(' · ') || c.devise;
   }
 
   onDomaineIdsChange(ids: number[]): void {
@@ -1940,14 +1984,16 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.openedAgency.set(null);
     const from = (this.draftFrom || '').trim();
     const to = (this.draftTo || '').trim();
-    const devise = (this.draftDevise || '').trim().toUpperCase();
+    const devises = this.selectedDraftDevises();
+    const devise = this.displayDeviseFrom(devises);
+    this.draftDevise = devise;
 
     const domaines = this.selectedDomaines();
     if (!domaines.length) {
       if (showToastOnError) this.toast.warning('Domaine requis.');
       return false;
     }
-    if (!devise) {
+    if (!devises.length) {
       if (showToastOnError) this.toast.warning('Devise requise.');
       return false;
     }
@@ -1990,6 +2036,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
       domaine: domaines[0],
       domaines,
       devise,
+      devises,
       from,
       to,
       produitIds,
@@ -2482,6 +2529,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   resetFilters(): void {
     this.draftDomaineIds = this.defaultDomaineIds();
     this.draftDevise = this.devises().includes('USD') ? 'USD' : this.devises()[0];
+    this.syncDeviseIdsFromCodes([this.draftDevise]);
     this.activePreset = '30d';
     this.resetDraftDates();
     this.resetOptionalDraft();
@@ -2740,8 +2788,13 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     if (domaines.length) {
       this.draftDomaineIds = domaines.map((code) => pilotageDomaineOptionId(code));
     }
-    const devise = (q.get('devise') || '').trim().toUpperCase();
-    if (devise) this.draftDevise = devise;
+    const devisesFromUrl = q.getAll('devise').map((d) => d.trim().toUpperCase()).filter(Boolean);
+    if (devisesFromUrl.length) {
+      this.syncDeviseIdsFromCodes(devisesFromUrl);
+    } else {
+      const devise = (q.get('devise') || '').trim().toUpperCase();
+      if (devise) this.syncDeviseIdsFromCodes([devise]);
+    }
     const from = (q.get('from') || '').trim();
     const to = (q.get('to') || '').trim();
     if (from && to) {
@@ -2785,7 +2838,10 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   private writeDashboardUrl(): void {
     let params = new HttpParams();
     for (const code of this.selectedDomaines()) params = params.append('domaine', code);
-    params = params.set('devise', this.draftDevise).set('from', this.draftFrom).set('to', this.draftTo);
+    params = params.set('from', this.draftFrom).set('to', this.draftTo);
+    for (const devise of this.selectedDraftDevises()) {
+      params = params.append('devise', devise);
+    }
     for (const id of this.draftProduitIds) params = params.append('produit', String(id));
     if (this.draftEcran) params = params.set('ecran', this.draftEcran);
     if (this.draftPartenaire) params = params.set('partenaire', this.draftPartenaire);

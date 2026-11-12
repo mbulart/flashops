@@ -1,8 +1,9 @@
 package com.flashops.api.pilotage;
 
+import java.math.BigDecimal;
 import java.util.List;
 
-/** Paramètres du bundle pilotage (phase 1) — alignés sur les critères front. */
+/** Paramètres du bundle pilotage — alignés sur les critères front. */
 public record PilotageBundleQuery(
     String domaine,
     String devise,
@@ -20,7 +21,14 @@ public record PilotageBundleQuery(
     PilotageAgenceFilterScope geoScope,
     List<String> domaines,
     List<String> extraProductKeys,
-    boolean transfertRestrictedToExtras) {
+    boolean transfertRestrictedToExtras,
+    List<String> devises,
+    BigDecimal tauxUsdCdf) {
+
+  public PilotageBundleQuery {
+    devises = devises == null ? List.of() : List.copyOf(devises);
+    tauxUsdCdf = tauxUsdCdf == null ? BigDecimal.ZERO : tauxUsdCdf;
+  }
 
   public PilotageBundleQuery(
       String domaine,
@@ -55,7 +63,9 @@ public record PilotageBundleQuery(
         geoScope,
         domaines,
         List.of(),
-        false);
+        false,
+        PilotageMoneySql.ensureNonEmpty(List.of(), devise),
+        BigDecimal.ZERO);
   }
 
   public List<String> resolvedDomaines() {
@@ -67,6 +77,14 @@ public record PilotageBundleQuery(
       return List.of();
     }
     return List.of(domaine.trim());
+  }
+
+  public List<String> resolvedDevises() {
+    return PilotageMoneySql.ensureNonEmpty(devises, devise);
+  }
+
+  public boolean convertsToUsd() {
+    return PilotageMoneySql.convertsToUsd(resolvedDevises(), tauxUsdCdf);
   }
 
   public boolean usesAgenceGrain() {
@@ -101,86 +119,78 @@ public record PilotageBundleQuery(
   }
 
   public PilotageBundleQuery withPeriod(String from, String to) {
-    return new PilotageBundleQuery(
-        domaine,
-        devise,
-        from,
-        to,
-        produitIds,
-        ecran,
-        statutUniformes,
-        categories,
-        agenceIds,
-        agentIds,
-        typeOperationIds,
-        jourFiltre,
-        couloirCodes,
-        geoScope,
-        domaines,
-        extraProductKeys,
-        transfertRestrictedToExtras);
+    return copy(from, to, agenceIds, geoScope, extraProductKeys, transfertRestrictedToExtras, devises, tauxUsdCdf, devise);
   }
 
   public PilotageBundleQuery withAgenceIds(List<Integer> nextAgenceIds) {
-    return new PilotageBundleQuery(
-        domaine,
-        devise,
+    return copy(
         from,
         to,
-        produitIds,
-        ecran,
-        statutUniformes,
-        categories,
         nextAgenceIds == null ? List.of() : List.copyOf(nextAgenceIds),
-        agentIds,
-        typeOperationIds,
-        jourFiltre,
-        couloirCodes,
         geoScope,
-        domaines,
         extraProductKeys,
-        transfertRestrictedToExtras);
+        transfertRestrictedToExtras,
+        devises,
+        tauxUsdCdf,
+        devise);
   }
 
   public PilotageBundleQuery withGeoScope(PilotageAgenceFilterScope nextGeoScope) {
-    return new PilotageBundleQuery(
-        domaine,
-        devise,
-        from,
-        to,
-        produitIds,
-        ecran,
-        statutUniformes,
-        categories,
-        agenceIds,
-        agentIds,
-        typeOperationIds,
-        jourFiltre,
-        couloirCodes,
-        nextGeoScope,
-        domaines,
-        extraProductKeys,
-        transfertRestrictedToExtras);
+    return copy(from, to, agenceIds, nextGeoScope, extraProductKeys, transfertRestrictedToExtras, devises, tauxUsdCdf, devise);
   }
 
   public PilotageBundleQuery withProductAccess(List<String> keys, boolean restrictTransfert) {
-    return new PilotageBundleQuery(
-        domaine,
-        devise,
+    return copy(
         from,
         to,
+        agenceIds,
+        geoScope,
+        keys == null ? List.of() : List.copyOf(keys),
+        restrictTransfert,
+        devises,
+        tauxUsdCdf,
+        devise);
+  }
+
+  public PilotageBundleQuery withDevisesAndTaux(List<String> nextDevises, BigDecimal nextTaux) {
+    List<String> clean = PilotageMoneySql.cleanDevises(nextDevises);
+    BigDecimal taux = nextTaux == null ? BigDecimal.ZERO : nextTaux;
+    String display = PilotageMoneySql.displayDevise(clean, taux);
+    if (display.isBlank() && !clean.isEmpty()) {
+      display = clean.get(0);
+    }
+    return copy(from, to, agenceIds, geoScope, extraProductKeys, transfertRestrictedToExtras, clean, taux, display);
+  }
+
+  private PilotageBundleQuery copy(
+      String nextFrom,
+      String nextTo,
+      List<Integer> nextAgenceIds,
+      PilotageAgenceFilterScope nextGeo,
+      List<String> nextExtras,
+      boolean nextRestrict,
+      List<String> nextDevises,
+      BigDecimal nextTaux,
+      String nextDevise) {
+    return new PilotageBundleQuery(
+        domaine,
+        nextDevise,
+        nextFrom,
+        nextTo,
         produitIds,
         ecran,
         statutUniformes,
         categories,
-        agenceIds,
+        nextAgenceIds,
         agentIds,
         typeOperationIds,
         jourFiltre,
         couloirCodes,
-        geoScope,
+        nextGeo,
         domaines,
-        keys == null ? List.of() : List.copyOf(keys),
-        restrictTransfert);
+        nextExtras,
+        nextRestrict,
+        nextDevises,
+        nextTaux);
   }
 }

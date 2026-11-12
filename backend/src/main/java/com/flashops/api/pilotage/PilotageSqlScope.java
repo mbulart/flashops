@@ -22,8 +22,8 @@ final class PilotageSqlScope {
 
     sql.append(" FROM ").append(table).append(" AS ").append(alias);
     sql.append(" INNER JOIN pilotage.dim_devise AS dv ON dv.devise_id = ").append(alias).append(".devise_id");
-    sql.append(" AND upper(btrim(dv.code)) = upper(btrim(?))");
-    args.add(q.devise());
+    sql.append(" AND upper(btrim(dv.code)) = ANY(?)");
+    args.add(PilotageMoneySql.toSqlArray(q.resolvedDevises()));
 
     if (joinDate) {
       sql.append(" INNER JOIN pilotage.dim_date AS dd ON dd.jour = ").append(alias).append(".jour");
@@ -107,8 +107,8 @@ final class PilotageSqlScope {
     sql.append(" INNER JOIN pilotage.dim_produit AS p ON p.produit_id = f.produit_id");
     sql.append(" INNER JOIN pilotage.dim_statut AS s ON s.statut_id = f.statut_id AND s.inclure_agregat");
     sql.append(" INNER JOIN pilotage.dim_devise AS dv ON dv.devise_id = f.devise_id");
-    sql.append(" AND upper(btrim(dv.code)) = upper(btrim(?))");
-    args.add(q.devise());
+    sql.append(" AND upper(btrim(dv.code)) = ANY(?)");
+    args.add(PilotageMoneySql.toSqlArray(q.resolvedDevises()));
 
     boolean joinAgence = q.usesAgenceGrain();
     if (joinAgence) {
@@ -209,8 +209,8 @@ final class PilotageSqlScope {
     var args = new ArrayList<Object>();
     sql.append(" FROM pilotage.agg_operation_mois AS g");
     sql.append(" INNER JOIN pilotage.dim_devise AS dv ON dv.devise_id = g.devise_id");
-    sql.append(" AND upper(btrim(dv.code)) = upper(btrim(?))");
-    args.add(q.devise());
+    sql.append(" AND upper(btrim(dv.code)) = ANY(?)");
+    args.add(PilotageMoneySql.toSqlArray(q.resolvedDevises()));
     sql.append(" WHERE g.mois = ?::date");
     args.add(moisIso);
     PilotageProductRules.appendAggregateDomaines(

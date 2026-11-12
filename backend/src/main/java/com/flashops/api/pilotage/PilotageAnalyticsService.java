@@ -1,5 +1,6 @@
 package com.flashops.api.pilotage;
 
+import com.flashops.api.admin.AppParametersService;
 import com.flashops.api.web.dto.PilotageDtos;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -18,12 +19,16 @@ public class PilotageAnalyticsService {
       java.util.Set.of("transfert", "monnaie", "service");
 
   private final PilotageAnalyticsRepository repository;
+  private final AppParametersService appParameters;
 
-  public PilotageAnalyticsService(PilotageAnalyticsRepository repository) {
+  public PilotageAnalyticsService(
+      PilotageAnalyticsRepository repository, AppParametersService appParameters) {
     this.repository = repository;
+    this.appParameters = appParameters;
   }
 
   public PilotageDtos.BundleResponse bundle(PilotageBundleQuery q) {
+    q = prepare(q);
     validate(q);
     var totals =
         repository
@@ -180,6 +185,7 @@ public class PilotageAnalyticsService {
       int size,
       String partyQuery,
       boolean export) {
+    q = prepare(q);
     validate(q);
     if (agenceId <= 0) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "agence invalide");
@@ -221,6 +227,7 @@ public class PilotageAnalyticsService {
 
   public PilotageDtos.AgenceClassementPage classementAgences(
       PilotageBundleQuery q, boolean worst, int page, int size, boolean byVolume) {
+    q = prepare(q);
     validate(q);
     var raw = repository.loadTopAgencesPage(q, page, size, worst, byVolume);
     return new PilotageDtos.AgenceClassementPage(
@@ -229,6 +236,7 @@ public class PilotageAnalyticsService {
 
   public PilotageDtos.CouloirClassementPage classementCouloirs(
       PilotageBundleQuery q, boolean worst, int page, int size) {
+    q = prepare(q);
     validate(q);
     var raw = repository.loadTopCorridorsPage(q, page, size, worst);
     var items =
@@ -242,6 +250,7 @@ public class PilotageAnalyticsService {
   }
 
   public PilotageDtos.ExportResponse export(PilotageBundleQuery q) {
+    q = prepare(q);
     validate(q);
     var agencies = toAgenceRanks(repository.loadTopAgences(q, 5000));
     var lignes = repository.loadLignes(q, 20000);
@@ -267,6 +276,7 @@ public class PilotageAnalyticsService {
   }
 
   public PilotageDtos.ProduitsMensuelExport exportProduitsMensuel(PilotageBundleQuery q) {
+    q = prepare(q);
     validate(q);
     var rows =
         repository.loadProductMonthly(q).stream()
@@ -322,13 +332,33 @@ public class PilotageAnalyticsService {
         .doubleValue();
   }
 
+  private PilotageBundleQuery prepare(PilotageBundleQuery q) {
+    BigDecimal taux = BigDecimal.ZERO;
+    try {
+      var row = appParameters.requireRow();
+      if (row.getTauxChangeUsdCdf() != null) {
+        taux = row.getTauxChangeUsdCdf();
+      }
+    } catch (RuntimeException ignored) {
+      taux = BigDecimal.ZERO;
+    }
+    return q.withDevisesAndTaux(q.resolvedDevises(), taux);
+  }
+
   private static void validate(PilotageBundleQuery q) {
     var domaines = q.resolvedDomaines();
     if (domaines.isEmpty() || domaines.stream().anyMatch(d -> !DOMAINES.contains(d))) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "domaine invalide");
     }
-    if (q.devise() == null || q.devise().isBlank()) {
+    if (q.resolvedDevises().isEmpty()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "devise requise");
+    }
+    var devises = q.resolvedDevises();
+    if (devises.contains("USD")
+        && devises.contains("CDF")
+        && (q.tauxUsdCdf() == null || q.tauxUsdCdf().compareTo(BigDecimal.ZERO) <= 0)) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "taux de change USD/CDF requis pour agréger les deux devises");
     }
     if (q.from() == null || q.to() == null || q.from().compareTo(q.to()) > 0) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "période invalide");

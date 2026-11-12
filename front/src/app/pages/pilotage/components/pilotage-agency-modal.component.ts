@@ -211,12 +211,13 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 />
               </div>
               <div class="filter-field">
-                <label class="form-label" for="agency-tx-devise">Devise</label>
-                <select id="agency-tx-devise" class="form-select form-select-sm" [(ngModel)]="draftDevise">
-                  @for (cur of deviseChoices(); track cur) {
-                    <option [value]="cur">{{ cur }}</option>
-                  }
-                </select>
+                <label class="form-label">Devise</label>
+                <app-multi-select
+                  [options]="deviseSelectOptions()"
+                  [selectedIds]="draftDeviseIds"
+                  (selectedIdsChange)="onDeviseIdsChange($event)"
+                  placeholder="Devises"
+                />
               </div>
               @if (sensOptions().length) {
                 <div class="filter-field">
@@ -847,6 +848,7 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
   draftFrom = '';
   draftTo = '';
   draftDevise = 'USD';
+  draftDeviseIds: number[] = [];
   draftEcran = '';
   draftProduitIds: number[] = [];
   draftPartenaire = '';
@@ -859,6 +861,7 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
   appliedFrom = '';
   appliedTo = '';
   appliedDevise = 'USD';
+  appliedDevises: string[] = ['USD'];
   private appliedEcran = '';
   private appliedProduitIds: number[] = [];
   private appliedPartenaire = '';
@@ -1157,8 +1160,43 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
 
   deviseChoices(): string[] {
     const list = [...(this.devises?.length ? this.devises : ['USD'])];
-    if (this.draftDevise && !list.includes(this.draftDevise)) list.unshift(this.draftDevise);
+    for (const cur of this.draftDeviseIds.length ? this.selectedDraftDevises() : [this.draftDevise]) {
+      if (cur && !list.includes(cur)) list.unshift(cur);
+    }
     return list;
+  }
+
+  deviseSelectOptions(): MultiSelectOption[] {
+    return this.deviseChoices().map((code, index) => ({ id: index + 1, label: code }));
+  }
+
+  onDeviseIdsChange(ids: number[]): void {
+    this.draftDeviseIds = ids;
+    const codes = this.selectedDraftDevises();
+    this.draftDevise = this.displayDeviseFrom(codes);
+  }
+
+  selectedDraftDevises(): string[] {
+    return this.deviseSelectOptions()
+      .filter((o) => this.draftDeviseIds.includes(o.id))
+      .map((o) => o.label);
+  }
+
+  private syncDeviseIdsFromCodes(codes: string[]): void {
+    const wanted = new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean));
+    const opts = this.deviseSelectOptions();
+    this.draftDeviseIds = opts.filter((o) => wanted.has(o.label.toUpperCase())).map((o) => o.id);
+    if (!this.draftDeviseIds.length && opts.length) {
+      const usd = opts.find((o) => o.label === 'USD');
+      this.draftDeviseIds = [usd?.id ?? opts[0].id];
+    }
+    this.draftDevise = this.displayDeviseFrom(this.selectedDraftDevises());
+  }
+
+  private displayDeviseFrom(codes: string[]): string {
+    const set = new Set(codes.map((c) => c.toUpperCase()));
+    if (set.has('USD') && set.has('CDF')) return 'USD';
+    return codes[0] || 'USD';
   }
 
   onProduitIdsChange(ids: number[]): void {
@@ -1194,14 +1232,17 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
       this.toast.warning('Date de fin invalide.');
       return;
     }
-    if (!(this.draftDevise || '').trim()) {
+    const devises = this.selectedDraftDevises();
+    if (!devises.length) {
       this.toast.warning('Devise requise.');
       return;
     }
     this.appliedDomaineIds = [...this.draftDomaineIds];
     this.appliedFrom = from;
     this.appliedTo = to;
-    this.appliedDevise = this.draftDevise.trim().toUpperCase();
+    this.appliedDevises = devises;
+    this.appliedDevise = this.displayDeviseFrom(devises);
+    this.draftDevise = this.appliedDevise;
     this.appliedEcran = this.sensOptions().some((e) => e.id === this.draftEcran) ? this.draftEcran : '';
     this.appliedProduitIds = [...this.draftProduitIds];
     this.appliedProduits = [...this.modalProduits()];
@@ -1324,11 +1365,18 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
     this.draftDomaineIds = this.domaineIdsFromCriteria();
     this.draftFrom = this.criteria.from;
     this.draftTo = this.criteria.to;
-    this.draftDevise = this.criteria.devise;
+    const devises =
+      this.criteria.devises?.length > 0
+        ? this.criteria.devises
+        : this.criteria.devise
+          ? [this.criteria.devise]
+          : ['USD'];
+    this.syncDeviseIdsFromCodes(devises);
     this.appliedDomaineIds = [...this.draftDomaineIds];
     this.appliedFrom = this.draftFrom;
     this.appliedTo = this.draftTo;
-    this.appliedDevise = this.draftDevise;
+    this.appliedDevises = this.selectedDraftDevises();
+    this.appliedDevise = this.displayDeviseFrom(this.appliedDevises);
     this.draftScopeTick.update((n) => n + 1);
   }
 
@@ -1440,6 +1488,11 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
       domaine: domaines[0] ?? this.criteria.domaine,
       domaines: domaines.length ? domaines : this.criteria.domaines,
       devise: this.appliedDevise || this.criteria.devise,
+      devises: this.appliedDevises.length
+        ? this.appliedDevises
+        : this.criteria.devises?.length
+          ? this.criteria.devises
+          : [this.appliedDevise || this.criteria.devise],
       from: this.appliedFrom || this.criteria.from,
       to: this.appliedTo || this.criteria.to,
       produitIds: this.resolvedAppliedProduitIds(),
