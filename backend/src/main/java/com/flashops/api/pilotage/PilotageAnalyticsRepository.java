@@ -38,13 +38,9 @@ public class PilotageAnalyticsRepository {
               SELECT coalesce(sum(g.nb), 0)::bigint AS nb,
                      """
               + nbMontantExpr
-              + """
-               AS nb_montant,
-                     """
+              + " AS nb_montant,"
               + PilotageMoneySql.sum("g", "montant", q)
-              + """
-                AS montant,
-              """
+              + " AS montant,"
                   + commissionSelect(grain.table(), "g", q)
                   + """
                      ,
@@ -82,9 +78,7 @@ public class PilotageAnalyticsRepository {
                      coalesce(sum(g.nb), 0)::bigint AS nb,
                      """
               + PilotageMoneySql.sum("g", "montant", q)
-              + """
-                AS montant
-              """);
+              + " AS montant");
       sql.append(scoped.fromAndWhere());
       sql.append(" GROUP BY g.jour ORDER BY g.jour");
       return jdbc.query(
@@ -141,9 +135,7 @@ public class PilotageAnalyticsRepository {
                      coalesce(sum(g.nb), 0)::bigint AS nb,
                      """
               + PilotageMoneySql.sum("g", "montant", q)
-              + """
-                AS montant
-              """);
+              + " AS montant");
       sql.append(body);
       sql.append(
           """
@@ -210,17 +202,14 @@ public class PilotageAnalyticsRepository {
                      coalesce(sum(g.nb), 0)::bigint AS nb,
                      """
               + PilotageMoneySql.sum("g", "montant", q)
-              + """
-                AS montant
-              """);
+              + " AS montant");
       sql.append(body);
       sql.append(
           """
            GROUP BY g.produit_id, p.module, p.produit, p.ecran, p.partenaire
            ORDER BY """
               + PilotageMoneySql.sumRaw("g", "montant", q)
-              + """
-                DESC, sum(g.nb) DESC
+              + " DESC, sum(g.nb) DESC" + """
            LIMIT 24
           """);
       return jdbc.query(
@@ -280,18 +269,14 @@ public class PilotageAnalyticsRepository {
                      coalesce(sum(g.nb), 0)::bigint AS nb,
                      """
               + PilotageMoneySql.sum("g", "montant", q)
-              + """
-                AS montant
-              """);
+              + " AS montant");
       sql.append(body);
       sql.append(
           """
            GROUP BY 1, g.produit_id, p.module, p.produit, p.ecran, p.partenaire
            ORDER BY 1, """
               + PilotageMoneySql.sumRaw("g", "montant", q)
-              + """
-                DESC, sum(g.nb) DESC
-          """);
+              + " DESC, sum(g.nb) DESC");
       return jdbc.query(
           sql.toString(),
           (rs, rowNum) ->
@@ -326,9 +311,7 @@ public class PilotageAnalyticsRepository {
               SELECT coalesce(sum(g.nb), 0)::bigint AS nb,
                      """
               + PilotageMoneySql.sum("g", "montant", q)
-              + """
-                AS montant
-              """);
+              + " AS montant");
       sql.append(scoped.fromAndWhere());
       var args = new ArrayList<>(scoped.args());
       return Optional.ofNullable(
@@ -354,9 +337,7 @@ public class PilotageAnalyticsRepository {
                count(*) FILTER (WHERE f.montant IS NOT NULL)::bigint AS nb_montant,
                """
               + PilotageMoneySql.sum("f", "montant", q)
-              + """
-                AS montant,
-        """
+              + " AS montant,"
             + commissionSelect("pilotage.fait_operation", "f", q)
             + """
                ,
@@ -383,9 +364,7 @@ public class PilotageAnalyticsRepository {
                count(*)::bigint AS nb,
                """
               + PilotageMoneySql.sum("f", "montant", q)
-              + """
-                AS montant
-        """
+              + " AS montant"
             + scoped.fromAndWhere()
             + " GROUP BY d.jour ORDER BY d.jour";
     return jdbc.query(
@@ -409,9 +388,7 @@ public class PilotageAnalyticsRepository {
                count(*)::bigint AS nb,
                """
               + PilotageMoneySql.sum("f", "montant", q)
-              + """
-                AS montant
-        """
+              + " AS montant"
             + scoped.fromAndWhere()
             + """
              AND f.produit_id = ANY(?)
@@ -448,17 +425,13 @@ public class PilotageAnalyticsRepository {
                count(*)::bigint AS nb,
                """
               + PilotageMoneySql.sum("f", "montant", q)
-              + """
-                AS montant
-        """
+              + " AS montant"
             + scoped.fromAndWhere()
             + """
              GROUP BY 1, f.produit_id, p.module, p.produit, p.ecran, p.partenaire
              ORDER BY 1, """
               + PilotageMoneySql.sumRaw("f", "montant", q)
-              + """
-                DESC, count(*) DESC
-            """;
+              + " DESC, count(*) DESC";
     return jdbc.query(
         sql,
         (rs, rowNum) ->
@@ -486,16 +459,13 @@ public class PilotageAnalyticsRepository {
                count(*)::bigint AS nb,
                """
               + PilotageMoneySql.sum("f", "montant", q)
-              + """
-                AS montant
-        """
+              + " AS montant"
             + scoped.fromAndWhere()
             + """
              GROUP BY f.produit_id, p.module, p.produit, p.ecran, p.partenaire
              ORDER BY """
               + PilotageMoneySql.sumRaw("f", "montant", q)
-              + """
-                DESC, count(*) DESC
+              + " DESC, count(*) DESC" + """
              LIMIT 24
             """;
     return jdbc.query(
@@ -638,9 +608,7 @@ public class PilotageAnalyticsRepository {
                coalesce(s.statut_uniforme, '') AS statut,
                """
               + PilotageMoneySql.value("f", "montant", q)
-              + """
-                AS montant
-        """
+              + " AS montant"
             + scope.replace(
                 " FROM pilotage.fait_operation AS f",
                 " FROM pilotage.fait_operation AS f"
@@ -736,15 +704,12 @@ public class PilotageAnalyticsRepository {
                coalesce(sum(g.nb), 0)::bigint AS nb,
                """
               + PilotageMoneySql.sum("g", "montant", q)
-              + """
-                AS montant
-        """
+              + " AS montant"
             + grouped
             + """
              ORDER BY """
               + PilotageMoneySql.sumRaw("g", "montant", q)
-              + """
-                DESC, sum(g.nb) DESC
+              + " DESC, sum(g.nb) DESC" + """
              LIMIT ?
             """;
     var args = new ArrayList<>(scoped.args());
@@ -918,9 +883,7 @@ public class PilotageAnalyticsRepository {
                coalesce(sum(g.nb), 0)::bigint AS nb,
                """
               + PilotageMoneySql.sum("g", "montant", q)
-              + """
-                AS montant,
-        """
+              + " AS montant,"
             + commissionSelect(grain.table(), "g", q)
             + grouped
             + order
@@ -979,9 +942,7 @@ public class PilotageAnalyticsRepository {
                count(*)::bigint AS nb,
                """
               + PilotageMoneySql.sum("f", "montant", q)
-              + """
-                AS montant,
-        """
+              + " AS montant,"
             + commissionSelect("pilotage.fait_operation", "f", q)
             + grouped
             + order
@@ -1052,9 +1013,7 @@ public class PilotageAnalyticsRepository {
                coalesce(sum(g.nb), 0)::bigint AS nb,
                """
               + PilotageMoneySql.sum("g", "montant", q)
-              + """
-                AS montant
-        """
+              + " AS montant"
             + groupSql
             + order
             + """
@@ -1099,9 +1058,7 @@ public class PilotageAnalyticsRepository {
                count(*)::bigint AS nb,
                """
               + PilotageMoneySql.sum("f", "montant", q)
-              + """
-                AS montant
-        """
+              + " AS montant"
             + groupSql
             + order
             + """
@@ -1252,8 +1209,7 @@ public class PilotageAnalyticsRepository {
           0::numeric AS commission_fcn,
           """
           + PilotageMoneySql.sum(alias, "commission_agent", q)
-          + """
-           AS commission_agent,
+          + " AS commission_agent," + """
           0::numeric AS commission_fcn_agent
           """;
     }
@@ -1263,8 +1219,7 @@ public class PilotageAnalyticsRepository {
           + PilotageMoneySql.sum(alias, "commission_fcn", q)
           + " AS commission_fcn, "
           + PilotageMoneySql.sum(alias, "commission_agent", q)
-          + """
-           AS commission_agent,
+          + " AS commission_agent," + """
           0::numeric AS commission_fcn_agent
           """;
     }
