@@ -3,7 +3,13 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { AgenceAdmin, AgenceAdminFilters, AgenceAdminInput } from '../../core/models/agences.models';
-import { PilotageReseauRef } from '../../core/models/pilotage.models';
+import {
+  PilotageAgenceRank,
+  PilotageCriteria,
+  PilotageDomaine,
+  PilotageDomaineOption,
+  PilotageReseauRef,
+} from '../../core/models/pilotage.models';
 import { AgencesService } from '../../core/services/agences.service';
 import { AuthService } from '../../core/services/auth.service';
 import { PilotageService } from '../../core/services/pilotage.service';
@@ -12,9 +18,16 @@ import { FilterPanelComponent } from '../../shared/components/filter-panel/filte
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SectionCardComponent } from '../../shared/components/section-card/section-card.component';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
-import { exportExcel } from '../../shared/utils/format.utils';
+import { exportExcel, periodPresetRange } from '../../shared/utils/format.utils';
 import { TableActionsMenuComponent } from '../parametrages/components/table-actions-menu.component';
+import { PilotageAgencyModalComponent } from '../pilotage/components/pilotage-agency-modal.component';
 import { AgenceFormModalComponent } from './components/agence-form-modal.component';
+
+const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
+  { code: 'transfert', label: 'Transferts' },
+  { code: 'monnaie', label: 'Monnaie' },
+  { code: 'service', label: 'Services' },
+];
 
 @Component({
   selector: 'app-agences-page',
@@ -28,8 +41,21 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
     SkeletonComponent,
     TableActionsMenuComponent,
     AgenceFormModalComponent,
+    PilotageAgencyModalComponent,
   ],
   template: `
+    @if (openedAgency(); as agency) {
+      @if (agencyCriteria(); as c) {
+        <app-pilotage-agency-modal
+          [agency]="agency"
+          [criteria]="c"
+          [domaines]="domaines()"
+          [devises]="devises()"
+          (closed)="closeAgencyFiche()"
+        />
+      }
+    }
+
     <app-page-header title="Agences" />
 
     <app-filter-panel title="Filtres" [expanded]="true">
@@ -166,17 +192,17 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
                 <th>Statut</th>
                 <th>Dernière tx</th>
                 <th>Mère</th>
-                @if (auth.can('agences.ecrire')) {
-                  <th class="text-end" style="width: 2.75rem"></th>
-                }
+                <th class="text-end" style="width: 2.75rem"></th>
               </tr>
             </thead>
             <tbody>
               @for (row of rows(); track row.agenceId) {
                 <tr>
                   <td>
-                    <div class="agences-cell-primary">{{ row.nom || '—' }}</div>
-                    <div class="agences-cell-muted">{{ row.categorie || '—' }}</div>
+                    <button type="button" class="agences-name-btn" (click)="openAgencyFiche(row)">
+                      <span class="agences-cell-primary">{{ row.nom || '—' }}</span>
+                      <span class="agences-cell-muted">{{ row.categorie || '—' }}</span>
+                    </button>
                   </td>
                   <td>
                     <div class="agences-cell-primary">
@@ -218,20 +244,24 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
                       —
                     }
                   </td>
-                  @if (auth.can('agences.ecrire')) {
-                    <td class="text-end">
-                      <app-table-actions-menu #rowMenu>
+                  <td class="text-end">
+                    <app-table-actions-menu #rowMenu>
+                      <button type="button" class="table-actions-menu__item" (click)="openAgencyFiche(row); rowMenu.close()">
+                        <i class="bi bi-eye"></i>
+                        Voir la fiche
+                      </button>
+                      @if (auth.can('agences.ecrire')) {
                         <button type="button" class="table-actions-menu__item" (click)="openEdit(row); rowMenu.close()">
                           <i class="bi bi-pencil"></i>
                           Modifier
                         </button>
-                      </app-table-actions-menu>
-                    </td>
-                  }
+                      }
+                    </app-table-actions-menu>
+                  </td>
                 </tr>
               } @empty {
                 <tr>
-                  <td [attr.colspan]="auth.can('agences.ecrire') ? 8 : 7" class="text-center text-muted py-3">
+                  <td colspan="8" class="text-center text-muted py-3">
                     Aucune agence pour ces filtres.
                   </td>
                 </tr>
@@ -353,11 +383,27 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
       line-height: 1.25;
       vertical-align: middle;
     }
+    .agences-name-btn {
+      display: block;
+      width: 100%;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+    .agences-name-btn:hover .agences-cell-primary,
+    .agences-name-btn:focus-visible .agences-cell-primary {
+      color: var(--bs-primary, #0d6efd);
+      text-decoration: underline;
+    }
     .agences-cell-primary {
+      display: block;
       font-weight: 600;
       line-height: 1.25;
     }
     .agences-cell-muted {
+      display: block;
       color: var(--text-muted, #6b7280);
       font-size: 0.74rem;
       line-height: 1.2;
@@ -426,6 +472,11 @@ export class AgencesPageComponent implements OnInit {
   readonly editingId = signal<number | null>(null);
   readonly editingAgency = signal<AgenceAdmin | null>(null);
 
+  readonly openedAgency = signal<PilotageAgenceRank | null>(null);
+  readonly agencyCriteria = signal<PilotageCriteria | null>(null);
+  readonly domaines = signal<PilotageDomaineOption[]>(DEFAULT_DOMAINES);
+  readonly devises = signal<string[]>(['USD']);
+
   readonly pageCount = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize())));
 
   readonly editorZones = computed(() => {
@@ -435,6 +486,16 @@ export class AgencesPageComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.pilotage.loadMeta().subscribe({
+      next: (meta) => {
+        this.domaines.set(meta.domaines?.length ? meta.domaines : DEFAULT_DOMAINES);
+        this.devises.set(meta.devises?.length ? meta.devises : ['USD']);
+      },
+      error: () => {
+        this.domaines.set(DEFAULT_DOMAINES);
+        this.devises.set(['USD']);
+      },
+    });
     this.pilotage.listReseauRegions().subscribe({
       next: (rows) => this.regions.set(rows ?? []),
       error: () => this.regions.set([]),
@@ -538,10 +599,71 @@ export class AgencesPageComponent implements OnInit {
     this.editorOpen.set(true);
   }
 
+  openAgencyFiche(row: AgenceAdmin): void {
+    this.agencyCriteria.set(this.buildAgencyCriteria());
+    this.openedAgency.set({
+      agenceId: row.agenceId,
+      codeAgence: row.code_agence || '',
+      nom: row.nom || row.code_agence || String(row.agenceId),
+      categorie: row.categorie || '',
+      posId: row.pos_id || '',
+      region: row.region || '',
+      zone: row.zone || '',
+      volume: 0,
+      montant: 0,
+      commission: 0,
+      commissionFcn: 0,
+      commissionAgent: 0,
+      commissionFcnAgent: 0,
+    });
+  }
+
+  closeAgencyFiche(): void {
+    this.openedAgency.set(null);
+    this.agencyCriteria.set(null);
+  }
+
   closeEditor(): void {
     this.editorOpen.set(false);
     this.editingId.set(null);
     this.editingAgency.set(null);
+  }
+
+  private buildAgencyCriteria(): PilotageCriteria {
+    const range = periodPresetRange('30d');
+    const domaines = (this.domaines().map((d) => d.code) as PilotageDomaine[]).filter(Boolean);
+    const useDomaines = domaines.length ? domaines : (['transfert', 'monnaie', 'service'] as PilotageDomaine[]);
+    const devises = this.devises().length ? this.devises() : ['USD'];
+    const devise = devises.includes('USD') ? 'USD' : devises[0];
+    return {
+      domaine: useDomaines[0],
+      domaines: useDomaines,
+      devise,
+      devises: [devise],
+      from: range.from,
+      to: range.to,
+      produitIds: [],
+      produitLabels: [],
+      partenaire: '',
+      modePaiement: '',
+      sousProduit: '',
+      ecran: '',
+      statutUniformes: [],
+      categories: [],
+      agenceIds: [],
+      agentIds: [],
+      typeOperationIds: [],
+      jourFiltre: '',
+      paysId: null,
+      provinceId: null,
+      villeIds: [],
+      territoireId: null,
+      communeIds: [],
+      reseauRegions: [],
+      zoneIds: [],
+      couloirCodes: [],
+      locationLabels: {},
+    };
   }
 
   async saveAgency(body: AgenceAdminInput): Promise<void> {
