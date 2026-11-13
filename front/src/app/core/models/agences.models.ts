@@ -62,6 +62,8 @@ export interface AgenceAdminFilters {
   pays?: string;
   categorie?: string;
   activity_days?: number | null;
+  /** Nouveau | Actif | Inactif */
+  statut_activite?: string[];
   from?: string;
   to?: string;
   parent_agence_id?: number | null;

@@ -67,6 +67,15 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
             </select>
           </div>
           <div class="filter-field">
+            <label class="form-label" for="ag-statut">Statut</label>
+            <select id="ag-statut" class="form-select form-select-sm" [(ngModel)]="draftStatutActivite">
+              <option value="">Tous</option>
+              <option value="Nouveau">Nouveau</option>
+              <option value="Actif">Actif</option>
+              <option value="Inactif">Inactif</option>
+            </select>
+          </div>
+          <div class="filter-field">
             <label class="form-label" for="ag-coords">Géoloc.</label>
             <select id="ag-coords" class="form-select form-select-sm" [(ngModel)]="draftSansCoords">
               <option [ngValue]="false">Toutes</option>
@@ -338,6 +347,7 @@ export class AgencesPageComponent implements OnInit {
   readonly pageSizes = [25, 50, 100];
 
   draftActivityDays: number | null = null;
+  draftStatutActivite = '';
   draftSansCoords = false;
   draftIdentifiant = '';
   draftQ = '';
@@ -346,6 +356,12 @@ export class AgencesPageComponent implements OnInit {
   draftVille = '';
   draftCommune = '';
   draftCategorie = '';
+
+  readonly statutActiviteBadgeColors = {
+    Nouveau: { bg: 'FFDBEAFE', fg: 'FF1D4ED8' },
+    Actif: { bg: 'FFDCFCE7', fg: 'FF15803D' },
+    Inactif: { bg: 'FFF3F4F6', fg: 'FF6B7280' },
+  } as const;
 
   private applied: AgenceAdminFilters = { page: 1, size: 25 };
 
@@ -405,6 +421,7 @@ export class AgencesPageComponent implements OnInit {
 
   resetFilters(): void {
     this.draftActivityDays = null;
+    this.draftStatutActivite = '';
     this.draftSansCoords = false;
     this.draftIdentifiant = '';
     this.draftQ = '';
@@ -526,12 +543,19 @@ export class AgencesPageComponent implements OnInit {
               { label: 'longitude', key: 'longitude' },
               { label: 'premiere_transaction', key: 'premiere_transaction' },
               { label: 'derniere_transaction', key: 'derniere_transaction' },
-              { label: 'statut_activite', key: 'statut_activite' },
+              {
+                label: 'statut_activite',
+                key: 'statut_activite',
+                badgeColors: { ...this.statutActiviteBadgeColors },
+              },
               { label: 'agence_mere_id', key: 'parentAgenceId' },
               { label: 'agence_mere_code', key: 'mere_code' },
               { label: 'agence_mere_nom', key: 'mere_nom' },
             ],
-            rows: rows.map((r) => ({ ...r })),
+            rows: rows.map((r) => ({
+              ...r,
+              statut_activite: r.statut_activite || 'Inactif',
+            })),
           },
         ],
       });
@@ -553,6 +577,9 @@ export class AgencesPageComponent implements OnInit {
       commune: this.draftCommune.trim() || undefined,
       categorie: this.draftCategorie.trim() || undefined,
       activity_days: this.draftActivityDays,
+      statut_activite: this.draftStatutActivite.trim()
+        ? [this.draftStatutActivite.trim()]
+        : undefined,
       sans_coords: this.draftSansCoords || undefined,
       page,
       size: this.pageSize(),

@@ -23,6 +23,29 @@ public class AgenceAdminRepository {
 
   private static final Logger log = LoggerFactory.getLogger(AgenceAdminRepository.class);
 
+  /** Aligné sur le badge UI : 1ʳᵉ tx ≤ 30j → Nouveau ; dernière tx > 90j / absente → Inactif ; sinon Actif. */
+  private static final String STATUT_ACTIVITE_EXPR =
+      """
+      CASE
+        WHEN last_tx.premiere_tx IS NULL THEN 'Inactif'
+        WHEN last_tx.premiere_tx >= (CURRENT_DATE - 30) THEN 'Nouveau'
+        WHEN last_tx.derniere_tx IS NULL
+          OR last_tx.derniere_tx < (CURRENT_DATE - 90) THEN 'Inactif'
+        ELSE 'Actif'
+      END
+      """;
+
+  private static final String ACTIVITY_JOIN =
+      """
+      LEFT JOIN (
+        SELECT agence_id,
+               MIN(jour)::date AS premiere_tx,
+               MAX(jour)::date AS derniere_tx
+        FROM pilotage.agg_operation_agence_jour
+        GROUP BY agence_id
+      ) last_tx ON last_tx.agence_id = d.agence_id
+      """;
+
   private static final String SELECT_LIST =
       """
       SELECT d.agence_id,
@@ -52,27 +75,18 @@ public class AgenceAdminRepository {
              coalesce(nullif(btrim(mere.nom), ''), '') AS mere_nom,
              to_char(last_tx.premiere_tx, 'YYYY-MM-DD') AS premiere_transaction,
              to_char(last_tx.derniere_tx, 'YYYY-MM-DD') AS derniere_transaction,
-             CASE
-               WHEN last_tx.premiere_tx IS NULL THEN 'Inactif'
-               WHEN last_tx.premiere_tx >= (CURRENT_DATE - 30) THEN 'Nouveau'
-               WHEN last_tx.derniere_tx IS NULL
-                 OR last_tx.derniere_tx < (CURRENT_DATE - 90) THEN 'Inactif'
-               ELSE 'Actif'
-             END AS statut_activite
+             """
+          + STATUT_ACTIVITE_EXPR
+          + """
+             AS statut_activite
       FROM pilotage.dim_agence AS d
       LEFT JOIN pilotage.dim_region AS rg ON rg.region_id = d.region_id
       LEFT JOIN pilotage.dim_zone AS zn ON zn.zone_id = d.zone_id
       LEFT JOIN public.zones AS az ON lower(btrim(az.libelle)) = lower(btrim(zn.libelle))
       LEFT JOIN public.responsables_zone AS rz ON rz.id = az.responsable_zone_id
       LEFT JOIN pilotage.dim_agence AS mere ON mere.agence_id = d.parent_agence_id
-      LEFT JOIN (
-        SELECT agence_id,
-               MIN(jour)::date AS premiere_tx,
-               MAX(jour)::date AS derniere_tx
-        FROM pilotage.agg_operation_agence_jour
-        GROUP BY agence_id
-      ) last_tx ON last_tx.agence_id = d.agence_id
-      """;
+      """
+          + ACTIVITY_JOIN;
 
   private final JdbcTemplate jdbc;
 
@@ -91,12 +105,7 @@ public class AgenceAdminRepository {
 
     Long total =
         jdbc.queryForObject(
-            "SELECT COUNT(*) FROM pilotage.dim_agence AS d "
-                + "LEFT JOIN ("
-                + "  SELECT agence_id, MAX(jour)::date AS derniere_tx "
-                + "  FROM pilotage.agg_operation_agence_jour GROUP BY agence_id"
-                + ") last_tx ON last_tx.agence_id = d.agence_id "
-                + where,
+            "SELECT COUNT(*) FROM pilotage.dim_agence AS d " + ACTIVITY_JOIN + where,
             Long.class,
             args.toArray());
 
@@ -300,6 +309,27 @@ public class AgenceAdminRepository {
     if (q.activityDays() != null && q.activityDays() > 0) {
       where.append(" AND last_tx.derniere_tx >= (CURRENT_DATE - ?::int) ");
       args.add(q.activityDays());
+    }
+    if (q.statutActivites() != null && !q.statutActivites().isEmpty()) {
+      List<String> clean =
+          q.statutActivites().stream()
+              .filter(AgenceAdminRepository::notBlank)
+              .map(String::trim)
+              .map(
+                  s -> {
+                    String t = s.trim();
+                    if (t.equalsIgnoreCase("Nouveau")) return "Nouveau";
+                    if (t.equalsIgnoreCase("Actif")) return "Actif";
+                    if (t.equalsIgnoreCase("Inactif")) return "Inactif";
+                    return null;
+                  })
+              .filter(s -> s != null)
+              .distinct()
+              .toList();
+      if (!clean.isEmpty()) {
+        where.append(" AND (").append(STATUT_ACTIVITE_EXPR).append(") = ANY(?) ");
+        args.add(clean.toArray(new String[0]));
+      }
     }
     if (notBlank(q.from()) && notBlank(q.to())) {
       where.append(

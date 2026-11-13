@@ -65,6 +65,9 @@ export class AgencesService {
     set('pays', filters.pays);
     set('categorie', filters.categorie);
     set('activity_days', filters.activity_days);
+    for (const s of filters.statut_activite ?? []) {
+      if (s) params = params.append('statut_activite', s);
+    }
     set('from', filters.from);
     set('to', filters.to);
     set('parent_agence_id', filters.parent_agence_id);

@@ -158,10 +158,20 @@ export function downloadCsv(filename: string, rows: Record<string, unknown>[], c
   URL.revokeObjectURL(url);
 }
 
+export interface ExcelColumnBadgeColors {
+  bg: string;
+  fg: string;
+}
+
 export interface ExcelSheet {
   name: string;
   rows: Record<string, unknown>[];
-  columns: { key: string; label: string }[];
+  columns: {
+    key: string;
+    label: string;
+    /** Si défini, colore la cellule selon la valeur texte (badges Excel). */
+    badgeColors?: Record<string, ExcelColumnBadgeColors>;
+  }[];
 }
 
 export interface ExcelBrandOptions {
@@ -502,9 +512,18 @@ async function writeBrandedExcel(options: ExcelExportOptions, download: boolean)
     for (const row of sheet.rows) {
       const values = sheet.columns.map((c) => excelCellValue(row[c.key]));
       const excelRow = ws.addRow(values);
-      excelRow.eachCell((cell) => {
+      sheet.columns.forEach((col, i) => {
+        const cell = excelRow.getCell(i + 1);
         cell.border = thinExcelBorder();
         cell.font = { name: 'Calibri', size: 10 };
+        const raw = row[col.key];
+        const key = raw == null ? '' : String(raw).trim();
+        const badge = col.badgeColors?.[key];
+        if (badge) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: badge.bg } };
+          cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: badge.fg } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        }
       });
     }
 

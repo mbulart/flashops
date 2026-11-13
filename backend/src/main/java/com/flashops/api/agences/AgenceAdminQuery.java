@@ -14,6 +14,8 @@ public record AgenceAdminQuery(
     String pays,
     String categorie,
     Integer activityDays,
+    /** Nouveau | Actif | Inactif — vide = pas de filtre. */
+    List<String> statutActivites,
     String from,
     String to,
     Integer parentAgenceId,
