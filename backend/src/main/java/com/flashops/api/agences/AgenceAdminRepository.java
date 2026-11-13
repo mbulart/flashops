@@ -42,7 +42,11 @@ public class AgenceAdminRepository {
              d.zone_id,
              coalesce(nullif(nullif(btrim(rg.libelle), ''), 'Non renseigné'), '') AS region,
              coalesce(nullif(nullif(btrim(zn.libelle), ''), 'Non renseigné'), '') AS zone,
-             coalesce(nullif(btrim(rz.nom), ''), '') AS responsable_zone,
+             coalesce(
+               nullif(btrim(rz.nom), ''),
+               nullif(btrim(d.responsable_zone_nom), ''),
+               ''
+             ) AS responsable_zone,
              d.parent_agence_id,
              coalesce(nullif(btrim(mere.code_agence), ''), '') AS mere_code,
              coalesce(nullif(btrim(mere.nom), ''), '') AS mere_nom,
@@ -120,7 +124,11 @@ public class AgenceAdminRepository {
                d.zone_id,
                coalesce(nullif(nullif(btrim(rg.libelle), ''), 'Non renseigné'), '') AS region,
                coalesce(nullif(nullif(btrim(zn.libelle), ''), 'Non renseigné'), '') AS zone,
-               coalesce(nullif(btrim(rz.nom), ''), '') AS responsable_zone,
+               coalesce(
+                 nullif(btrim(rz.nom), ''),
+                 nullif(btrim(d.responsable_zone_nom), ''),
+                 ''
+               ) AS responsable_zone,
                d.parent_agence_id,
                coalesce(nullif(btrim(mere.code_agence), ''), '') AS mere_code,
                coalesce(nullif(btrim(mere.nom), ''), '') AS mere_nom,
