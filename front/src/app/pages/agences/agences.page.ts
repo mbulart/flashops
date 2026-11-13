@@ -35,7 +35,7 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
     <app-filter-panel title="Filtres" [expanded]="true">
       <div class="agences-filters">
         <div class="agences-filter-row">
-          <div class="filter-field filter-field--grow">
+          <div class="filter-field filter-field--search">
             <label class="form-label" for="ag-q">Recherche</label>
             <input
               id="ag-q"
@@ -121,7 +121,7 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
             </select>
           </div>
           <div class="filter-field filter-field--actions">
-            <label class="form-label">&nbsp;</label>
+            <label class="form-label" aria-hidden="true">&nbsp;</label>
             <div class="agences-filters-actions">
               <button type="button" class="btn btn-outline-secondary btn-sm" (click)="resetFilters()">Réinit.</button>
               <button type="button" class="btn btn-primary btn-sm" (click)="applyFilters()">
@@ -156,7 +156,7 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
         </div>
       } @else {
         <div class="parametrages-table-scroll">
-          <table class="table table-hover table-sm align-middle mb-0">
+          <table class="table table-hover table-sm align-middle mb-0 agences-table">
             <thead>
               <tr>
                 <th>Agence</th>
@@ -167,7 +167,7 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
                 <th>Dernière tx</th>
                 <th>Mère</th>
                 @if (auth.can('agences.ecrire')) {
-                  <th class="text-end" style="width: 3.5rem"></th>
+                  <th class="text-end" style="width: 2.75rem"></th>
                 }
               </tr>
             </thead>
@@ -175,37 +175,45 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
               @for (row of rows(); track row.agenceId) {
                 <tr>
                   <td>
-                    <span class="d-block fw-semibold">{{ row.nom || '—' }}</span>
-                    <small class="text-muted">{{ row.categorie || '—' }}</small>
+                    <div class="agences-cell-primary">{{ row.nom || '—' }}</div>
+                    <div class="agences-cell-muted">{{ row.categorie || '—' }}</div>
                   </td>
-                  <td class="small">
-                    <div><span class="text-muted">ID</span> {{ row.agenceId }}</div>
-                    <div class="font-monospace">{{ row.code_agence || '—' }}</div>
+                  <td>
+                    <div class="agences-cell-primary">
+                      <span class="text-muted">ID</span> {{ row.agenceId }}
+                      <span class="font-monospace"> · {{ row.code_agence || '—' }}</span>
+                    </div>
                     @if (row.pos_id) {
-                      <div class="text-muted">FP {{ row.pos_id }}</div>
+                      <div class="agences-cell-muted">FP {{ row.pos_id }}</div>
                     }
                   </td>
-                  <td class="small">
-                    <div>{{ row.region || '—' }}</div>
-                    <div class="text-muted">{{ row.zone || '—' }}</div>
-                    @if (row.responsable_zone) {
-                      <div class="text-muted">RZ {{ row.responsable_zone }}</div>
-                    }
+                  <td>
+                    <div class="agences-cell-primary">{{ row.region || '—' }}</div>
+                    <div class="agences-cell-muted">
+                      {{ row.zone || '—' }}
+                      @if (row.responsable_zone) {
+                        <span> · RZ {{ row.responsable_zone }}</span>
+                      }
+                    </div>
                   </td>
-                  <td class="small">
-                    <div>{{ row.ville || '—' }}{{ row.commune ? ' · ' + row.commune : '' }}</div>
-                    <div class="text-muted font-monospace">{{ coordsLabel(row) }}</div>
+                  <td>
+                    <div class="agences-cell-primary">
+                      {{ row.ville || '—' }}{{ row.commune ? ' · ' + row.commune : '' }}
+                    </div>
+                    <div class="agences-cell-muted font-monospace">{{ coordsLabel(row) }}</div>
                   </td>
                   <td>
                     <span class="badge rounded-pill agence-statut" [class]="statutBadgeClass(row.statut_activite)">
                       {{ row.statut_activite || 'Inactif' }}
                     </span>
                   </td>
-                  <td class="small text-nowrap">{{ formatJour(row.derniere_transaction) }}</td>
-                  <td class="small">
+                  <td class="text-nowrap">{{ formatJour(row.derniere_transaction) }}</td>
+                  <td>
                     @if (row.parentAgenceId) {
-                      <span class="d-block">{{ row.mere_nom || row.mere_code || row.parentAgenceId }}</span>
-                      <small class="text-muted font-monospace">{{ row.mere_code }}</small>
+                      <div class="agences-cell-primary">{{ row.mere_nom || row.mere_code || row.parentAgenceId }}</div>
+                      @if (row.mere_code) {
+                        <div class="agences-cell-muted font-monospace">{{ row.mere_code }}</div>
+                      }
                     } @else {
                       —
                     }
@@ -223,7 +231,7 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
                 </tr>
               } @empty {
                 <tr>
-                  <td [attr.colspan]="auth.can('agences.ecrire') ? 8 : 7" class="text-center text-muted py-4">
+                  <td [attr.colspan]="auth.can('agences.ecrire') ? 8 : 7" class="text-center text-muted py-3">
                     Aucune agence pour ces filtres.
                   </td>
                 </tr>
@@ -260,27 +268,30 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
     .agences-filters {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.55rem;
     }
     .agences-filter-row {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 0.65rem 0.75rem;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 0.45rem 0.65rem;
       align-items: end;
     }
-    @media (min-width: 992px) {
+    .agences-filter-row .filter-field--search {
+      grid-column: span 2;
+    }
+    @media (max-width: 1199.98px) {
       .agences-filter-row {
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
-      .agences-filter-row .filter-field--grow {
-        grid-column: span 3;
+      .agences-filter-row .filter-field--search {
+        grid-column: span 1;
       }
     }
-    @media (max-width: 991.98px) {
+    @media (max-width: 767.98px) {
       .agences-filter-row {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-      .agences-filter-row .filter-field--grow,
+      .agences-filter-row .filter-field--search,
       .agences-filter-row .filter-field--actions {
         grid-column: 1 / -1;
       }
@@ -289,14 +300,16 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
       min-width: 0;
     }
     .agences-filters .form-label {
-      margin-bottom: 0.2rem;
-      font-size: 0.78rem;
+      margin-bottom: 0.15rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
       color: var(--text-muted, #6b7280);
     }
     .agences-filters-actions {
       display: flex;
       justify-content: flex-end;
-      gap: 0.45rem;
+      gap: 0.4rem;
       flex-wrap: wrap;
     }
     .agences-table-actions {
@@ -313,16 +326,49 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
       align-items: center;
       justify-content: flex-end;
       gap: 0.4rem;
-      padding: 0.75rem 1rem;
+      padding: 0.55rem 0.85rem;
       border-top: 1px solid var(--card-border, #e5e7eb);
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       color: var(--text-muted, #6b7280);
+    }
+    .agences-table {
+      font-size: 0.8125rem;
+      --bs-table-cell-padding-y: 0.28rem;
+      --bs-table-cell-padding-x: 0.55rem;
+    }
+    .agences-table thead th {
+      font-size: 0.72rem;
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      color: var(--text-muted, #6b7280);
+      white-space: nowrap;
+      padding-top: 0.4rem;
+      padding-bottom: 0.4rem;
+      vertical-align: middle;
+    }
+    .agences-table tbody td {
+      padding-top: 0.28rem;
+      padding-bottom: 0.28rem;
+      line-height: 1.25;
+      vertical-align: middle;
+    }
+    .agences-cell-primary {
+      font-weight: 600;
+      line-height: 1.25;
+    }
+    .agences-cell-muted {
+      color: var(--text-muted, #6b7280);
+      font-size: 0.74rem;
+      line-height: 1.2;
+      margin-top: 0.05rem;
     }
     .agence-statut {
       font-weight: 600;
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       letter-spacing: 0.01em;
-      padding: 0.35em 0.7em;
+      padding: 0.18em 0.55em;
+      line-height: 1.2;
     }
     .agence-statut--nouveau {
       background: #dbeafe;
