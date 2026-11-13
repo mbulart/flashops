@@ -20,7 +20,10 @@ export interface AgenceAdmin {
   parentAgenceId: number | null;
   mere_code: string;
   mere_nom: string;
+  premiere_transaction: string | null;
   derniere_transaction: string | null;
+  /** Nouveau | Actif | Inactif */
+  statut_activite: 'Nouveau' | 'Actif' | 'Inactif' | string;
 }
 
 export interface AgenceAdminPage {

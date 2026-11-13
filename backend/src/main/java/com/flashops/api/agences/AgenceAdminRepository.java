@@ -50,7 +50,15 @@ public class AgenceAdminRepository {
              d.parent_agence_id,
              coalesce(nullif(btrim(mere.code_agence), ''), '') AS mere_code,
              coalesce(nullif(btrim(mere.nom), ''), '') AS mere_nom,
-             to_char(last_tx.derniere_tx, 'YYYY-MM-DD') AS derniere_transaction
+             to_char(last_tx.premiere_tx, 'YYYY-MM-DD') AS premiere_transaction,
+             to_char(last_tx.derniere_tx, 'YYYY-MM-DD') AS derniere_transaction,
+             CASE
+               WHEN last_tx.premiere_tx IS NULL THEN 'Inactif'
+               WHEN last_tx.premiere_tx >= (CURRENT_DATE - 30) THEN 'Nouveau'
+               WHEN last_tx.derniere_tx IS NULL
+                 OR last_tx.derniere_tx < (CURRENT_DATE - 90) THEN 'Inactif'
+               ELSE 'Actif'
+             END AS statut_activite
       FROM pilotage.dim_agence AS d
       LEFT JOIN pilotage.dim_region AS rg ON rg.region_id = d.region_id
       LEFT JOIN pilotage.dim_zone AS zn ON zn.zone_id = d.zone_id
@@ -58,7 +66,9 @@ public class AgenceAdminRepository {
       LEFT JOIN public.responsables_zone AS rz ON rz.id = az.responsable_zone_id
       LEFT JOIN pilotage.dim_agence AS mere ON mere.agence_id = d.parent_agence_id
       LEFT JOIN (
-        SELECT agence_id, MAX(jour)::date AS derniere_tx
+        SELECT agence_id,
+               MIN(jour)::date AS premiere_tx,
+               MAX(jour)::date AS derniere_tx
         FROM pilotage.agg_operation_agence_jour
         GROUP BY agence_id
       ) last_tx ON last_tx.agence_id = d.agence_id
@@ -105,47 +115,7 @@ public class AgenceAdminRepository {
   }
 
   public Optional<AgenceAdminRow> findById(int agenceId) {
-    var sql =
-        """
-        SELECT d.agence_id,
-               coalesce(nullif(btrim(d.code_agence), ''), '') AS code_agence,
-               coalesce(nullif(btrim(d.nom), ''), '') AS nom,
-               coalesce(nullif(btrim(d.categorie), ''), '') AS categorie,
-               coalesce(nullif(btrim(d.pos_id), ''), '') AS pos_id,
-               coalesce(nullif(btrim(d.fp_agent), ''), '') AS fp_agent,
-               coalesce(nullif(btrim(d.ville), ''), '') AS ville,
-               coalesce(nullif(btrim(d.commune), ''), '') AS commune,
-               coalesce(nullif(btrim(d.province), ''), '') AS province,
-               coalesce(nullif(btrim(d.pays), ''), '') AS pays,
-               coalesce(nullif(btrim(d.adresse), ''), '') AS adresse,
-               d.latitude,
-               d.longitude,
-               d.region_id,
-               d.zone_id,
-               coalesce(nullif(nullif(btrim(rg.libelle), ''), 'Non renseigné'), '') AS region,
-               coalesce(nullif(nullif(btrim(zn.libelle), ''), 'Non renseigné'), '') AS zone,
-               coalesce(
-                 nullif(btrim(rz.nom), ''),
-                 nullif(btrim(d.responsable_zone_nom), ''),
-                 ''
-               ) AS responsable_zone,
-               d.parent_agence_id,
-               coalesce(nullif(btrim(mere.code_agence), ''), '') AS mere_code,
-               coalesce(nullif(btrim(mere.nom), ''), '') AS mere_nom,
-               to_char(last_tx.derniere_tx, 'YYYY-MM-DD') AS derniere_transaction
-        FROM pilotage.dim_agence AS d
-        LEFT JOIN pilotage.dim_region AS rg ON rg.region_id = d.region_id
-        LEFT JOIN pilotage.dim_zone AS zn ON zn.zone_id = d.zone_id
-        LEFT JOIN public.zones AS az ON lower(btrim(az.libelle)) = lower(btrim(zn.libelle))
-        LEFT JOIN public.responsables_zone AS rz ON rz.id = az.responsable_zone_id
-        LEFT JOIN pilotage.dim_agence AS mere ON mere.agence_id = d.parent_agence_id
-        LEFT JOIN (
-          SELECT agence_id, MAX(jour)::date AS derniere_tx
-          FROM pilotage.agg_operation_agence_jour
-          GROUP BY agence_id
-        ) last_tx ON last_tx.agence_id = d.agence_id
-        WHERE d.agence_id = ? AND d.agence_id <> 0
-        """;
+    var sql = SELECT_LIST + " WHERE d.agence_id = ? AND d.agence_id <> 0 ";
     try {
       return Optional.ofNullable(jdbc.queryForObject(sql, this::mapRow, agenceId));
     } catch (EmptyResultDataAccessException ex) {
@@ -425,7 +395,9 @@ public class AgenceAdminRepository {
         (Integer) rs.getObject("parent_agence_id"),
         rs.getString("mere_code"),
         rs.getString("mere_nom"),
-        rs.getString("derniere_transaction"));
+        rs.getString("premiere_transaction"),
+        rs.getString("derniere_transaction"),
+        rs.getString("statut_activite"));
   }
 
   private static boolean notBlank(String v) {

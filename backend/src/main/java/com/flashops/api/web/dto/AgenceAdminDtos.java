@@ -32,7 +32,10 @@ public final class AgenceAdminDtos {
       Integer parentAgenceId,
       @JsonProperty("mere_code") String mereCode,
       @JsonProperty("mere_nom") String mereNom,
-      @JsonProperty("derniere_transaction") String derniereTransaction) {}
+      @JsonProperty("premiere_transaction") String premiereTransaction,
+      @JsonProperty("derniere_transaction") String derniereTransaction,
+      /** Nouveau | Actif | Inactif */
+      @JsonProperty("statut_activite") String statutActivite) {}
 
   public record AgenceAdminPage(
       long total, int page, int size, List<AgenceAdminRow> items) {}

@@ -154,6 +154,7 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
                 <th>Identifiants</th>
                 <th>Réseau</th>
                 <th>Localisation</th>
+                <th>Statut</th>
                 <th>Dernière tx</th>
                 <th>Mère</th>
                 @if (auth.can('agences.ecrire')) {
@@ -186,6 +187,11 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
                     <div>{{ row.ville || '—' }}{{ row.commune ? ' · ' + row.commune : '' }}</div>
                     <div class="text-muted font-monospace">{{ coordsLabel(row) }}</div>
                   </td>
+                  <td>
+                    <span class="badge rounded-pill agence-statut" [class]="statutBadgeClass(row.statut_activite)">
+                      {{ row.statut_activite || 'Inactif' }}
+                    </span>
+                  </td>
                   <td class="small text-nowrap">{{ formatJour(row.derniere_transaction) }}</td>
                   <td class="small">
                     @if (row.parentAgenceId) {
@@ -208,7 +214,7 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
                 </tr>
               } @empty {
                 <tr>
-                  <td [attr.colspan]="auth.can('agences.ecrire') ? 7 : 6" class="text-center text-muted py-4">
+                  <td [attr.colspan]="auth.can('agences.ecrire') ? 8 : 7" class="text-center text-muted py-4">
                     Aucune agence pour ces filtres.
                   </td>
                 </tr>
@@ -302,6 +308,24 @@ import { AgenceFormModalComponent } from './components/agence-form-modal.compone
       border-top: 1px solid var(--card-border, #e5e7eb);
       font-size: 0.85rem;
       color: var(--text-muted, #6b7280);
+    }
+    .agence-statut {
+      font-weight: 600;
+      font-size: 0.72rem;
+      letter-spacing: 0.01em;
+      padding: 0.35em 0.7em;
+    }
+    .agence-statut--nouveau {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+    .agence-statut--actif {
+      background: #dcfce7;
+      color: #15803d;
+    }
+    .agence-statut--inactif {
+      background: #f3f4f6;
+      color: #6b7280;
     }
   `,
 })
@@ -430,6 +454,13 @@ export class AgencesPageComponent implements OnInit {
     return `${Number(row.latitude).toFixed(5)}, ${Number(row.longitude).toFixed(5)}`;
   }
 
+  statutBadgeClass(statut: string | null | undefined): string {
+    const s = (statut || 'Inactif').trim().toLowerCase();
+    if (s === 'nouveau') return 'agence-statut--nouveau';
+    if (s === 'actif') return 'agence-statut--actif';
+    return 'agence-statut--inactif';
+  }
+
   openCreate(): void {
     this.editingId.set(null);
     this.editingAgency.set(null);
@@ -493,7 +524,9 @@ export class AgencesPageComponent implements OnInit {
               { label: 'adresse', key: 'adresse' },
               { label: 'latitude', key: 'latitude' },
               { label: 'longitude', key: 'longitude' },
+              { label: 'premiere_transaction', key: 'premiere_transaction' },
               { label: 'derniere_transaction', key: 'derniere_transaction' },
+              { label: 'statut_activite', key: 'statut_activite' },
               { label: 'agence_mere_id', key: 'parentAgenceId' },
               { label: 'agence_mere_code', key: 'mere_code' },
               { label: 'agence_mere_nom', key: 'mere_nom' },
