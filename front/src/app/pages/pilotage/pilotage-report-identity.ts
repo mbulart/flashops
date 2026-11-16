@@ -14,7 +14,7 @@ export interface PilotageReportIdentity {
 }
 
 export function buildPilotageReportIdentity(opts: {
-  kind: 'agences' | 'produits-mensuel' | 'agences-mois' | 'agences-semaine';
+  kind: 'agences' | 'produits-mensuel' | 'agences-mois';
   criteria: PilotageCriteria;
   domainesLabel: string;
   period: string;
@@ -28,17 +28,9 @@ export function buildPilotageReportIdentity(opts: {
       ? 'Agences et opérations'
       : opts.kind === 'produits-mensuel'
         ? 'Produits par mois'
-        : opts.kind === 'agences-semaine'
-          ? 'Agences par semaine'
-          : 'Agences par mois';
+        : 'Agences par mois';
   const kindCode =
-    opts.kind === 'agences'
-      ? 'AGX'
-      : opts.kind === 'produits-mensuel'
-        ? 'PMX'
-        : opts.kind === 'agences-semaine'
-          ? 'AGS'
-          : 'AGM';
+    opts.kind === 'agences' ? 'AGX' : opts.kind === 'produits-mensuel' ? 'PMX' : 'AGM';
   const devise = (opts.criteria.devise || 'USD').trim().toUpperCase();
   const domainSlug = slugPart(opts.domainesLabel);
   const seq = Math.floor(Math.random() * 900 + 100);

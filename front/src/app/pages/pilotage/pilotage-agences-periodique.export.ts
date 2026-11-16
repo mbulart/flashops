@@ -14,7 +14,6 @@ const TOTAL_BG = 'FFFFE08A';
 
 export interface PilotageAgencesPeriodiqueExcelInput {
   identity: PilotageReportIdentity;
-  grain: 'month' | 'week' | string;
   from: string;
   to: string;
   devise: string;
@@ -47,7 +46,51 @@ export async function downloadPilotageAgencesPeriodiqueExcel(
     ? workbook.addImage({ base64: signature.base64, extension: 'png' })
     : undefined;
 
-  writeSheet(workbook, input, logoId, logo, signatureId, signature);
+  const usedNames = new Set<string>();
+  // Feuilles chronologiques (plus ancien → plus récent).
+  const periods = [...input.periods].sort((a, b) =>
+    (a.periodeDebut || a.periode).localeCompare(b.periodeDebut || b.periode)
+  );
+  if (!periods.length) {
+    writeMonthSheet(
+      workbook,
+      input,
+      {
+        periode: '',
+        label: 'Sans données',
+        periodeDebut: input.from,
+        periodeFin: input.to,
+        volume: 0,
+        montant: 0,
+        commission: 0,
+        commissionFcn: 0,
+        commissionAgent: 0,
+        commissionFcnAgent: 0,
+        agencies: [],
+      },
+      'Sans données',
+      logoId,
+      logo,
+      signatureId,
+      signature
+    );
+  } else {
+    const total = periods.length;
+    periods.forEach((period, index) => {
+      const sheetName = uniqueSheetName(sheetNameForPeriod(period), usedNames);
+      writeMonthSheet(
+        workbook,
+        input,
+        period,
+        sheetName,
+        logoId,
+        logo,
+        signatureId,
+        signature
+      );
+      onProgress?.(86 + Math.round(((index + 1) / total) * 12));
+    });
+  }
   onProgress?.(98);
 
   const buffer = await workbook.xlsx.writeBuffer();
@@ -65,15 +108,16 @@ export async function downloadPilotageAgencesPeriodiqueExcel(
   onProgress?.(100);
 }
 
-function writeSheet(
+function writeMonthSheet(
   workbook: ExcelBook,
   input: PilotageAgencesPeriodiqueExcelInput,
+  period: PilotageAgencePeriodeBucket,
+  sheetName: string,
   logoId: number | undefined,
   logo: Logo | null,
   signatureId: number | undefined,
   signature: Logo | null
 ): void {
-  const sheetName = input.grain === 'week' ? 'Agences par semaine' : 'Agences par mois';
   const ws = workbook.addWorksheet(sheetName, {
     views: [{ showGridLines: false, state: 'frozen', ySplit: 7 }],
   });
@@ -98,27 +142,50 @@ function writeSheet(
   writeHeader(ws, headerRow, headers);
 
   let cursor = headerRow + 1;
-  let zebra = 0;
-  for (const period of input.periods) {
-    cursor = writePeriodGroup(ws, cursor, headers.length, period, input.devise);
-    const totalMontant = Number(period.montant) || 0;
-    period.agencies.forEach((row, index) => {
-      cursor = writeAgencyRow(ws, cursor, row, index + 1, totalMontant, zebra);
-      zebra += 1;
-    });
-    cursor = writePeriodTotal(ws, cursor, headers.length, period);
-    cursor += 1;
-  }
+  cursor = writePeriodGroup(ws, cursor, headers.length, period, input.devise);
+  const totalMontant = Number(period.montant) || 0;
+  period.agencies.forEach((row, index) => {
+    cursor = writeAgencyRow(ws, cursor, row, index + 1, totalMontant, index);
+  });
+  cursor = writePeriodTotal(ws, cursor, headers.length, period);
 
   setWidths(ws, [8, 34, 16, 16, 16, 18, 18, 14, 18, 16, 16, 18, 20, 12]);
-  const agencyCount = input.periods.reduce((n, p) => n + p.agencies.length, 0);
   footer(
     ws,
-    cursor + 1,
+    cursor + 2,
     headers.length,
-    `${input.periods.length} période(s) · ${agencyCount} ligne(s) agence · ${input.devise}`
+    `${period.agencies.length} agence(s) · ${input.devise}`
   );
-  placeSignature(ws, cursor + 3, signatureId, signature, input.appName);
+  placeSignature(ws, cursor + 4, signatureId, signature, input.appName);
+}
+
+function sheetNameForPeriod(period: PilotageAgencePeriodeBucket): string {
+  const label = (period.label || period.periode || 'Mois').trim();
+  return sanitizeSheetName(label || period.periode || 'Mois');
+}
+
+function sanitizeSheetName(raw: string): string {
+  const cleaned = raw.replace(/[\\/*?:\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+  return (cleaned || 'Mois').slice(0, 31);
+}
+
+function uniqueSheetName(base: string, used: Set<string>): string {
+  let name = base.slice(0, 31);
+  if (!used.has(name.toLowerCase())) {
+    used.add(name.toLowerCase());
+    return name;
+  }
+  for (let i = 2; i < 1000; i++) {
+    const suffix = ` (${i})`;
+    name = `${base.slice(0, Math.max(1, 31 - suffix.length))}${suffix}`;
+    if (!used.has(name.toLowerCase())) {
+      used.add(name.toLowerCase());
+      return name;
+    }
+  }
+  const fallback = `Mois ${used.size + 1}`.slice(0, 31);
+  used.add(fallback.toLowerCase());
+  return fallback;
 }
 
 function writePeriodGroup(
@@ -191,7 +258,7 @@ function writeAgencyRow(
 function writePeriodTotal(
   ws: ExcelSheet,
   rowNumber: number,
-  columns: number,
+  _columns: number,
   period: PilotageAgencePeriodeBucket
 ): number {
   const row = ws.getRow(rowNumber);

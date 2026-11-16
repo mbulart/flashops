@@ -936,29 +936,14 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                           class="pilotage-export-collapse__item"
                           role="menuitem"
                           [disabled]="exportingExcel()"
-                          (click)="exportAgencesPeriodique('month')"
+                          (click)="exportAgencesPeriodique()"
                         >
                           <span class="pilotage-export-collapse__item-title">
                             <i class="bi bi-building me-2" aria-hidden="true"></i>
                             Agences par mois
                           </span>
                           <span class="pilotage-export-collapse__item-desc">
-                            Classement agences mois par mois avec totaux de période.
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          class="pilotage-export-collapse__item"
-                          role="menuitem"
-                          [disabled]="exportingExcel()"
-                          (click)="exportAgencesPeriodique('week')"
-                        >
-                          <span class="pilotage-export-collapse__item-title">
-                            <i class="bi bi-calendar-week me-2" aria-hidden="true"></i>
-                            Agences par semaine
-                          </span>
-                          <span class="pilotage-export-collapse__item-desc">
-                            Classement agences semaine par semaine avec totaux de période.
+                            Une feuille Excel par mois, classement et totaux.
                           </span>
                         </button>
                       }
@@ -2290,31 +2275,28 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     return plusOne.getTime() <= to.getTime();
   }
 
-  exportAgencesPeriodique(grain: 'month' | 'week'): void {
+  exportAgencesPeriodique(): void {
     const criteria = this.criteria();
     if (!criteria || this.exportingExcel() || !this.periodAtLeastOneMonth()) return;
     this.exportMenuOpen.set(false);
     this.exportingExcel.set(true);
     this.exportProgress.set(3);
     this.startExportCreep();
-    const kind = grain === 'week' ? 'agences-semaine' : 'agences-mois';
-    const errLabel = grain === 'week' ? 'par semaine' : 'par mois';
     this.pilotage
       .loadAgencesPeriodique(
         criteria,
-        grain,
+        'month',
         this.agencyOrder(),
         this.agencyTri(),
         (ratio) => this.bumpExportProgress(ratio * 100)
       )
       .subscribe({
         next: (data) => {
-          const identity = this.buildExportIdentity(kind, criteria);
+          const identity = this.buildExportIdentity('agences-mois', criteria);
           const settings = this.appSettings.settings();
           downloadPilotageAgencesPeriodiqueExcel(
             {
               identity,
-              grain: data.grain || grain,
               from: data.from || criteria.from,
               to: data.to || criteria.to,
               devise: data.devise || criteria.devise,
@@ -2327,21 +2309,21 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
           )
             .then(() => {
               if (!data.periods.length) {
-                this.toast.warning(`Aucune donnée agence ${errLabel} pour ce périmètre.`);
+                this.toast.warning('Aucune donnée agence par mois pour ce périmètre.');
               }
             })
-            .catch(() => this.toast.error(`Export agences ${errLabel} impossible.`))
+            .catch(() => this.toast.error('Export agences par mois impossible.'))
             .finally(() => this.finishExport());
         },
         error: () => {
           this.finishExport();
-          this.toast.error(`Export agences ${errLabel} impossible.`);
+          this.toast.error('Export agences par mois impossible.');
         },
       });
   }
 
   private buildExportIdentity(
-    kind: 'agences' | 'produits-mensuel' | 'agences-mois' | 'agences-semaine',
+    kind: 'agences' | 'produits-mensuel' | 'agences-mois',
     criteria: PilotageCriteria
   ) {
     const domaines = criteria.domaines?.length ? criteria.domaines : [criteria.domaine];
