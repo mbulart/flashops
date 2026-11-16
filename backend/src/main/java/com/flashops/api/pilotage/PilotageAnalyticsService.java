@@ -231,6 +231,107 @@ public class PilotageAnalyticsService {
     }
   }
 
+  public PilotageDtos.TransactionsPage transactions(
+      PilotageBundleQuery q, int page, int size, String partyQuery) {
+    q = withMoneyContext(q);
+    validate(q);
+    try {
+      var pageData = repository.loadTransactions(q, page, size, partyQuery);
+      var lignes =
+          pageData.rows().stream()
+              .map(
+                  r ->
+                      new PilotageDtos.TransactionListItem(
+                          r.operationId(),
+                          r.jour(),
+                          r.heure(),
+                          r.agenceId(),
+                          r.codeAgence(),
+                          r.agenceNom(),
+                          r.produit(),
+                          r.ecran(),
+                          r.operateur(),
+                          r.expediteur(),
+                          r.beneficiaire(),
+                          r.statut(),
+                          r.devise(),
+                          r.montant()))
+              .toList();
+      return new PilotageDtos.TransactionsPage(
+          pageData.total(),
+          pageData.page(),
+          pageData.size(),
+          pageData.moyenne(),
+          pageData.montantTotal(),
+          lignes);
+    } catch (DataAccessException ex) {
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "pilotage indisponible");
+    }
+  }
+
+  public PilotageDtos.TransactionDetail transactionDetail(
+      long operationId, List<Integer> restrictAgenceIds) {
+    if (operationId <= 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "opération invalide");
+    }
+    try {
+      return repository
+          .loadTransactionDetail(operationId, restrictAgenceIds)
+          .map(
+              r ->
+                  new PilotageDtos.TransactionDetail(
+                      r.operationId(),
+                      r.jour(),
+                      r.heure(),
+                      r.dateOperation(),
+                      r.reference(),
+                      r.sourceId(),
+                      r.idExterne(),
+                      r.cleMetier(),
+                      r.agenceId(),
+                      r.codeAgence(),
+                      r.agenceNom(),
+                      r.posId(),
+                      r.fpAgent(),
+                      r.produit(),
+                      r.module(),
+                      r.ecran(),
+                      r.partenaire(),
+                      r.operateur(),
+                      r.expediteur(),
+                      r.beneficiaire(),
+                      r.telephone(),
+                      r.telephoneExpediteur(),
+                      r.numeroAbonnement(),
+                      r.numeroId(),
+                      r.commentaire(),
+                      r.statut(),
+                      r.devise(),
+                      r.deviseReception(),
+                      r.typeOperation(),
+                      r.paysOrigine(),
+                      r.paysDestination(),
+                      r.villeOrigine(),
+                      r.montant(),
+                      r.montantTotal(),
+                      r.montantCaisse(),
+                      r.montantPaye(),
+                      r.frais(),
+                      r.taxes(),
+                      r.marge(),
+                      r.commission(),
+                      r.commissionFcn(),
+                      r.commissionAgent(),
+                      r.commissionFcnAgent(),
+                      r.taux(),
+                      r.montantReception(),
+                      r.tauxChange()))
+          .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "transaction introuvable"));
+    } catch (DataAccessException ex) {
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "pilotage indisponible");
+    }
+  }
+
   public PilotageDtos.AgenceClassementPage classementAgences(
       PilotageBundleQuery q, boolean worst, int page, int size) {
     return classementAgences(q, worst, page, size, false);

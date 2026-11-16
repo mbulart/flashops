@@ -28,6 +28,9 @@ import {
   PilotageProductSlice,
   PilotageProductTimeseriesPoint,
   PilotageReseauRef,
+  PilotageTransactionDetail,
+  PilotageTransactionListItem,
+  PilotageTransactionsPage,
 } from '../models/pilotage.models';
 import { RuntimeConfigService } from './runtime-config.service';
 import { pilotageFilterProduitsByUiDomain } from '../../pages/pilotage/pilotage-filtres.config';
@@ -227,6 +230,23 @@ export class PilotageService {
     return this.http
       .get<{ data: PilotageAgenceTransactionsPage }>(`${this.baseUrl}/agences/${agenceId}/transactions`, { params })
       .pipe(map((r) => normalizeAgenceTransactions(r.data)));
+  }
+
+  loadTransactions(criteria: PilotageCriteria, page: number, size: number, partyQuery = '') {
+    let params = this.criteriaParams(criteria).set('page', String(page)).set('size', String(size));
+    const partie = partyQuery.trim();
+    if (partie) {
+      params = params.set('partie', partie);
+    }
+    return this.http
+      .get<{ data: PilotageTransactionsPage }>(`${this.baseUrl}/transactions`, { params })
+      .pipe(map((r) => normalizeTransactionsPage(r.data)));
+  }
+
+  loadTransactionDetail(operationId: number) {
+    return this.http
+      .get<{ data: PilotageTransactionDetail }>(`${this.baseUrl}/transactions/${operationId}`)
+      .pipe(map((r) => normalizeTransactionDetail(r.data)));
   }
 
   loadClassementAgences(
@@ -535,6 +555,94 @@ function normalizeAgenceTransactions(raw: PilotageAgenceTransactionsPage): Pilot
         montant: Number(row.montant ?? 0),
       };
     }),
+  };
+}
+
+function normalizeTransactionsPage(raw: PilotageTransactionsPage): PilotageTransactionsPage {
+  const page = raw as PilotageTransactionsPage & { montant_total?: number };
+  return {
+    total: Number(raw?.total ?? 0),
+    page: Number(raw?.page ?? 1),
+    size: Number(raw?.size ?? 25),
+    moyenne: Number(raw?.moyenne ?? 0),
+    montantTotal: Number(page?.montantTotal ?? page?.montant_total ?? 0),
+    lignes: (raw?.lignes ?? []).map((line) => {
+      const row = line as PilotageTransactionListItem & {
+        operation_id?: number;
+        agence_id?: number;
+      };
+      return {
+        operationId: Number(row.operationId ?? row.operation_id ?? 0),
+        jour: row.jour ?? '',
+        heure: row.heure ?? '',
+        agenceId: Number(row.agenceId ?? row.agence_id ?? 0),
+        code_agence: row.code_agence ?? '',
+        agence_nom: row.agence_nom ?? '',
+        produit: row.produit ?? '',
+        ecran: row.ecran ?? '',
+        operateur: row.operateur ?? '',
+        expediteur: row.expediteur ?? '',
+        beneficiaire: row.beneficiaire ?? '',
+        statut: row.statut ?? '',
+        devise: row.devise ?? '',
+        montant: Number(row.montant ?? 0),
+      };
+    }),
+  };
+}
+
+function normalizeTransactionDetail(raw: PilotageTransactionDetail): PilotageTransactionDetail {
+  const row = raw as PilotageTransactionDetail & {
+    operation_id?: number;
+    agence_id?: number;
+  };
+  return {
+    operationId: Number(row.operationId ?? row.operation_id ?? 0),
+    jour: row.jour ?? '',
+    heure: row.heure ?? '',
+    date_operation: row.date_operation ?? '',
+    reference: row.reference ?? '',
+    source_id: row.source_id ?? '',
+    id_externe: row.id_externe ?? '',
+    cle_metier: row.cle_metier ?? '',
+    agenceId: Number(row.agenceId ?? row.agence_id ?? 0),
+    code_agence: row.code_agence ?? '',
+    agence_nom: row.agence_nom ?? '',
+    pos_id: row.pos_id ?? '',
+    fp_agent: row.fp_agent ?? '',
+    produit: row.produit ?? '',
+    module: row.module ?? '',
+    ecran: row.ecran ?? '',
+    partenaire: row.partenaire ?? '',
+    operateur: row.operateur ?? '',
+    expediteur: row.expediteur ?? '',
+    beneficiaire: row.beneficiaire ?? '',
+    telephone: row.telephone ?? '',
+    telephone_expediteur: row.telephone_expediteur ?? '',
+    numero_abonnement: row.numero_abonnement ?? '',
+    numero_id: row.numero_id ?? '',
+    commentaire: row.commentaire ?? '',
+    statut: row.statut ?? '',
+    devise: row.devise ?? '',
+    devise_reception: row.devise_reception ?? '',
+    type_operation: row.type_operation ?? '',
+    pays_origine: row.pays_origine ?? '',
+    pays_destination: row.pays_destination ?? '',
+    ville_origine: row.ville_origine ?? '',
+    montant: numberOrNull(row.montant),
+    montant_total: numberOrNull(row.montant_total),
+    montant_caisse: numberOrNull(row.montant_caisse),
+    montant_paye: numberOrNull(row.montant_paye),
+    frais: numberOrNull(row.frais),
+    taxes: numberOrNull(row.taxes),
+    marge: numberOrNull(row.marge),
+    commission: numberOrNull(row.commission),
+    commission_fcn: numberOrNull(row.commission_fcn),
+    commission_agent: numberOrNull(row.commission_agent),
+    commission_fcn_agent: numberOrNull(row.commission_fcn_agent),
+    taux: numberOrNull(row.taux),
+    montant_reception: numberOrNull(row.montant_reception),
+    taux_change: row.taux_change == null ? null : Boolean(row.taux_change),
   };
 }
 

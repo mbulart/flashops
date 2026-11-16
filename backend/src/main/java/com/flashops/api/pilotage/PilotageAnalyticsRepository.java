@@ -608,6 +608,168 @@ public class PilotageAnalyticsRepository {
     return new AgenceTransactions(total, safePage, safeSize, moyenne, montantTotal, rows);
   }
 
+  /**
+   * Liste paginée globale des transactions du périmètre (DESC par défaut : plus récent → plus
+   * ancien).
+   */
+  public TransactionsPage loadTransactions(
+      PilotageBundleQuery q, int page, int size, String partyQuery) {
+    int safeSize = Math.min(Math.max(size, 1), 100);
+    int safePage = Math.max(page, 1);
+    long offset = (long) (safePage - 1) * safeSize;
+    if (offset > 200_000L) {
+      safePage = (int) (200_000L / safeSize) + 1;
+      offset = (long) (safePage - 1) * safeSize;
+    }
+    var scoped = PilotageSqlScope.buildLignes(jdbc, q);
+    String scope = scoped.fromAndWhere() + " AND f.agence_id <> 0";
+    var args = new ArrayList<>(scoped.args());
+    String party = partyQuery == null ? "" : partyQuery.trim();
+    if (!party.isEmpty()) {
+      scope += " AND (f.expediteur ILIKE ? OR f.beneficiaire ILIKE ? OR f.reference ILIKE ?)";
+      String like = "%" + party.replace("%", "").replace("_", "") + "%";
+      args.add(like);
+      args.add(like);
+      args.add(like);
+    }
+    var stats =
+        jdbc.queryForObject(
+            "SELECT count(*)::bigint AS total,"
+                + " coalesce(avg(f.montant), 0) AS moyenne,"
+                + " coalesce(sum(f.montant), 0) AS montant_total "
+                + scope,
+            (rs, rowNum) ->
+                new AgenceTxStats(
+                    rs.getLong("total"), rs.getBigDecimal("moyenne"), rs.getBigDecimal("montant_total")),
+            args.toArray());
+    var sql =
+        """
+        SELECT f.operation_id,
+               d.jour::text AS jour,
+               coalesce(
+                 to_char(f.date_operation, 'HH24:MI'),
+                 CASE
+                   WHEN f.heure IS NULL THEN NULL
+                   ELSE lpad(f.heure::text, 2, '0') || ':00'
+                 END
+               ) AS heure,
+               f.agence_id,
+               coalesce(nullif(btrim(ag.code_agence), ''), '') AS code_agence,
+               coalesce(nullif(btrim(ag.nom), ''), '') AS agence_nom,
+               coalesce(nullif(btrim(p.produit), ''), '') AS produit,
+               coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
+               coalesce(nullif(btrim(agent.nom), ''), '') AS operateur,
+               coalesce(nullif(btrim(f.expediteur), ''), '') AS expediteur,
+               coalesce(nullif(btrim(f.beneficiaire), ''), '') AS beneficiaire,
+               coalesce(s.statut_uniforme, '') AS statut,
+               coalesce(nullif(btrim(dv.code), ''), '') AS devise,
+               f.montant
+        """
+            + scope.replace(
+                " FROM pilotage.fait_operation AS f",
+                " FROM pilotage.fait_operation AS f"
+                    + " LEFT JOIN pilotage.dim_agent AS agent ON agent.agent_id = f.agent_id")
+            + """
+             ORDER BY d.jour DESC, coalesce(f.date_operation, d.jour::timestamp) DESC, f.operation_id DESC
+             LIMIT ? OFFSET ?
+            """;
+    var pageArgs = new ArrayList<>(args);
+    pageArgs.add(safeSize);
+    pageArgs.add((int) offset);
+    var rows = jdbc.query(sql, this::mapTransactionListItem, pageArgs.toArray());
+    long total = stats == null ? 0L : stats.total();
+    BigDecimal moyenne = stats == null || stats.moyenne() == null ? BigDecimal.ZERO : stats.moyenne();
+    BigDecimal montantTotal =
+        stats == null || stats.montantTotal() == null ? BigDecimal.ZERO : stats.montantTotal();
+    return new TransactionsPage(total, safePage, safeSize, moyenne, montantTotal, rows);
+  }
+
+  public Optional<TransactionDetailRow> loadTransactionDetail(
+      long operationId, List<Integer> restrictAgenceIds) {
+    if (operationId <= 0) {
+      return Optional.empty();
+    }
+    if (restrictAgenceIds != null && restrictAgenceIds.isEmpty()) {
+      return Optional.empty();
+    }
+    var sql =
+        new StringBuilder(
+            """
+            SELECT f.operation_id,
+                   d.jour::text AS jour,
+                   coalesce(
+                     to_char(f.date_operation, 'HH24:MI'),
+                     CASE
+                       WHEN f.heure IS NULL THEN NULL
+                       ELSE lpad(f.heure::text, 2, '0') || ':00'
+                     END
+                   ) AS heure,
+                   to_char(f.date_operation, 'YYYY-MM-DD HH24:MI:SS') AS date_operation,
+                   coalesce(nullif(btrim(f.reference), ''), '') AS reference,
+                   coalesce(nullif(btrim(f.source_id), ''), '') AS source_id,
+                   coalesce(nullif(btrim(f.id_externe), ''), '') AS id_externe,
+                   coalesce(nullif(btrim(f.cle_metier), ''), '') AS cle_metier,
+                   f.agence_id,
+                   coalesce(nullif(btrim(ag.code_agence), ''), '') AS code_agence,
+                   coalesce(nullif(btrim(ag.nom), ''), '') AS agence_nom,
+                   coalesce(nullif(btrim(f.pos_id), ''), nullif(btrim(ag.pos_id), ''), '') AS pos_id,
+                   coalesce(nullif(btrim(f.fp_agent), ''), '') AS fp_agent,
+                   coalesce(nullif(btrim(p.produit), ''), '') AS produit,
+                   coalesce(nullif(btrim(p.module), ''), '') AS module,
+                   coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
+                   coalesce(nullif(btrim(p.partenaire), ''), '') AS partenaire,
+                   coalesce(nullif(btrim(agent.nom), ''), '') AS operateur,
+                   coalesce(nullif(btrim(f.expediteur), ''), '') AS expediteur,
+                   coalesce(nullif(btrim(f.beneficiaire), ''), '') AS beneficiaire,
+                   coalesce(nullif(btrim(f.telephone), ''), '') AS telephone,
+                   coalesce(nullif(btrim(f.telephone_expediteur), ''), '') AS telephone_expediteur,
+                   coalesce(nullif(btrim(f.numero_abonnement), ''), '') AS numero_abonnement,
+                   coalesce(nullif(btrim(f.numero_id), ''), '') AS numero_id,
+                   coalesce(nullif(btrim(f.commentaire), ''), '') AS commentaire,
+                   coalesce(s.statut_uniforme, '') AS statut,
+                   coalesce(nullif(btrim(dv.code), ''), '') AS devise,
+                   coalesce(nullif(btrim(dvr.code), ''), '') AS devise_reception,
+                   coalesce(nullif(btrim(typ.libelle), ''), '') AS type_operation,
+                   coalesce(nullif(btrim(po.libelle), ''), '') AS pays_origine,
+                   coalesce(nullif(btrim(pd.libelle), ''), '') AS pays_destination,
+                   coalesce(nullif(btrim(f.ville_origine), ''), '') AS ville_origine,
+                   f.montant,
+                   f.montant_total,
+                   f.montant_caisse,
+                   f.montant_paye,
+                   f.frais,
+                   f.taxes,
+                   f.marge,
+                   f.commission,
+                   f.commission_fcn,
+                   f.commission_agent,
+                   f.commission_fcn_agent,
+                   f.taux,
+                   f.montant_reception,
+                   f.taux_change
+            FROM pilotage.fait_operation AS f
+            INNER JOIN pilotage.dim_date AS d ON d.date_id = f.date_id
+            INNER JOIN pilotage.dim_produit AS p ON p.produit_id = f.produit_id
+            INNER JOIN pilotage.dim_statut AS s ON s.statut_id = f.statut_id
+            INNER JOIN pilotage.dim_devise AS dv ON dv.devise_id = f.devise_id
+            LEFT JOIN pilotage.dim_devise AS dvr ON dvr.devise_id = f.devise_reception_id
+            LEFT JOIN pilotage.dim_agence AS ag ON ag.agence_id = f.agence_id
+            LEFT JOIN pilotage.dim_agent AS agent ON agent.agent_id = f.agent_id
+            LEFT JOIN pilotage.dim_type_operation AS typ ON typ.type_operation_id = f.type_operation_id
+            LEFT JOIN pilotage.dim_pays AS po ON po.pays_id = f.pays_origine_id
+            LEFT JOIN pilotage.dim_pays AS pd ON pd.pays_id = f.pays_destination_id
+            WHERE f.operation_id = ?
+            """);
+    var args = new ArrayList<Object>();
+    args.add(operationId);
+    if (restrictAgenceIds != null) {
+      sql.append(" AND f.agence_id = ANY(?)");
+      args.add(restrictAgenceIds.toArray(new Integer[0]));
+    }
+    return jdbc.query(sql.toString(), this::mapTransactionDetail, args.toArray()).stream()
+        .findFirst();
+  }
+
   public List<AgenceRankRow> loadTopAgences(PilotageBundleQuery q, int limit) {
     return loadTopAgences(q, limit, false);
   }
@@ -1132,6 +1294,83 @@ public class PilotageAnalyticsRepository {
         rs.getBigDecimal("montant"));
   }
 
+  private TransactionListRow mapTransactionListItem(java.sql.ResultSet rs, int rowNum)
+      throws java.sql.SQLException {
+    String heure = rs.getString("heure");
+    return new TransactionListRow(
+        rs.getLong("operation_id"),
+        rs.getString("jour"),
+        heure == null ? "" : heure,
+        rs.getInt("agence_id"),
+        nullToEmpty(rs.getString("code_agence")),
+        nullToEmpty(rs.getString("agence_nom")),
+        nullToEmpty(rs.getString("produit")),
+        nullToEmpty(rs.getString("ecran")),
+        nullToEmpty(rs.getString("operateur")),
+        nullToEmpty(rs.getString("expediteur")),
+        nullToEmpty(rs.getString("beneficiaire")),
+        nullToEmpty(rs.getString("statut")),
+        nullToEmpty(rs.getString("devise")),
+        rs.getBigDecimal("montant"));
+  }
+
+  private TransactionDetailRow mapTransactionDetail(java.sql.ResultSet rs, int rowNum)
+      throws java.sql.SQLException {
+    boolean tauxChangeNull = rs.getObject("taux_change") == null;
+    Boolean tauxChange = tauxChangeNull ? null : rs.getBoolean("taux_change");
+    return new TransactionDetailRow(
+        rs.getLong("operation_id"),
+        nullToEmpty(rs.getString("jour")),
+        nullToEmpty(rs.getString("heure")),
+        nullToEmpty(rs.getString("date_operation")),
+        nullToEmpty(rs.getString("reference")),
+        nullToEmpty(rs.getString("source_id")),
+        nullToEmpty(rs.getString("id_externe")),
+        nullToEmpty(rs.getString("cle_metier")),
+        rs.getInt("agence_id"),
+        nullToEmpty(rs.getString("code_agence")),
+        nullToEmpty(rs.getString("agence_nom")),
+        nullToEmpty(rs.getString("pos_id")),
+        nullToEmpty(rs.getString("fp_agent")),
+        nullToEmpty(rs.getString("produit")),
+        nullToEmpty(rs.getString("module")),
+        nullToEmpty(rs.getString("ecran")),
+        nullToEmpty(rs.getString("partenaire")),
+        nullToEmpty(rs.getString("operateur")),
+        nullToEmpty(rs.getString("expediteur")),
+        nullToEmpty(rs.getString("beneficiaire")),
+        nullToEmpty(rs.getString("telephone")),
+        nullToEmpty(rs.getString("telephone_expediteur")),
+        nullToEmpty(rs.getString("numero_abonnement")),
+        nullToEmpty(rs.getString("numero_id")),
+        nullToEmpty(rs.getString("commentaire")),
+        nullToEmpty(rs.getString("statut")),
+        nullToEmpty(rs.getString("devise")),
+        nullToEmpty(rs.getString("devise_reception")),
+        nullToEmpty(rs.getString("type_operation")),
+        nullToEmpty(rs.getString("pays_origine")),
+        nullToEmpty(rs.getString("pays_destination")),
+        nullToEmpty(rs.getString("ville_origine")),
+        rs.getBigDecimal("montant"),
+        rs.getBigDecimal("montant_total"),
+        rs.getBigDecimal("montant_caisse"),
+        rs.getBigDecimal("montant_paye"),
+        rs.getBigDecimal("frais"),
+        rs.getBigDecimal("taxes"),
+        rs.getBigDecimal("marge"),
+        rs.getBigDecimal("commission"),
+        rs.getBigDecimal("commission_fcn"),
+        rs.getBigDecimal("commission_agent"),
+        rs.getBigDecimal("commission_fcn_agent"),
+        rs.getBigDecimal("taux"),
+        rs.getBigDecimal("montant_reception"),
+        tauxChange);
+  }
+
+  private static String nullToEmpty(String value) {
+    return value == null ? "" : value;
+  }
+
   private static Double coord(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
     BigDecimal value = rs.getBigDecimal(column);
     if (value == null || value.signum() == 0) {
@@ -1427,6 +1666,78 @@ public class PilotageAnalyticsRepository {
       BigDecimal moyenne,
       BigDecimal montantTotal,
       List<AgenceTransactionRow> rows) {}
+
+  public record TransactionListRow(
+      long operationId,
+      String jour,
+      String heure,
+      int agenceId,
+      String codeAgence,
+      String agenceNom,
+      String produit,
+      String ecran,
+      String operateur,
+      String expediteur,
+      String beneficiaire,
+      String statut,
+      String devise,
+      BigDecimal montant) {}
+
+  public record TransactionsPage(
+      long total,
+      int page,
+      int size,
+      BigDecimal moyenne,
+      BigDecimal montantTotal,
+      List<TransactionListRow> rows) {}
+
+  public record TransactionDetailRow(
+      long operationId,
+      String jour,
+      String heure,
+      String dateOperation,
+      String reference,
+      String sourceId,
+      String idExterne,
+      String cleMetier,
+      int agenceId,
+      String codeAgence,
+      String agenceNom,
+      String posId,
+      String fpAgent,
+      String produit,
+      String module,
+      String ecran,
+      String partenaire,
+      String operateur,
+      String expediteur,
+      String beneficiaire,
+      String telephone,
+      String telephoneExpediteur,
+      String numeroAbonnement,
+      String numeroId,
+      String commentaire,
+      String statut,
+      String devise,
+      String deviseReception,
+      String typeOperation,
+      String paysOrigine,
+      String paysDestination,
+      String villeOrigine,
+      BigDecimal montant,
+      BigDecimal montantTotal,
+      BigDecimal montantCaisse,
+      BigDecimal montantPaye,
+      BigDecimal frais,
+      BigDecimal taxes,
+      BigDecimal marge,
+      BigDecimal commission,
+      BigDecimal commissionFcn,
+      BigDecimal commissionAgent,
+      BigDecimal commissionFcnAgent,
+      BigDecimal taux,
+      BigDecimal montantReception,
+      Boolean tauxChange) {}
 
   private record AgenceTxStats(long total, BigDecimal moyenne, BigDecimal montantTotal) {}
 

@@ -275,6 +275,82 @@ export interface PilotageAgenceTransactionsPage {
   lignes: PilotageAgenceTransaction[];
 }
 
+/** Liste globale module Transactions. */
+export interface PilotageTransactionListItem {
+  operationId: number;
+  jour: string;
+  heure: string;
+  agenceId: number;
+  code_agence: string;
+  agence_nom: string;
+  produit: string;
+  ecran: string;
+  operateur: string;
+  expediteur: string;
+  beneficiaire: string;
+  statut: string;
+  devise: string;
+  montant: number;
+}
+
+export interface PilotageTransactionsPage {
+  total: number;
+  page: number;
+  size: number;
+  moyenne: number;
+  montantTotal: number;
+  lignes: PilotageTransactionListItem[];
+}
+
+export interface PilotageTransactionDetail {
+  operationId: number;
+  jour: string;
+  heure: string;
+  date_operation: string;
+  reference: string;
+  source_id: string;
+  id_externe: string;
+  cle_metier: string;
+  agenceId: number;
+  code_agence: string;
+  agence_nom: string;
+  pos_id: string;
+  fp_agent: string;
+  produit: string;
+  module: string;
+  ecran: string;
+  partenaire: string;
+  operateur: string;
+  expediteur: string;
+  beneficiaire: string;
+  telephone: string;
+  telephone_expediteur: string;
+  numero_abonnement: string;
+  numero_id: string;
+  commentaire: string;
+  statut: string;
+  devise: string;
+  devise_reception: string;
+  type_operation: string;
+  pays_origine: string;
+  pays_destination: string;
+  ville_origine: string;
+  montant: number | null;
+  montant_total: number | null;
+  montant_caisse: number | null;
+  montant_paye: number | null;
+  frais: number | null;
+  taxes: number | null;
+  marge: number | null;
+  commission: number | null;
+  commission_fcn: number | null;
+  commission_agent: number | null;
+  commission_fcn_agent: number | null;
+  taux: number | null;
+  montant_reception: number | null;
+  taux_change: boolean | null;
+}
+
 export interface PilotageAgenceGeoPoint {
   agenceId: number;
   codeAgence: string;

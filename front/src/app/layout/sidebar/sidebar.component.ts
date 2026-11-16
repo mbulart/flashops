@@ -155,6 +155,12 @@ export class SidebarComponent implements OnInit {
         { label: 'Tableau de bord', path: '/', icon: 'bi bi-speedometer2', permission: 'dashboard.voir' },
         { label: 'Agences', path: '/agences', icon: 'bi bi-building', permission: 'agences.lire' },
         {
+          label: 'Transactions',
+          path: '/transactions',
+          icon: 'bi bi-receipt',
+          permission: 'dashboard.voir',
+        },
+        {
           label: 'Approvisionnement VAS',
           path: '/approvisionnement-vas',
           icon: 'bi bi-wallet2',

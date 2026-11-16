@@ -333,6 +333,68 @@ public class PilotageController {
     return Map.of("data", analyticsService.agenceFiche(agenceId));
   }
 
+  @GetMapping("/transactions")
+  public Map<String, PilotageDtos.TransactionsPage> transactions(
+      @RequestParam("domaine") java.util.List<String> domaine,
+      @RequestParam("devise") List<String> devise,
+      @RequestParam("from") String from,
+      @RequestParam("to") String to,
+      @RequestParam(value = "produit_id", required = false) List<Integer> produitIds,
+      @RequestParam(value = "ecran", required = false) String ecran,
+      @RequestParam(value = "statut_uniforme", required = false) List<String> statutUniformes,
+      @RequestParam(value = "categorie", required = false) List<String> categories,
+      @RequestParam(value = "agence_id", required = false) List<Integer> agenceIds,
+      @RequestParam(value = "agent_id", required = false) List<Integer> agentIds,
+      @RequestParam(value = "type_operation_id", required = false) List<Integer> typeOperationIds,
+      @RequestParam(value = "jour_filtre", required = false) String jourFiltre,
+      @RequestParam(value = "couloir", required = false) List<String> couloirCodes,
+      @RequestParam(value = "reseau_region", required = false) List<String> reseauRegion,
+      @RequestParam(value = "zone_id", required = false) List<Integer> zoneId,
+      @RequestParam(value = "pays_id", required = false) Integer paysId,
+      @RequestParam(value = "province_id", required = false) Integer provinceId,
+      @RequestParam(value = "ville_id", required = false) List<Integer> villeId,
+      @RequestParam(value = "territoire_id", required = false) Integer territoireId,
+      @RequestParam(value = "commune_id", required = false) List<Integer> communeId,
+      @RequestParam(value = "partie", required = false) String partie,
+      @RequestParam(value = "page", defaultValue = "1") int page,
+      @RequestParam(value = "size", defaultValue = "25") int size) {
+    int userId = AuthSupport.currentUserId();
+    permissions.require(userId, "dashboard.voir");
+    var query =
+        scopedQuery(
+            domaine,
+            devise,
+            from,
+            to,
+            produitIds,
+            ecran,
+            statutUniformes,
+            categories,
+            agenceIds,
+            agentIds,
+            typeOperationIds,
+            jourFiltre,
+            couloirCodes,
+            reseauRegion,
+            zoneId,
+            paysId,
+            provinceId,
+            villeId,
+            territoireId,
+            communeId);
+    return Map.of("data", analyticsService.transactions(query, page, size, partie));
+  }
+
+  @GetMapping("/transactions/{operationId:\\d+}")
+  public Map<String, PilotageDtos.TransactionDetail> transactionDetail(
+      @PathVariable("operationId") long operationId) {
+    int userId = AuthSupport.currentUserId();
+    permissions.require(userId, "dashboard.voir");
+    UserDataScope scope = dataScope.resolve(userId);
+    List<Integer> restrict = scope.unrestricted() ? null : scope.allowedAgenceIds();
+    return Map.of("data", analyticsService.transactionDetail(operationId, restrict));
+  }
+
   @GetMapping("/agences/{agenceId:\\d+}/transactions")
   public Map<String, PilotageDtos.AgenceTransactionsPage> agenceTransactions(
       @PathVariable("agenceId") int agenceId,

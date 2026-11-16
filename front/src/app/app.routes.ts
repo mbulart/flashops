@@ -29,6 +29,12 @@ export const routes: Routes = [
         canActivate: [permissionGuard('agences.lire')],
       },
       {
+        path: 'transactions',
+        loadComponent: () =>
+          import('./pages/transactions/transactions.page').then((m) => m.TransactionsPageComponent),
+        canActivate: [permissionGuard('dashboard.voir')],
+      },
+      {
         path: 'approvisionnement-vas',
         loadComponent: () =>
           import('./pages/approvisionnement-vas/approvisionnement-vas.page').then(
