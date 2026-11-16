@@ -1,7 +1,12 @@
 import { Component, Input, OnChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { formatNumberFr } from '../../utils/format.utils';
-import { heatIntensity, mapHeatColor, type HeatMetric } from '../../utils/heat-scale.utils';
+import {
+  heatIntensity,
+  mapHeatColor,
+  mapHeatNeedsLightText,
+  type HeatMetric,
+} from '../../utils/heat-scale.utils';
 
 /** Point journalier (reports ou pilotage). */
 export type HeatmapDayPoint = {
@@ -40,7 +45,7 @@ interface HeatCell {
         @for (cell of cells; track cell.date) {
           <div
             class="heatmap-cell"
-            [class.heatmap-cell--light-text]="cell.intensity >= 0.32"
+            [class.heatmap-cell--light-text]="needsLightText(cell.intensity)"
             role="listitem"
             [style.background]="cell.color"
             [attr.title]="tooltip(cell)"
@@ -137,6 +142,10 @@ export class HeatmapCalendarComponent implements OnChanges {
   }
 
   heatColor = mapHeatColor;
+
+  needsLightText(intensity: number): boolean {
+    return mapHeatNeedsLightText(intensity);
+  }
 
   /** md ≈ 2 mois, sm ≈ 1 trimestre+, xs ≈ semestre+ */
   density(): 'lg' | 'md' | 'sm' | 'xs' {

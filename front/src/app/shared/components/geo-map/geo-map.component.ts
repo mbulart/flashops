@@ -228,7 +228,7 @@ type MapEngine = 'google' | 'leaflet';
         background: #16a34a;
       }
       .geo-map-swatch--missing {
-        background: #dc2626;
+        background: #e60023;
       }
       :host ::ng-deep .geo-hex-icon,
       :host ::ng-deep .geo-brand-pin-icon {
@@ -1155,19 +1155,19 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   private markerRing(p: GeoPoint, intensity: number): string {
     if (this.ringColor) return this.ringColor;
-    if (this.presenceMode) return this.isMissing(p) ? '#dc2626' : '#16a34a';
+    if (this.presenceMode) return this.isMissing(p) ? '#e60023' : '#16a34a';
     return this.staticPin ? '#ffd500' : mapHeatStrokeColor(intensity);
   }
 
   private markerFill(p: GeoPoint, intensity: number): string {
     if (this.ringColor) return this.ringColor;
-    if (this.presenceMode) return this.isMissing(p) ? '#ef4444' : '#22c55e';
+    if (this.presenceMode) return this.isMissing(p) ? '#ff0033' : '#22c55e';
     return this.staticPin ? '#ffd500' : mapHeatColor(intensity);
   }
 
   private markerStroke(p: GeoPoint, intensity: number): string {
     if (this.ringColor) return '#1a1a1a';
-    if (this.presenceMode) return this.isMissing(p) ? '#991b1b' : '#166534';
+    if (this.presenceMode) return this.isMissing(p) ? '#b8001c' : '#166534';
     return this.staticPin ? '#1a1a1a' : mapHeatStrokeColor(intensity);
   }
 

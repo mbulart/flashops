@@ -34,19 +34,27 @@ export function heatIntensity(value: number, min: number, max: number): number {
   return Math.min(1, Math.max(0, (value - min) / (max - min)));
 }
 
-/** Carte + heatmap journalière : rouge sang (faible) → vert luisant (fort). */
+/**
+ * Carte + heatmap journalière : rouge rubis vif (faible) → vert (fort).
+ * Rouge type Pinterest / YouTube (#E60023 → #FF0000), pas un rouge sang sombre.
+ */
 export function mapHeatColor(intensity: number): string {
   const x = Math.min(1, Math.max(0, intensity));
   const hue = Math.round(lerpHeat(0, 142, x));
-  const sat = Math.round(lerpHeat(96, 92, x));
-  const light = Math.round(lerpHeat(42, 52, x));
+  const sat = Math.round(lerpHeat(100, 88, x));
+  const light = Math.round(lerpHeat(50, 46, x));
   return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
 export function mapHeatStrokeColor(intensity: number): string {
   const x = Math.min(1, Math.max(0, intensity));
   const hue = Math.round(lerpHeat(0, 142, x));
-  const sat = Math.round(lerpHeat(90, 88, x));
-  const light = Math.round(lerpHeat(30, 36, x));
+  const sat = Math.round(lerpHeat(100, 86, x));
+  const light = Math.round(lerpHeat(40, 34, x));
   return `hsl(${hue}, ${sat}%, ${light}%)`;
+}
+
+/** Texte clair (blanc) sur la zone rouge / sombre de l’échelle. */
+export function mapHeatNeedsLightText(intensity: number): boolean {
+  return Math.min(1, Math.max(0, intensity)) <= 0.42;
 }
