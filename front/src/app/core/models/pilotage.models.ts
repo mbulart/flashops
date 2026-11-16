@@ -200,6 +200,29 @@ export interface PilotageProduitsMensuelExport {
   rows: PilotageProductMonthlyRow[];
 }
 
+export interface PilotageAgencePeriodeBucket {
+  periode: string;
+  label: string;
+  periodeDebut: string;
+  periodeFin: string;
+  volume: number;
+  montant: number;
+  commission: number;
+  commissionFcn: number;
+  commissionAgent: number;
+  commissionFcnAgent: number;
+  agencies: PilotageAgenceRank[];
+}
+
+export interface PilotageAgencesPeriodiqueExport {
+  grain: 'month' | 'week' | string;
+  from: string;
+  to: string;
+  domaine: string;
+  devise: string;
+  periods: PilotageAgencePeriodeBucket[];
+}
+
 export interface PilotageAgenceRank {
   agenceId: number;
   codeAgence: string;

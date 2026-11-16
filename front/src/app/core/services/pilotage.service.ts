@@ -21,6 +21,8 @@ import {
   PilotageDomaine,
   PilotageExport,
   PilotageLigneExport,
+  PilotageAgencesPeriodiqueExport,
+  PilotageAgencePeriodeBucket,
   PilotageProduitsMensuelExport,
   PilotageProductMonthlyRow,
   PilotageFiltres,
@@ -196,6 +198,41 @@ export class PilotageService {
             event.type === HttpEventType.Response
         ),
         map((event) => normalizeProduitsMensuel(event.body!.data))
+      );
+  }
+
+  loadAgencesPeriodique(
+    criteria: PilotageCriteria,
+    grain: 'month' | 'week',
+    ordre: 'top' | 'pire' = 'top',
+    tri: 'montant' | 'volume' = 'montant',
+    onProgress?: (ratio: number) => void
+  ) {
+    const params = this.criteriaParams(criteria)
+      .set('grain', grain)
+      .set('ordre', ordre)
+      .set('tri', tri);
+    return this.http
+      .get<{ data: PilotageAgencesPeriodiqueExport }>(`${this.baseUrl}/export/agences-periodique`, {
+        params,
+        reportProgress: true,
+        observe: 'events',
+      })
+      .pipe(
+        tap((event) => {
+          if (!onProgress || event.type !== HttpEventType.DownloadProgress) return;
+          const total = event.total ?? 0;
+          if (total > 0) {
+            onProgress(Math.min(0.82, (event.loaded / total) * 0.82));
+            return;
+          }
+          onProgress(Math.min(0.55, event.loaded / (event.loaded + 200_000)));
+        }),
+        filter(
+          (event): event is HttpResponse<{ data: PilotageAgencesPeriodiqueExport }> =>
+            event.type === HttpEventType.Response
+        ),
+        map((event) => normalizeAgencesPeriodique(event.body!.data))
       );
   }
 
@@ -727,6 +764,41 @@ function normalizeProduitsMensuel(raw: PilotageProduitsMensuelExport): PilotageP
     domaine: raw.domaine,
     devise: raw.devise,
     rows,
+  };
+}
+
+function normalizeAgencesPeriodique(
+  raw: PilotageAgencesPeriodiqueExport
+): PilotageAgencesPeriodiqueExport {
+  const periods = (raw.periods ?? []).map((bucket) => {
+    const row = bucket as PilotageAgencePeriodeBucket & {
+      periode_debut?: string;
+      periode_fin?: string;
+      commission_fcn?: number;
+      commission_agent?: number;
+      commission_fcn_agent?: number;
+    };
+    return {
+      periode: row.periode ?? '',
+      label: row.label ?? row.periode ?? '',
+      periodeDebut: row.periodeDebut ?? row.periode_debut ?? '',
+      periodeFin: row.periodeFin ?? row.periode_fin ?? '',
+      volume: Number(row.volume ?? 0),
+      montant: Number(row.montant ?? 0),
+      commission: Number(row.commission ?? 0),
+      commissionFcn: Number(row.commissionFcn ?? row.commission_fcn ?? 0),
+      commissionAgent: Number(row.commissionAgent ?? row.commission_agent ?? 0),
+      commissionFcnAgent: Number(row.commissionFcnAgent ?? row.commission_fcn_agent ?? 0),
+      agencies: (row.agencies ?? []).map((a) => normalizeAgenceRank(a)),
+    };
+  });
+  return {
+    grain: raw.grain === 'week' ? 'week' : 'month',
+    from: raw.from,
+    to: raw.to,
+    domaine: raw.domaine,
+    devise: raw.devise,
+    periods,
   };
 }
 

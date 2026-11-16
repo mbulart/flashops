@@ -983,6 +983,172 @@ public class PilotageAnalyticsRepository {
         : " ORDER BY " + montantExpr + " DESC, " + volumeExpr + " DESC ";
   }
 
+  /**
+   * Classement agences découpé par mois ou semaine ISO (pour export comparatif).
+   *
+   * @param grain {@code month} ou {@code week}
+   */
+  public List<AgencePeriodiqueRow> loadAgencesPeriodiques(
+      PilotageBundleQuery q, String grain, boolean worst, boolean byVolume) {
+    String trunc = "week".equalsIgnoreCase(grain) ? "week" : "month";
+    try {
+      if (q.couloirOnFact()) {
+        return loadFaitAgencesPeriodiques(q, trunc, worst, byVolume);
+      }
+      return loadGrainAgencesPeriodiques(q, trunc, worst, byVolume);
+    } catch (DataAccessException ex) {
+      log.error("Agences périodiques pilotage indisponibles", ex);
+      return List.of();
+    }
+  }
+
+  private List<AgencePeriodiqueRow> loadGrainAgencesPeriodiques(
+      PilotageBundleQuery q, String trunc, boolean worst, boolean byVolume) {
+    String order =
+        " ORDER BY periode DESC, "
+            + orderByMontantVolume("sum(g.montant)", "sum(g.nb)", worst, byVolume)
+                .replace(" ORDER BY ", "");
+    Grain grain = resolveAgenceRankGrain(q);
+    var scoped =
+        PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
+    String periodSelect = periodSelectSql("g.jour", trunc);
+    String periodGroup = periodGroupSql("g.jour", trunc);
+    String grouped =
+        withAgenceGeo(scoped.fromAndWhere(), "d")
+            + """
+             AND g.agence_id <> 0
+             GROUP BY
+            """
+            + periodGroup
+            + ", g.agence_id, d.code_agence, d.nom, d.categorie, d.pos_id, rg.libelle, zn.libelle";
+    var sql =
+        """
+        SELECT
+        """
+            + periodSelect
+            + """
+               g.agence_id,
+               coalesce(nullif(btrim(d.code_agence), ''), '') AS code_agence,
+               coalesce(nullif(btrim(d.nom), ''), '') AS nom,
+               coalesce(nullif(btrim(d.categorie), ''), '') AS categorie,
+               coalesce(nullif(btrim(d.pos_id), ''), '') AS pos_id,
+        """
+            + AGENCE_GEO_SELECT
+            + """
+               coalesce(sum(g.nb), 0)::bigint AS nb,
+               coalesce(sum(g.montant), 0) AS montant,
+        """
+            + commissionSelect(grain.table(), "g", q)
+            + grouped
+            + order;
+    return jdbc.query(sql, this::mapAgencePeriodique, scoped.args().toArray());
+  }
+
+  private List<AgencePeriodiqueRow> loadFaitAgencesPeriodiques(
+      PilotageBundleQuery q, String trunc, boolean worst, boolean byVolume) {
+    String order =
+        " ORDER BY periode DESC, "
+            + orderByMontantVolume("sum(f.montant)", "count(*)", worst, byVolume)
+                .replace(" ORDER BY ", "");
+    var scoped = PilotageSqlScope.buildFait(jdbc, q);
+    String from = scoped.fromAndWhere();
+    if (scoped.agenceAlias() == null) {
+      from =
+          from.replaceFirst(
+              " WHERE ",
+              " INNER JOIN pilotage.dim_agence AS ag ON ag.agence_id = f.agence_id WHERE ");
+    }
+    from = withAgenceGeo(from, "ag");
+    String periodSelect = periodSelectSql("d.jour", trunc);
+    String periodGroup = periodGroupSql("d.jour", trunc);
+    String grouped =
+        from
+            + """
+             AND f.agence_id <> 0
+             GROUP BY
+            """
+            + periodGroup
+            + ", f.agence_id, ag.code_agence, ag.nom, ag.categorie, ag.pos_id, rg.libelle, zn.libelle";
+    var sql =
+        """
+        SELECT
+        """
+            + periodSelect
+            + """
+               f.agence_id,
+               coalesce(nullif(btrim(ag.code_agence), ''), '') AS code_agence,
+               coalesce(nullif(btrim(ag.nom), ''), '') AS nom,
+               coalesce(nullif(btrim(ag.categorie), ''), '') AS categorie,
+               coalesce(nullif(btrim(ag.pos_id), ''), '') AS pos_id,
+        """
+            + AGENCE_GEO_SELECT
+            + """
+               count(*)::bigint AS nb,
+               coalesce(sum(f.montant), 0) AS montant,
+        """
+            + commissionSelect("pilotage.fait_operation", "f", q)
+            + grouped
+            + order;
+    return jdbc.query(sql, this::mapAgencePeriodique, scoped.args().toArray());
+  }
+
+  private static String periodSelectSql(String jourExpr, String trunc) {
+    if ("week".equals(trunc)) {
+      return """
+          to_char(date_trunc('week', %s::date), 'IYYY') || '-W' || to_char(date_trunc('week', %s::date), 'IW') AS periode,
+          date_trunc('week', %s::date)::date AS periode_debut,
+          (date_trunc('week', %s::date) + interval '6 days')::date AS periode_fin,
+          """
+          .formatted(jourExpr, jourExpr, jourExpr, jourExpr);
+    }
+    return """
+        to_char(date_trunc('month', %s::date), 'YYYY-MM') AS periode,
+        date_trunc('month', %s::date)::date AS periode_debut,
+        (date_trunc('month', %s::date) + interval '1 month - 1 day')::date AS periode_fin,
+        """
+        .formatted(jourExpr, jourExpr, jourExpr);
+  }
+
+  private static String periodGroupSql(String jourExpr, String trunc) {
+    if ("week".equals(trunc)) {
+      return """
+          to_char(date_trunc('week', %s::date), 'IYYY') || '-W' || to_char(date_trunc('week', %s::date), 'IW'),
+          date_trunc('week', %s::date)::date,
+          (date_trunc('week', %s::date) + interval '6 days')::date
+          """
+          .formatted(jourExpr, jourExpr, jourExpr, jourExpr);
+    }
+    return """
+        to_char(date_trunc('month', %s::date), 'YYYY-MM'),
+        date_trunc('month', %s::date)::date,
+        (date_trunc('month', %s::date) + interval '1 month - 1 day')::date
+        """
+        .formatted(jourExpr, jourExpr, jourExpr);
+  }
+
+  private AgencePeriodiqueRow mapAgencePeriodique(java.sql.ResultSet rs, int rowNum)
+      throws java.sql.SQLException {
+    java.sql.Date debut = rs.getDate("periode_debut");
+    java.sql.Date fin = rs.getDate("periode_fin");
+    return new AgencePeriodiqueRow(
+        rs.getString("periode"),
+        debut == null ? "" : debut.toLocalDate().toString(),
+        fin == null ? "" : fin.toLocalDate().toString(),
+        rs.getInt("agence_id"),
+        rs.getString("code_agence"),
+        rs.getString("nom"),
+        rs.getString("categorie"),
+        rs.getString("pos_id"),
+        rs.getString("region"),
+        rs.getString("zone"),
+        rs.getLong("nb"),
+        money(rs, "montant"),
+        money(rs, "commission"),
+        money(rs, "commission_fcn"),
+        money(rs, "commission_agent"),
+        money(rs, "commission_fcn_agent"));
+  }
+
   private AgenceClassement loadGrainTopAgences(
       PilotageBundleQuery q,
       int limit,
@@ -1742,6 +1908,24 @@ public class PilotageAnalyticsRepository {
   private record AgenceTxStats(long total, BigDecimal moyenne, BigDecimal montantTotal) {}
 
   public record AgenceRankRow(
+      int agenceId,
+      String codeAgence,
+      String nom,
+      String categorie,
+      String posId,
+      String region,
+      String zone,
+      long nb,
+      BigDecimal montant,
+      BigDecimal commission,
+      BigDecimal commissionFcn,
+      BigDecimal commissionAgent,
+      BigDecimal commissionFcnAgent) {}
+
+  public record AgencePeriodiqueRow(
+      String periode,
+      String periodeDebut,
+      String periodeFin,
       int agenceId,
       String codeAgence,
       String nom,

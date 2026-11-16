@@ -112,6 +112,27 @@ public final class PilotageDtos {
       String devise,
       java.util.List<ProductMonthlyPoint> rows) {}
 
+  public record AgencePeriodeBucket(
+      String periode,
+      String label,
+      @JsonProperty("periode_debut") String periodeDebut,
+      @JsonProperty("periode_fin") String periodeFin,
+      long volume,
+      java.math.BigDecimal montant,
+      java.math.BigDecimal commission,
+      @JsonProperty("commission_fcn") java.math.BigDecimal commissionFcn,
+      @JsonProperty("commission_agent") java.math.BigDecimal commissionAgent,
+      @JsonProperty("commission_fcn_agent") java.math.BigDecimal commissionFcnAgent,
+      java.util.List<AgenceRank> agencies) {}
+
+  public record AgencesPeriodiqueExport(
+      String grain,
+      String from,
+      String to,
+      String domaine,
+      String devise,
+      java.util.List<AgencePeriodeBucket> periods) {}
+
   public record AgenceRank(
       int agenceId,
       @JsonProperty("code_agence") String codeAgence,

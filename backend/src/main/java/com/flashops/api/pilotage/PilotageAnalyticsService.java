@@ -408,6 +408,99 @@ public class PilotageAnalyticsService {
         q.from(), q.to(), String.join(",", q.resolvedDomaines()), q.devise(), rows);
   }
 
+  public PilotageDtos.AgencesPeriodiqueExport exportAgencesPeriodique(
+      PilotageBundleQuery q, String grain, boolean worst, boolean byVolume) {
+    q = withMoneyContext(q);
+    validate(q);
+    String resolved = "week".equalsIgnoreCase(grain) ? "week" : "month";
+    var flat = repository.loadAgencesPeriodiques(q, resolved, worst, byVolume);
+    var byPeriod = new java.util.LinkedHashMap<String, java.util.List<PilotageAnalyticsRepository.AgencePeriodiqueRow>>();
+    for (var row : flat) {
+      byPeriod.computeIfAbsent(row.periode(), k -> new java.util.ArrayList<>()).add(row);
+    }
+    var periods = new java.util.ArrayList<PilotageDtos.AgencePeriodeBucket>();
+    for (var entry : byPeriod.entrySet()) {
+      var rows = entry.getValue();
+      if (rows.isEmpty()) {
+        continue;
+      }
+      var first = rows.get(0);
+      long volume = 0L;
+      java.math.BigDecimal montant = java.math.BigDecimal.ZERO;
+      java.math.BigDecimal commission = java.math.BigDecimal.ZERO;
+      java.math.BigDecimal commissionFcn = java.math.BigDecimal.ZERO;
+      java.math.BigDecimal commissionAgent = java.math.BigDecimal.ZERO;
+      java.math.BigDecimal commissionFcnAgent = java.math.BigDecimal.ZERO;
+      var agencies = new java.util.ArrayList<PilotageDtos.AgenceRank>();
+      for (var r : rows) {
+        volume += r.nb();
+        montant = montant.add(nullToZero(r.montant()));
+        commission = commission.add(nullToZero(r.commission()));
+        commissionFcn = commissionFcn.add(nullToZero(r.commissionFcn()));
+        commissionAgent = commissionAgent.add(nullToZero(r.commissionAgent()));
+        commissionFcnAgent = commissionFcnAgent.add(nullToZero(r.commissionFcnAgent()));
+        agencies.add(
+            new PilotageDtos.AgenceRank(
+                r.agenceId(),
+                r.codeAgence(),
+                r.nom(),
+                r.categorie(),
+                r.posId(),
+                r.region(),
+                r.zone(),
+                r.nb(),
+                r.montant(),
+                r.commission(),
+                r.commissionFcn(),
+                r.commissionAgent(),
+                r.commissionFcnAgent()));
+      }
+      periods.add(
+          new PilotageDtos.AgencePeriodeBucket(
+              first.periode(),
+              periodLabel(resolved, first.periode(), first.periodeDebut(), first.periodeFin()),
+              first.periodeDebut(),
+              first.periodeFin(),
+              volume,
+              montant,
+              commission,
+              commissionFcn,
+              commissionAgent,
+              commissionFcnAgent,
+              agencies));
+    }
+    return new PilotageDtos.AgencesPeriodiqueExport(
+        resolved,
+        q.from(),
+        q.to(),
+        String.join(",", q.resolvedDomaines()),
+        q.devise(),
+        periods);
+  }
+
+  private static java.math.BigDecimal nullToZero(java.math.BigDecimal value) {
+    return value == null ? java.math.BigDecimal.ZERO : value;
+  }
+
+  private static String periodLabel(String grain, String periode, String debut, String fin) {
+    try {
+      if ("week".equals(grain)) {
+        var start = java.time.LocalDate.parse(debut);
+        var end = java.time.LocalDate.parse(fin);
+        int week = start.get(java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+        var fmt = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        return "Semaine " + week + " · " + start.format(fmt) + " – " + end.format(fmt);
+      }
+      var start = java.time.LocalDate.parse(debut);
+      var fmt =
+          java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", java.util.Locale.FRENCH);
+      String label = start.format(fmt);
+      return label.isEmpty() ? periode : Character.toUpperCase(label.charAt(0)) + label.substring(1);
+    } catch (RuntimeException ex) {
+      return periode == null ? "" : periode;
+    }
+  }
+
   private static java.util.List<PilotageDtos.AgenceRank> toAgenceRanks(
       java.util.List<PilotageAnalyticsRepository.AgenceRankRow> rows) {
     return rows.stream()

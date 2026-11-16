@@ -78,6 +78,7 @@ import {
   PilotageSeriesGranularity,
 } from './pilotage-charts.util';
 import { downloadPilotageExcel } from './pilotage-excel.export';
+import { downloadPilotageAgencesPeriodiqueExcel } from './pilotage-agences-periodique.export';
 import { downloadPilotageProduitsMensuelExcel } from './pilotage-produits-mensuel.export';
 import { buildPilotageReportIdentity } from './pilotage-report-identity';
 
@@ -929,6 +930,38 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                           Volume et valeur mensuels par produit, totaux et graphique Flash.
                         </span>
                       </button>
+                      @if (periodAtLeastOneMonth()) {
+                        <button
+                          type="button"
+                          class="pilotage-export-collapse__item"
+                          role="menuitem"
+                          [disabled]="exportingExcel()"
+                          (click)="exportAgencesPeriodique('month')"
+                        >
+                          <span class="pilotage-export-collapse__item-title">
+                            <i class="bi bi-building me-2" aria-hidden="true"></i>
+                            Agences par mois
+                          </span>
+                          <span class="pilotage-export-collapse__item-desc">
+                            Classement agences mois par mois avec totaux de période.
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          class="pilotage-export-collapse__item"
+                          role="menuitem"
+                          [disabled]="exportingExcel()"
+                          (click)="exportAgencesPeriodique('week')"
+                        >
+                          <span class="pilotage-export-collapse__item-title">
+                            <i class="bi bi-calendar-week me-2" aria-hidden="true"></i>
+                            Agences par semaine
+                          </span>
+                          <span class="pilotage-export-collapse__item-desc">
+                            Classement agences semaine par semaine avec totaux de période.
+                          </span>
+                        </button>
+                      }
                     </div>
                   }
                 </div>
@@ -2246,8 +2279,69 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
       });
   }
 
+  periodAtLeastOneMonth(): boolean {
+    const c = this.criteria();
+    if (!c?.from || !c?.to) return false;
+    const from = new Date(`${c.from}T00:00:00`);
+    const to = new Date(`${c.to}T00:00:00`);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return false;
+    const plusOne = new Date(from);
+    plusOne.setMonth(plusOne.getMonth() + 1);
+    return plusOne.getTime() <= to.getTime();
+  }
+
+  exportAgencesPeriodique(grain: 'month' | 'week'): void {
+    const criteria = this.criteria();
+    if (!criteria || this.exportingExcel() || !this.periodAtLeastOneMonth()) return;
+    this.exportMenuOpen.set(false);
+    this.exportingExcel.set(true);
+    this.exportProgress.set(3);
+    this.startExportCreep();
+    const kind = grain === 'week' ? 'agences-semaine' : 'agences-mois';
+    const errLabel = grain === 'week' ? 'par semaine' : 'par mois';
+    this.pilotage
+      .loadAgencesPeriodique(
+        criteria,
+        grain,
+        this.agencyOrder(),
+        this.agencyTri(),
+        (ratio) => this.bumpExportProgress(ratio * 100)
+      )
+      .subscribe({
+        next: (data) => {
+          const identity = this.buildExportIdentity(kind, criteria);
+          const settings = this.appSettings.settings();
+          downloadPilotageAgencesPeriodiqueExcel(
+            {
+              identity,
+              grain: data.grain || grain,
+              from: data.from || criteria.from,
+              to: data.to || criteria.to,
+              devise: data.devise || criteria.devise,
+              periods: data.periods,
+              logoUrl: settings.logo_light || '/branding/logo-light1.png',
+              appName: settings.app_name || 'Flash OPS',
+              faviconUrl: settings.favicon || '/branding/logo-light1.png',
+            },
+            (percent) => this.bumpExportProgress(percent)
+          )
+            .then(() => {
+              if (!data.periods.length) {
+                this.toast.warning(`Aucune donnée agence ${errLabel} pour ce périmètre.`);
+              }
+            })
+            .catch(() => this.toast.error(`Export agences ${errLabel} impossible.`))
+            .finally(() => this.finishExport());
+        },
+        error: () => {
+          this.finishExport();
+          this.toast.error(`Export agences ${errLabel} impossible.`);
+        },
+      });
+  }
+
   private buildExportIdentity(
-    kind: 'agences' | 'produits-mensuel',
+    kind: 'agences' | 'produits-mensuel' | 'agences-mois' | 'agences-semaine',
     criteria: PilotageCriteria
   ) {
     const domaines = criteria.domaines?.length ? criteria.domaines : [criteria.domaine];
