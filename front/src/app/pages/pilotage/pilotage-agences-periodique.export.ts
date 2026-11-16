@@ -9,7 +9,6 @@ const BLACK = 'FF111111';
 const GRAY = 'FF6B7280';
 const WHITE = 'FFFFFFFF';
 const ZEBRAS = 'FFF8F5E6';
-const GROUP = 'FFFFF4CC';
 const TOTAL_BG = 'FFFFE08A';
 
 export interface PilotageAgencesPeriodiqueExcelInput {
@@ -142,7 +141,6 @@ function writeMonthSheet(
   writeHeader(ws, headerRow, headers);
 
   let cursor = headerRow + 1;
-  cursor = writePeriodGroup(ws, cursor, headers.length, period, input.devise);
   const totalMontant = Number(period.montant) || 0;
   period.agencies.forEach((row, index) => {
     cursor = writeAgencyRow(ws, cursor, row, index + 1, totalMontant, index);
@@ -186,33 +184,6 @@ function uniqueSheetName(base: string, used: Set<string>): string {
   const fallback = `Mois ${used.size + 1}`.slice(0, 31);
   used.add(fallback.toLowerCase());
   return fallback;
-}
-
-function writePeriodGroup(
-  ws: ExcelSheet,
-  rowNumber: number,
-  columns: number,
-  period: PilotageAgencePeriodeBucket,
-  devise: string
-): number {
-  const row = ws.getRow(rowNumber);
-  const vol = (Number(period.volume) || 0).toLocaleString('fr-FR');
-  const mont = (Number(period.montant) || 0).toLocaleString('fr-FR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  row.getCell(1).value =
-    `${period.label} · ${period.agencies.length} agence(s) · Volume ${vol} · Montant ${mont} ${devise}`;
-  ws.mergeCells(rowNumber, 1, rowNumber, columns);
-  for (let c = 1; c <= columns; c++) {
-    const cell = row.getCell(c);
-    cell.fill = solid(GROUP);
-    cell.font = { name: 'Calibri', bold: true, size: 11, color: { argb: BLACK } };
-    cell.alignment = { vertical: 'middle' };
-    cell.border = border();
-  }
-  row.height = 22;
-  return rowNumber + 1;
 }
 
 function writeAgencyRow(
