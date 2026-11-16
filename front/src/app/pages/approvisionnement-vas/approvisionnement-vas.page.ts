@@ -197,6 +197,13 @@ interface SoldeSeuilRow {
       }
 
       <app-section-card title="Demandes">
+        @if (canCreate()) {
+          <div actions>
+            <a class="btn btn-primary btn-sm" routerLink="/approvisionnement-vas/nouvelle">
+              <i class="bi bi-plus-lg me-1"></i>Nouvelle demande
+            </a>
+          </div>
+        }
         <div class="row g-2 mb-3 align-items-end">
           <div class="col-md-4">
             <label class="form-label form-label-sm" for="filtre-statut">Statut</label>
