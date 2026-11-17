@@ -686,8 +686,11 @@ public class ApprovisionnementVasRepository {
     return (v == null ? BigDecimal.ZERO : v).setScale(2, RoundingMode.HALF_UP);
   }
 
-  public static BigDecimal moyenne(BigDecimal j1, BigDecimal j2) {
-    return scale(j1.add(j2).divide(BigDecimal.valueOf(2), 6, RoundingMode.HALF_UP));
+  public static BigDecimal moyenne(BigDecimal j1, BigDecimal j2, LocalDate dateReference) {
+    int diviseur = ApprovisionnementPeriodes.diviseurMoyenne(dateReference);
+    BigDecimal a = j1 == null ? BigDecimal.ZERO : j1;
+    BigDecimal b = j2 == null ? BigDecimal.ZERO : j2;
+    return scale(a.add(b).divide(BigDecimal.valueOf(diviseur), 6, RoundingMode.HALF_UP));
   }
 
   private static void setNullableInt(PreparedStatement ps, int idx, Integer value)

@@ -14,6 +14,21 @@ public final class ApprovisionnementPeriodes {
 
   public record Periodes(Periode j1, Periode j2) {}
 
+  /**
+   * Diviseur de la moyenne (consommation J-1 + J-2).
+   * Lundi / mardi : les périodes couvrent 4 jours → ÷4 ; autres jours ouvrés → ÷2.
+   */
+  public static int diviseurMoyenne(LocalDate dateReference) {
+    if (dateReference == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "date_reference requise");
+    }
+    DayOfWeek dow = dateReference.getDayOfWeek();
+    if (dow == DayOfWeek.MONDAY || dow == DayOfWeek.TUESDAY) {
+      return 4;
+    }
+    return 2;
+  }
+
   public static Periodes resolve(LocalDate dateReference) {
     if (dateReference == null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "date_reference requise");

@@ -55,4 +55,13 @@ class ApprovisionnementPeriodesTest {
         ResponseStatusException.class,
         () -> ApprovisionnementPeriodes.resolve(LocalDate.of(2026, 11, 15)));
   }
+
+  @Test
+  void diviseurMoyenne_lundiMardiPar4_restePar2() {
+    assertEquals(4, ApprovisionnementPeriodes.diviseurMoyenne(LocalDate.of(2026, 11, 9))); // lundi
+    assertEquals(4, ApprovisionnementPeriodes.diviseurMoyenne(LocalDate.of(2026, 11, 10))); // mardi
+    assertEquals(2, ApprovisionnementPeriodes.diviseurMoyenne(LocalDate.of(2026, 11, 11))); // mercredi
+    assertEquals(2, ApprovisionnementPeriodes.diviseurMoyenne(LocalDate.of(2026, 11, 12))); // jeudi
+    assertEquals(2, ApprovisionnementPeriodes.diviseurMoyenne(LocalDate.of(2026, 11, 13))); // vendredi
+  }
 }

@@ -66,7 +66,8 @@ public class ApprovisionnementVasService {
     var periodes = ApprovisionnementPeriodes.resolve(dateReference);
     TotauxPeriode j1 = repo.totauxConsommation(produitId, devisenorm, periodes.j1());
     TotauxPeriode j2 = repo.totauxConsommation(produitId, devisenorm, periodes.j2());
-    BigDecimal moyenne = ApprovisionnementVasRepository.moyenne(j1.consommation(), j2.consommation());
+    BigDecimal moyenne =
+        ApprovisionnementVasRepository.moyenne(j1.consommation(), j2.consommation(), dateReference);
     return new ConsommationCalculView(
         dateReference,
         produit.produitId(),
@@ -575,7 +576,7 @@ public class ApprovisionnementVasService {
       TotauxPeriode j1 = repo.totauxConsommation(line.produitId(), devise, periodes.j1());
       TotauxPeriode j2 = repo.totauxConsommation(line.produitId(), devise, periodes.j2());
       BigDecimal moyenne =
-          ApprovisionnementVasRepository.moyenne(j1.consommation(), j2.consommation());
+          ApprovisionnementVasRepository.moyenne(j1.consommation(), j2.consommation(), dateRef);
       String libelle =
           line.libelleSolde() == null || line.libelleSolde().isBlank()
               ? "Solde à 08h"
