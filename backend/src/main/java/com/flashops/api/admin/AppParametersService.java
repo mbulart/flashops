@@ -74,6 +74,11 @@ public class AppParametersService {
     if (taux.compareTo(BigDecimal.ZERO) < 0) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid exchange rate");
     }
+    BigDecimal tauxFcn =
+        input.tauxChangeUsdFcn() == null ? BigDecimal.valueOf(1000) : input.tauxChangeUsdFcn();
+    if (tauxFcn.compareTo(BigDecimal.ZERO) < 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid FCN exchange rate");
+    }
     BigDecimal delai =
         input.delaiTraitementHeures() == null ? BigDecimal.valueOf(2) : input.delaiTraitementHeures();
     if (delai.compareTo(BigDecimal.ZERO) <= 0) {
@@ -99,6 +104,7 @@ public class AppParametersService {
       p.setSmtpMotDePasse(input.smtpPassword().trim());
     }
     p.setTauxChangeUsdCdf(taux);
+    p.setTauxChangeUsdFcn(tauxFcn);
     p.setDelaiTraitementHeures(delai);
     p.setModifieLe(Instant.now());
     repo.save(p);
@@ -120,6 +126,8 @@ public class AppParametersService {
 
   private static AppSettingsView toView(ParametresApplication p) {
     BigDecimal taux = p.getTauxChangeUsdCdf() == null ? BigDecimal.ZERO : p.getTauxChangeUsdCdf();
+    BigDecimal tauxFcn =
+        p.getTauxChangeUsdFcn() == null ? BigDecimal.valueOf(1000) : p.getTauxChangeUsdFcn();
     BigDecimal delai =
         p.getDelaiTraitementHeures() == null ? BigDecimal.valueOf(2) : p.getDelaiTraitementHeures();
     return new AppSettingsView(
@@ -140,6 +148,7 @@ public class AppParametersService {
         p.getSmtpFromName(),
         p.getSmtpTestTo(),
         taux,
+        tauxFcn,
         delai);
   }
 

@@ -1624,17 +1624,22 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.draftDeviseIds = kept.length ? kept : this.defaultDeviseIds();
   }
 
-  /** Affichage chip / KPI : USD si USD+CDF (conversion serveur), sinon jointure. */
+  /** Affichage chip / KPI : USD si USD+(CDF|FCN) (conversion serveur), sinon jointure. */
   displayDevise(codes: string[]): string {
     const set = new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean));
-    if (set.has('USD') && set.has('CDF')) return 'USD';
+    if (set.has('USD') && (set.has('CDF') || set.has('FCN'))) return 'USD';
     return [...set].join(' · ') || 'USD';
   }
 
   devisesChip(c: PilotageCriteria): string {
-    const list = c.devises?.length ? c.devises : c.devise ? [c.devise] : [];
-    if (list.includes('USD') && list.includes('CDF') && (c.devise || '').toUpperCase() === 'USD') {
-      return 'USD · CDF → USD';
+    const list = (c.devises?.length ? c.devises : c.devise ? [c.devise] : []).map((d) =>
+      d.trim().toUpperCase()
+    );
+    if (list.includes('USD') && (c.devise || '').toUpperCase() === 'USD') {
+      const converted = ['CDF', 'FCN'].filter((code) => list.includes(code));
+      if (converted.length) {
+        return `USD · ${converted.join('+')} → USD`;
+      }
     }
     return list.join(' · ') || c.devise;
   }

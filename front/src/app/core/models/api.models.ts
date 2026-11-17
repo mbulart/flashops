@@ -59,6 +59,8 @@ export interface AppSettings extends PublicAppSettings {
   smtp_test_to: string;
   /** 1 USD = N CDF — utilisé par les modules pour les conversions. */
   taux_change_usd_cdf: number;
+  /** 1 USD = N FCN — utilisé pour convertir les montants FCN en USD. */
+  taux_change_usd_fcn: number;
   /** Délai de traitement Approvisionnement VAS (heures). */
   delai_traitement_heures: number;
 }

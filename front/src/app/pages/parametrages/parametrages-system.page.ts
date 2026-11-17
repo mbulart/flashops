@@ -160,6 +160,19 @@ type SettingsTab = 'identity' | 'smtp' | 'change' | 'datetime';
                 />
               </div>
               <div class="col-md-6">
+                <label class="form-label" for="sys-taux-fcn">1 USD = … FCN</label>
+                <input
+                  id="sys-taux-fcn"
+                  type="number"
+                  class="form-control"
+                  name="tauxChangeFcn"
+                  [(ngModel)]="form.taux_change_usd_fcn"
+                  min="0"
+                  step="0.000001"
+                  required
+                />
+              </div>
+              <div class="col-md-6">
                 <label class="form-label" for="sys-delai">Délai traitement Approvisionnement VAS (heures)</label>
                 <input
                   id="sys-delai"
@@ -273,6 +286,7 @@ export class ParametragesSystemPageComponent {
       ...data,
       timezone: data.timezone || 'Africa/Kinshasa',
       taux_change_usd_cdf: Number(data.taux_change_usd_cdf ?? 0),
+      taux_change_usd_fcn: Number(data.taux_change_usd_fcn ?? 1000),
       delai_traitement_heures: Number(data.delai_traitement_heures ?? 2),
     };
   }
@@ -296,6 +310,7 @@ export class ParametragesSystemPageComponent {
       smtp_from_name: '',
       smtp_test_to: '',
       taux_change_usd_cdf: 0,
+      taux_change_usd_fcn: 1000,
       delai_traitement_heures: 2,
     };
   }

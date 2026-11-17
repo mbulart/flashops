@@ -8,8 +8,8 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Expressions monétaires pilotage. Quand USD et CDF sont sélectionnés ensemble, les montants CDF
- * (et assimilés non-USD) sont convertis en USD via {@code taux_change_usd_cdf} (1 USD = N CDF).
+ * Expressions monétaires pilotage. Quand USD est sélectionné avec CDF et/ou FCN, les montants
+ * non-USD sont convertis en USD via les taux système (1 USD = N CDF / N FCN).
  */
 final class PilotageMoneySql {
 
@@ -34,26 +34,32 @@ final class PilotageMoneySql {
     return List.copyOf(out);
   }
 
-  static boolean convertsToUsd(List<String> devises, BigDecimal tauxUsdCdf) {
+  private static boolean positive(BigDecimal taux) {
+    return taux != null && taux.compareTo(BigDecimal.ZERO) > 0;
+  }
+
+  static boolean convertsToUsd(List<String> devises, BigDecimal tauxUsdCdf, BigDecimal tauxUsdFcn) {
     if (devises == null || devises.isEmpty()) {
       return false;
     }
-    if (tauxUsdCdf == null || tauxUsdCdf.compareTo(BigDecimal.ZERO) <= 0) {
+    Set<String> set = Set.copyOf(devises);
+    if (!set.contains("USD")) {
       return false;
     }
-    Set<String> set = Set.copyOf(devises);
-    return set.contains("USD") && set.contains("CDF");
+    boolean cdf = set.contains("CDF") && positive(tauxUsdCdf);
+    boolean fcn = set.contains("FCN") && positive(tauxUsdFcn);
+    return cdf || fcn;
   }
 
-  static String displayDevise(List<String> devises, BigDecimal tauxUsdCdf) {
+  static String displayDevise(List<String> devises, BigDecimal tauxUsdCdf, BigDecimal tauxUsdFcn) {
     List<String> clean = cleanDevises(devises);
-    if (convertsToUsd(clean, tauxUsdCdf)) {
+    if (convertsToUsd(clean, tauxUsdCdf, tauxUsdFcn)) {
       return "USD";
     }
     return clean.isEmpty() ? "" : clean.get(0);
   }
 
-  /** {@code coalesce(sum(...), 0)} avec conversion éventuelle CDF→USD. */
+  /** {@code coalesce(sum(...), 0)} avec conversion éventuelle CDF/FCN→USD. */
   static String sum(String alias, String column, PilotageBundleQuery q) {
     return "coalesce(" + sumRaw(alias, column, q) + ", 0)";
   }
@@ -64,7 +70,7 @@ final class PilotageMoneySql {
     if (!q.convertsToUsd()) {
       return "sum(" + ref + ")";
     }
-    return "sum(" + converted(ref, q.tauxUsdCdf()) + ")";
+    return "sum(" + converted(ref, q.tauxUsdCdf(), q.tauxUsdFcn()) + ")";
   }
 
   /** {@code coalesce(avg(...), 0)} sur montants éventuellement convertis. */
@@ -73,7 +79,7 @@ final class PilotageMoneySql {
     if (!q.convertsToUsd()) {
       return "coalesce(avg(" + ref + "), 0)";
     }
-    return "coalesce(avg(" + converted(ref, q.tauxUsdCdf()) + "), 0)";
+    return "coalesce(avg(" + converted(ref, q.tauxUsdCdf(), q.tauxUsdFcn()) + "), 0)";
   }
 
   /** Valeur unitaire (ligne) éventuellement convertie. */
@@ -82,18 +88,40 @@ final class PilotageMoneySql {
     if (!q.convertsToUsd()) {
       return ref;
     }
-    return converted(ref, q.tauxUsdCdf());
+    return converted(ref, q.tauxUsdCdf(), q.tauxUsdFcn());
   }
 
-  private static String converted(String ref, BigDecimal tauxUsdCdf) {
-    String taux = tauxUsdCdf.toPlainString();
-    return "CASE WHEN upper(btrim(dv.code)) = 'USD' THEN "
-        + ref
-        + " ELSE "
-        + ref
-        + " / NULLIF("
-        + taux
-        + "::numeric, 0) END";
+  private static String converted(String ref, BigDecimal tauxUsdCdf, BigDecimal tauxUsdFcn) {
+    StringBuilder sql = new StringBuilder("CASE WHEN upper(btrim(dv.code)) = 'USD' THEN ");
+    sql.append(ref);
+    if (positive(tauxUsdCdf)) {
+      String taux = tauxUsdCdf.toPlainString();
+      sql.append(" WHEN upper(btrim(dv.code)) = 'CDF' THEN ")
+          .append(ref)
+          .append(" / NULLIF(")
+          .append(taux)
+          .append("::numeric, 0)");
+    }
+    if (positive(tauxUsdFcn)) {
+      String taux = tauxUsdFcn.toPlainString();
+      sql.append(" WHEN upper(btrim(dv.code)) = 'FCN' THEN ")
+          .append(ref)
+          .append(" / NULLIF(")
+          .append(taux)
+          .append("::numeric, 0)");
+    }
+    // Autres devises non-USD : conserver l’ancien comportement via le taux CDF si disponible.
+    if (positive(tauxUsdCdf)) {
+      sql.append(" ELSE ")
+          .append(ref)
+          .append(" / NULLIF(")
+          .append(tauxUsdCdf.toPlainString())
+          .append("::numeric, 0)");
+    } else {
+      sql.append(" ELSE ").append(ref);
+    }
+    sql.append(" END");
+    return sql.toString();
   }
 
   static String[] toSqlArray(List<String> devises) {

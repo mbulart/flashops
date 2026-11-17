@@ -9,6 +9,7 @@ public record PilotageBundleQuery(
     String devise,
     List<String> devises,
     BigDecimal tauxUsdCdf,
+    BigDecimal tauxUsdFcn,
     String from,
     String to,
     List<Integer> produitIds,
@@ -46,6 +47,7 @@ public record PilotageBundleQuery(
         devise,
         List.of(),
         null,
+        null,
         from,
         to,
         produitIds,
@@ -79,7 +81,7 @@ public record PilotageBundleQuery(
   }
 
   public boolean convertsToUsd() {
-    return PilotageMoneySql.convertsToUsd(resolvedDevises(), tauxUsdCdf);
+    return PilotageMoneySql.convertsToUsd(resolvedDevises(), tauxUsdCdf, tauxUsdFcn);
   }
 
   public boolean usesAgenceGrain() {
@@ -113,12 +115,14 @@ public record PilotageBundleQuery(
     return hasCouloir() && !couloirOnAggregate();
   }
 
-  public PilotageBundleQuery withMoney(List<String> nextDevises, String displayDevise, BigDecimal taux) {
+  public PilotageBundleQuery withMoney(
+      List<String> nextDevises, String displayDevise, BigDecimal tauxCdf, BigDecimal tauxFcn) {
     return new PilotageBundleQuery(
         domaine,
         displayDevise,
         nextDevises == null ? List.of() : List.copyOf(nextDevises),
-        taux,
+        tauxCdf,
+        tauxFcn,
         from,
         to,
         produitIds,
@@ -142,6 +146,7 @@ public record PilotageBundleQuery(
         devise,
         devises,
         tauxUsdCdf,
+        tauxUsdFcn,
         from,
         to,
         produitIds,
@@ -165,6 +170,7 @@ public record PilotageBundleQuery(
         devise,
         devises,
         tauxUsdCdf,
+        tauxUsdFcn,
         from,
         to,
         produitIds,
@@ -188,6 +194,7 @@ public record PilotageBundleQuery(
         devise,
         devises,
         tauxUsdCdf,
+        tauxUsdFcn,
         from,
         to,
         produitIds,
@@ -211,6 +218,7 @@ public record PilotageBundleQuery(
         devise,
         devises,
         tauxUsdCdf,
+        tauxUsdFcn,
         from,
         to,
         produitIds,

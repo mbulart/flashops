@@ -539,15 +539,20 @@ public class PilotageAnalyticsService {
 
   private PilotageBundleQuery withMoneyContext(PilotageBundleQuery q) {
     List<String> devises = PilotageMoneySql.ensureNonEmpty(q.devises(), q.devise());
-    BigDecimal taux = appParameters.requireRow().getTauxChangeUsdCdf();
-    if (taux == null) {
-      taux = BigDecimal.ZERO;
+    var params = appParameters.requireRow();
+    BigDecimal tauxCdf = params.getTauxChangeUsdCdf();
+    if (tauxCdf == null) {
+      tauxCdf = BigDecimal.ZERO;
     }
-    String display = PilotageMoneySql.displayDevise(devises, taux);
+    BigDecimal tauxFcn = params.getTauxChangeUsdFcn();
+    if (tauxFcn == null) {
+      tauxFcn = BigDecimal.ZERO;
+    }
+    String display = PilotageMoneySql.displayDevise(devises, tauxCdf, tauxFcn);
     if (display.isBlank() && !devises.isEmpty()) {
       display = devises.get(0);
     }
-    return q.withMoney(devises, display, taux);
+    return q.withMoney(devises, display, tauxCdf, tauxFcn);
   }
 
   private static void validate(PilotageBundleQuery q) {

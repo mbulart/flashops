@@ -64,6 +64,9 @@ public class ParametresApplication {
   @Column(name = "taux_change_usd_cdf", nullable = false, precision = 18, scale = 6)
   private BigDecimal tauxChangeUsdCdf = BigDecimal.ZERO;
 
+  @Column(name = "taux_change_usd_fcn", nullable = false, precision = 18, scale = 6)
+  private BigDecimal tauxChangeUsdFcn = BigDecimal.valueOf(1000);
+
   @Column(name = "delai_traitement_heures", nullable = false, precision = 8, scale = 2)
   private BigDecimal delaiTraitementHeures = BigDecimal.valueOf(2);
 
@@ -208,6 +211,14 @@ public class ParametresApplication {
 
   public void setTauxChangeUsdCdf(BigDecimal tauxChangeUsdCdf) {
     this.tauxChangeUsdCdf = tauxChangeUsdCdf;
+  }
+
+  public BigDecimal getTauxChangeUsdFcn() {
+    return tauxChangeUsdFcn;
+  }
+
+  public void setTauxChangeUsdFcn(BigDecimal tauxChangeUsdFcn) {
+    this.tauxChangeUsdFcn = tauxChangeUsdFcn;
   }
 
   public BigDecimal getDelaiTraitementHeures() {

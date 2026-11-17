@@ -39,6 +39,7 @@ public final class PilotageBundleParams {
         display,
         cleanDevises,
         null,
+        null,
         from,
         to,
         nullToEmpty(produitIds),

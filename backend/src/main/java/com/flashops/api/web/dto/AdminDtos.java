@@ -54,6 +54,7 @@ public final class AdminDtos {
       @JsonProperty("smtp_from_name") String smtpFromName,
       @JsonProperty("smtp_test_to") String smtpTestTo,
       @JsonProperty("taux_change_usd_cdf") BigDecimal tauxChangeUsdCdf,
+      @JsonProperty("taux_change_usd_fcn") BigDecimal tauxChangeUsdFcn,
       @JsonProperty("delai_traitement_heures") BigDecimal delaiTraitementHeures) {}
 
   public record AppSettingsUpdate(
@@ -74,6 +75,7 @@ public final class AdminDtos {
       @JsonProperty("smtp_from_name") String smtpFromName,
       @JsonProperty("smtp_test_to") String smtpTestTo,
       @JsonProperty("taux_change_usd_cdf") BigDecimal tauxChangeUsdCdf,
+      @JsonProperty("taux_change_usd_fcn") BigDecimal tauxChangeUsdFcn,
       @JsonProperty("delai_traitement_heures") BigDecimal delaiTraitementHeures) {}
 
   public record SmtpTestRequest(String to) {}
