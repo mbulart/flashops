@@ -37,14 +37,8 @@ import { SkeletonComponent } from '../skeleton/skeleton.component';
               {{ delta > 0 ? '+' : '' }}{{ delta | number: '1.1-1' }}%
             </span>
           }
-          @if (referenceLabel) {
-            <span class="kpi-card-hint">{{ referenceLabel }}</span>
-          }
-          @if (ecartLabel) {
-            <span class="kpi-card-hint">{{ ecartLabel }}</span>
-          }
-          @if (hint) {
-            <span class="kpi-card-hint">{{ hint }}</span>
+          @if (metaLine) {
+            <span class="kpi-card-meta" [attr.title]="metaLine">{{ metaLine }}</span>
           }
         } @else if (growthMetric) {
           @if (delta != null) {
@@ -114,4 +108,8 @@ export class KpiCardComponent {
   @Input() icon = 'bi bi-graph-up';
   @Input() variant: 'primary' | 'secondary' | 'muted' = 'primary';
   @Input() loading = false;
+
+  get metaLine(): string {
+    return [this.referenceLabel, this.ecartLabel, this.hint].filter(Boolean).join(' · ');
+  }
 }

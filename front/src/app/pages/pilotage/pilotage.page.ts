@@ -555,7 +555,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 [delta]="b.kpis.momMontantPct"
                 [referenceLabel]="compareAmountLabel(b.kpis.momReference, b.devise)"
                 [ecartLabel]="compareEcartLabel(b.kpis.momEcart, b.devise)"
-                [hint]="b.kpis.momPeriode"
+                [hint]="compactPeriode(b.kpis.momPeriode)"
                 [loading]="false"
               />
               <app-kpi-card
@@ -568,7 +568,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 [delta]="b.kpis.yoyMontantPct"
                 [referenceLabel]="compareAmountLabel(b.kpis.yoyReference, b.devise)"
                 [ecartLabel]="compareEcartLabel(b.kpis.yoyEcart, b.devise)"
-                [hint]="b.kpis.yoyPeriode"
+                [hint]="compactPeriode(b.kpis.yoyPeriode)"
                 [loading]="false"
               />
             }
@@ -2545,7 +2545,19 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
 
   compareAmountLabel(amount: number | null, devise: string): string {
     if (amount == null) return '';
-    return this.formatPilotageMontant(amount, devise);
+    return `vs ${this.formatPilotageMontant(amount, devise)}`;
+  }
+
+  compactPeriode(label: string): string {
+    const match = (label || '').match(/^(\d+)\s+(\S+)\s+(\d{4})\s+[–-]\s+(\d+)\s+(\S+)\s+(\d{4})$/);
+    if (!match) return label || '';
+    const [, d1, month1, year1, d2, month2, year2] = match;
+    if (month1 === month2 && year1 === year2) {
+      if (d1 === '1' && Number(d2) >= 28) return `${month1} ${year1}`;
+      return `${d1}–${d2} ${month1} ${year1}`;
+    }
+    if (year1 === year2) return `${d1} ${month1} – ${d2} ${month2} ${year1}`;
+    return `${d1} ${month1} ${year1} – ${d2} ${month2} ${year2}`;
   }
 
   compareEcartLabel(amount: number | null, devise: string): string {
