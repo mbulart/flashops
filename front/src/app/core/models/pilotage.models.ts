@@ -131,6 +131,14 @@ export interface PilotageKpiBlock {
   momMontantPct: number | null;
   yoyMontantPct: number | null;
   compareMois: string;
+  momStatut: string;
+  momReference: number | null;
+  momEcart: number | null;
+  momPeriode: string;
+  yoyStatut: string;
+  yoyReference: number | null;
+  yoyEcart: number | null;
+  yoyPeriode: string;
   commission: number;
   commissionFcn: number;
   commissionAgent: number;

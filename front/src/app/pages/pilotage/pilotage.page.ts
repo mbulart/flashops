@@ -548,15 +548,27 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
               <app-kpi-card
                 label="MoM montant"
                 icon="bi bi-graph-up-arrow"
-                [growthMetric]="true"
+                [growthDetail]="true"
+                [value]="formatPilotageMontant(b.kpis.montant, b.devise)"
+                [valueTitle]="formatValeurFr(b.kpis.montant, b.devise)"
+                [statut]="b.kpis.momStatut"
                 [delta]="b.kpis.momMontantPct"
+                [referenceLabel]="compareAmountLabel(b.kpis.momReference, b.devise)"
+                [ecartLabel]="compareEcartLabel(b.kpis.momEcart, b.devise)"
+                [hint]="b.kpis.momPeriode"
                 [loading]="false"
               />
               <app-kpi-card
                 label="YoY montant"
                 icon="bi bi-calendar-range"
-                [growthMetric]="true"
+                [growthDetail]="true"
+                [value]="formatPilotageMontant(b.kpis.montant, b.devise)"
+                [valueTitle]="formatValeurFr(b.kpis.montant, b.devise)"
+                [statut]="b.kpis.yoyStatut"
                 [delta]="b.kpis.yoyMontantPct"
+                [referenceLabel]="compareAmountLabel(b.kpis.yoyReference, b.devise)"
+                [ecartLabel]="compareEcartLabel(b.kpis.yoyEcart, b.devise)"
+                [hint]="b.kpis.yoyPeriode"
                 [loading]="false"
               />
             }
@@ -2529,6 +2541,19 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
       return formatNumberFr(n, { notation: 'compact', maximumFractionDigits: 2 });
     }
     return formatNumberFr(n);
+  }
+
+  compareAmountLabel(amount: number | null, devise: string): string {
+    if (amount == null) return '';
+    return this.formatPilotageMontant(amount, devise);
+  }
+
+  compareEcartLabel(amount: number | null, devise: string): string {
+    if (amount == null) return '';
+    const text = this.formatPilotageMontant(Math.abs(amount), devise);
+    if (amount > 0) return `+${text}`;
+    if (amount < 0) return `−${text}`;
+    return text;
   }
 
   formatPilotageMontant(amount: number, devise: string): string {

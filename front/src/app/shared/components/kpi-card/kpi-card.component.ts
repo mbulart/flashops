@@ -15,6 +15,37 @@ import { SkeletonComponent } from '../skeleton/skeleton.component';
         <span class="kpi-card-label">{{ label }}</span>
         @if (loading) {
           <app-skeleton type="text" width="72%" height="1.35rem" />
+        } @else if (growthDetail) {
+          <span class="kpi-card-value" [attr.title]="valueTitle || null">{{ value }}</span>
+          @if (statut === 'insuffisant') {
+            <span class="kpi-card-delta kpi-card-delta--flat">Données insuffisantes</span>
+          } @else if (statut === 'nouveau') {
+            <span class="kpi-card-delta kpi-card-delta--flat">Nouveau</span>
+          } @else if (delta != null) {
+            <span
+              class="kpi-card-delta"
+              [class.kpi-card-delta--up]="delta > 0"
+              [class.kpi-card-delta--down]="delta < 0"
+              [class.kpi-card-delta--flat]="delta === 0"
+            >
+              <i
+                class="bi"
+                [class.bi-arrow-up-short]="delta > 0"
+                [class.bi-arrow-down-short]="delta < 0"
+                [class.bi-dash]="delta === 0"
+              ></i>
+              {{ delta > 0 ? '+' : '' }}{{ delta | number: '1.1-1' }}%
+            </span>
+          }
+          @if (referenceLabel) {
+            <span class="kpi-card-hint">{{ referenceLabel }}</span>
+          }
+          @if (ecartLabel) {
+            <span class="kpi-card-hint">{{ ecartLabel }}</span>
+          }
+          @if (hint) {
+            <span class="kpi-card-hint">{{ hint }}</span>
+          }
         } @else if (growthMetric) {
           @if (delta != null) {
             <span
@@ -72,6 +103,11 @@ export class KpiCardComponent {
   @Input() valueTitle = '';
   /** MoM / YoY : le pourcentage devient la valeur principale colorée. */
   @Input() growthMetric = false;
+  /** MoM / YoY : montant courant, badge, référence, écart et période. */
+  @Input() growthDetail = false;
+  @Input() statut = '';
+  @Input() referenceLabel = '';
+  @Input() ecartLabel = '';
   @Input() hint = '';
   @Input() delta: number | null = null;
   @Input() deltaHint = '';

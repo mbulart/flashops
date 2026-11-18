@@ -262,8 +262,14 @@ async function writeAnalysesSheet(
     ['Commission FCN agent', k.commissionFcnAgent ?? 0],
     ['Ticket moyen', k.ticketMoyen],
     ['Succès', k.volumeSucces],
-    ['MoM montant', k.momMontantPct == null ? '—' : k.momMontantPct / 100],
-    ['YoY montant', k.yoyMontantPct == null ? '—' : k.yoyMontantPct / 100],
+    ['MoM montant', k.momMontantPct == null ? (k.momStatut === 'nouveau' ? 'Nouveau' : k.momStatut === 'insuffisant' ? 'Données insuffisantes' : '—') : k.momMontantPct / 100],
+    ['MoM référence', k.momReference ?? '—'],
+    ['MoM écart', k.momEcart ?? '—'],
+    ['MoM période', k.momPeriode || '—'],
+    ['YoY montant', k.yoyMontantPct == null ? (k.yoyStatut === 'nouveau' ? 'Nouveau' : k.yoyStatut === 'insuffisant' ? 'Données insuffisantes' : '—') : k.yoyMontantPct / 100],
+    ['YoY référence', k.yoyReference ?? '—'],
+    ['YoY écart', k.yoyEcart ?? '—'],
+    ['YoY période', k.yoyPeriode || '—'],
   ];
   kpis.forEach((kpi, index) => {
     const excelRow = ws.getRow(row + 1 + index);
@@ -279,8 +285,11 @@ async function writeAnalysesSheet(
       excelRow.getCell(2).numFmt = '#,##0.00';
     }
     if (kpi[0] === 'Volume' || kpi[0] === 'Succès') excelRow.getCell(2).numFmt = '#,##0';
-    if (kpi[0].startsWith('MoM') || kpi[0].startsWith('YoY')) {
+    if (kpi[0] === 'MoM montant' || kpi[0] === 'YoY montant') {
       if (typeof kpi[1] === 'number') excelRow.getCell(2).numFmt = '+0.0%;-0.0%;0%';
+    }
+    if (kpi[0] === 'MoM référence' || kpi[0] === 'MoM écart' || kpi[0] === 'YoY référence' || kpi[0] === 'YoY écart') {
+      if (typeof kpi[1] === 'number') excelRow.getCell(2).numFmt = '#,##0.00';
     }
   });
   row += kpis.length + 2;

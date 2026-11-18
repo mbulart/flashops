@@ -3,7 +3,6 @@ package com.flashops.api.pilotage;
 import com.flashops.api.admin.AppParametersService;
 import com.flashops.api.web.dto.PilotageDtos;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -73,10 +72,18 @@ public class PilotageAnalyticsService {
     } catch (DateTimeParseException ex) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "date fin invalide");
     }
-    LocalDate refMonth = end.withDayOfMonth(1);
-    var currentM = repository.loadMonthCompare(q, refMonth.toString()).orElse(null);
-    var prevM = repository.loadMonthCompare(q, refMonth.minusMonths(1).toString()).orElse(null);
-    var yoyM = repository.loadMonthCompare(q, refMonth.minusYears(1).toString()).orElse(null);
+    LocalDate start;
+    try {
+      start = LocalDate.parse(q.from());
+    } catch (DateTimeParseException ex) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "date début invalide");
+    }
+    var momWindow = PilotageMontantCompare.mom(start, end);
+    var yoyWindow = PilotageMontantCompare.yoy(start, end);
+    BigDecimal momRef = referenceMontant(q, momWindow);
+    BigDecimal yoyRef = referenceMontant(q, yoyWindow);
+    var momVar = PilotageMontantCompare.variation(totals.montant(), momRef);
+    var yoyVar = PilotageMontantCompare.variation(totals.montant(), yoyRef);
 
     var series =
         repository.loadTimeseries(q).stream()
@@ -151,9 +158,17 @@ public class PilotageAnalyticsService {
             totalsForKpi.montant(),
             ticket,
             totalsForKpi.nbSucces(),
-            growthPct(currentM != null ? currentM.montant() : null, prevM != null ? prevM.montant() : null),
-            growthPct(currentM != null ? currentM.montant() : null, yoyM != null ? yoyM.montant() : null),
-            refMonth.toString(),
+            pct(momVar),
+            pct(yoyVar),
+            momWindow.from().toString(),
+            momVar.statut(),
+            momRef,
+            momVar.ecart(),
+            PilotageMontantCompare.label(momWindow),
+            yoyVar.statut(),
+            yoyRef,
+            yoyVar.ecart(),
+            PilotageMontantCompare.label(yoyWindow),
             totalsForKpi.commission(),
             totalsForKpi.commissionFcn(),
             totalsForKpi.commissionAgent(),
@@ -549,18 +564,15 @@ public class PilotageAnalyticsService {
         .toList();
   }
 
-  private static Double growthPct(BigDecimal current, BigDecimal previous) {
-    if (current == null || previous == null) {
-      return null;
-    }
-    if (previous.compareTo(BigDecimal.ZERO) == 0) {
-      return current.compareTo(BigDecimal.ZERO) == 0 ? 0d : null;
-    }
-    var diff = current.subtract(previous);
-    return diff
-        .multiply(BigDecimal.valueOf(100))
-        .divide(previous, 4, RoundingMode.HALF_UP)
-        .doubleValue();
+  private BigDecimal referenceMontant(PilotageBundleQuery q, PilotageMontantCompare.Window window) {
+    return repository
+        .loadPeriodTotals(q.withPeriod(window.from().toString(), window.to().toString()))
+        .map(PilotageAnalyticsRepository.TotalsRow::montant)
+        .orElse(null);
+  }
+
+  private static Double pct(PilotageMontantCompare.Variation variation) {
+    return variation.pct() == null ? null : variation.pct().doubleValue();
   }
 
   private PilotageBundleQuery withMoneyContext(PilotageBundleQuery q) {

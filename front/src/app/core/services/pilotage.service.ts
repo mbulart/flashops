@@ -476,6 +476,12 @@ export class PilotageService {
   }
 }
 
+function nullableNumber(value: number | null | undefined): number | null {
+  if (value == null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function normalizeBundle(raw: PilotageBundle, domaines: PilotageDomaine[]): PilotageBundle {
   const k = raw.kpis as PilotageBundle['kpis'] & {
     ticket_moyen?: number;
@@ -483,6 +489,22 @@ function normalizeBundle(raw: PilotageBundle, domaines: PilotageDomaine[]): Pilo
     mom_montant_pct?: number | null;
     yoy_montant_pct?: number | null;
     compare_mois?: string;
+    momStatut?: string;
+    mom_statut?: string;
+    momReference?: number | null;
+    mom_reference?: number | null;
+    momEcart?: number | null;
+    mom_ecart?: number | null;
+    momPeriode?: string;
+    mom_periode?: string;
+    yoyStatut?: string;
+    yoy_statut?: string;
+    yoyReference?: number | null;
+    yoy_reference?: number | null;
+    yoyEcart?: number | null;
+    yoy_ecart?: number | null;
+    yoyPeriode?: string;
+    yoy_periode?: string;
     commission_fcn?: number;
     commission_agent?: number;
     commission_fcn_agent?: number;
@@ -497,6 +519,14 @@ function normalizeBundle(raw: PilotageBundle, domaines: PilotageDomaine[]): Pilo
       momMontantPct: k.momMontantPct ?? k.mom_montant_pct ?? null,
       yoyMontantPct: k.yoyMontantPct ?? k.yoy_montant_pct ?? null,
       compareMois: k.compareMois ?? k.compare_mois ?? '',
+      momStatut: k.momStatut ?? k.mom_statut ?? '',
+      momReference: nullableNumber(k.momReference ?? k.mom_reference),
+      momEcart: nullableNumber(k.momEcart ?? k.mom_ecart),
+      momPeriode: k.momPeriode ?? k.mom_periode ?? '',
+      yoyStatut: k.yoyStatut ?? k.yoy_statut ?? '',
+      yoyReference: nullableNumber(k.yoyReference ?? k.yoy_reference),
+      yoyEcart: nullableNumber(k.yoyEcart ?? k.yoy_ecart),
+      yoyPeriode: k.yoyPeriode ?? k.yoy_periode ?? '',
       commission: Number(k.commission ?? 0),
       commissionFcn: Number(k.commissionFcn ?? k.commission_fcn ?? 0),
       commissionAgent: Number(k.commissionAgent ?? k.commission_agent ?? 0),
