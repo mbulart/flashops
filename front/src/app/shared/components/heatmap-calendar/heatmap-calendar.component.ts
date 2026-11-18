@@ -106,23 +106,23 @@ interface HeatCell {
 
       /* Plus de jours → cases plus petites */
       .heatmap-wrap[data-density='md'] {
-        --heat-cell: 1.75rem;
-        --heat-gap: 0.22rem;
+        --heat-cell: 2.275rem;
+        --heat-gap: 0.286rem;
       }
       .heatmap-wrap[data-density='md'] .heatmap-day {
-        font-size: 0.55rem;
+        font-size: 0.715rem;
       }
       .heatmap-wrap[data-density='sm'] {
-        --heat-cell: 1.15rem;
-        --heat-gap: 0.16rem;
+        --heat-cell: 1.495rem;
+        --heat-gap: 0.208rem;
       }
       .heatmap-wrap[data-density='sm'] .heatmap-cell {
         border-radius: 3px;
         padding: 0;
       }
       .heatmap-wrap[data-density='xs'] {
-        --heat-cell: 0.85rem;
-        --heat-gap: 0.12rem;
+        --heat-cell: 1.105rem;
+        --heat-gap: 0.156rem;
       }
       .heatmap-wrap[data-density='xs'] .heatmap-cell {
         border-radius: 2px;
