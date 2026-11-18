@@ -38,6 +38,17 @@ public final class PilotageProductRules {
   /** Prédicat SQL sur alias {@code p} de {@code pilotage.dim_produit} (listes produits). */
   static final String SQL_MPESA_ON_P = sqlMonnaieElectroniqueOn("p");
 
+  /** Recharges TELCO hors périmètre (inutiles au pilotage). */
+  static final String SQL_IGNORED_ON_P = sqlIgnoredProduit("p");
+
+  private static String sqlIgnoredProduit(String pAlias) {
+    return "(upper(btrim(coalesce("
+        + pAlias
+        + ".module, ''))) = 'TELCO' AND btrim(coalesce("
+        + pAlias
+        + ".produit, '')) IN ('0902828912', '0997822855'))";
+  }
+
   /**
    * Restreint les lignes d’agrégat au domaine UI via {@code dim_produit} (pas seulement {@code
    * g.domaine}, qui peut diverger).
@@ -184,6 +195,7 @@ public final class PilotageProductRules {
       if (usesDomaineParam(domaine)) {
         args.add(domaine);
       }
+      appendIgnoredOnAggregate(aggregateAlias, sql);
       return;
     }
     sql.append(" AND (");
@@ -200,6 +212,7 @@ public final class PilotageProductRules {
       }
     }
     sql.append(")");
+    appendIgnoredOnAggregate(aggregateAlias, sql);
   }
 
   static void appendDimProduitDomaines(String pAlias, List<String> domaines, StringBuilder sql) {
@@ -220,6 +233,7 @@ public final class PilotageProductRules {
           sql,
           extraProductKeys,
           transfertRestrictedToExtras);
+      appendIgnoredOnJoinedProduit(pAlias, sql);
       return;
     }
     sql.append(" AND (");
@@ -233,6 +247,20 @@ public final class PilotageProductRules {
       sql.append("(").append(stripLeadingAnd(one.toString())).append(")");
     }
     sql.append(")");
+    appendIgnoredOnJoinedProduit(pAlias, sql);
+  }
+
+  /** Hors listes et hors totaux, même si un identifiant produit est passé explicitement. */
+  static void appendIgnoredOnAggregate(String aggregateAlias, StringBuilder sql) {
+    sql.append(" AND NOT EXISTS (SELECT 1 FROM pilotage.dim_produit AS dx WHERE dx.produit_id = ")
+        .append(aggregateAlias)
+        .append(".produit_id AND ")
+        .append(sqlIgnoredProduit("dx"))
+        .append(")");
+  }
+
+  static void appendIgnoredOnJoinedProduit(String pAlias, StringBuilder sql) {
+    sql.append(" AND NOT ").append(sqlIgnoredProduit(pAlias));
   }
 
   static List<String> cleanDomaines(List<String> domaines) {

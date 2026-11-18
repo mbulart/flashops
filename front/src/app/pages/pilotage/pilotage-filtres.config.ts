@@ -183,6 +183,7 @@ export function buildPilotageProduitChoices(
   const singles: PilotageProduitChoice[] = [];
 
   for (const row of rows) {
+    if (pilotageIsProduitIgnore(row.module, row.produit)) continue;
     if (row.domaine === 'transfert') {
       if (pilotageIsMonnaieElectronique(row.module, row.produit, row.ecran)) continue;
       if (transfertBucket) {
@@ -290,10 +291,17 @@ export function pilotageProduitLabel(
   return parts.join(' · ');
 }
 
-/** Modules sans envois (retraits seulement). */
+/** Modules sans envois (retraits seulement). RIA a un écran Envois. */
 export function pilotageModuleRetraitsOnly(module: string): boolean {
   const m = (module || '').trim().toUpperCase();
-  return m === 'RIA' || m === 'MUKURU' || m === 'FLASHPAYMENT';
+  return m === 'MUKURU' || m === 'FLASHPAYMENT';
+}
+
+/** Recharges TELCO hors périmètre : absentes des listes et des calculs. */
+export function pilotageIsProduitIgnore(module: string, produit: string): boolean {
+  if ((module || '').trim().toUpperCase() !== 'TELCO') return false;
+  const key = (produit || '').trim();
+  return key === '0902828912' || key === '0997822855';
 }
 
 /** MPESA / mobile money → domaine Monnaie (pas Transferts). */
@@ -320,8 +328,9 @@ export function pilotageFilterProduitsByUiDomain<T extends { module: string; pro
   domaine: PilotageDomaine,
   rows: T[]
 ): T[] {
+  const kept = rows.filter((p) => !pilotageIsProduitIgnore(p.module, p.produit));
   if (domaine === 'transfert') {
-    return rows.filter((p) => !pilotageIsMonnaieElectronique(p.module, p.produit, p.ecran));
+    return kept.filter((p) => !pilotageIsMonnaieElectronique(p.module, p.produit, p.ecran));
   }
-  return rows;
+  return kept;
 }

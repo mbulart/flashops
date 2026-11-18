@@ -316,6 +316,11 @@ public class PilotageFiltresRepository {
               + PilotageProductRules.SQL_MPESA_ON_P
               + """
             )
+            AND NOT (
+              """
+              + PilotageProductRules.SQL_IGNORED_ON_P
+              + """
+            )
           ORDER BY module, produit, ecran
           """,
           (rs, rowNum) ->
@@ -332,6 +337,11 @@ public class PilotageFiltresRepository {
           SELECT produit_id, module, produit, ecran, coalesce(partenaire, '') AS partenaire
           FROM pilotage.dim_produit AS p
           WHERE p.produit_id <> 0
+            AND NOT (
+              """
+              + PilotageProductRules.SQL_IGNORED_ON_P
+              + """
+            )
             AND (
               p.domaine = 'monnaie'
               OR (
@@ -356,6 +366,10 @@ public class PilotageFiltresRepository {
         FROM pilotage.dim_produit
         WHERE domaine = ?
           AND produit_id <> 0
+          AND NOT (
+            upper(btrim(coalesce(module, ''))) = 'TELCO'
+            AND btrim(coalesce(produit, '')) IN ('0902828912', '0997822855')
+          )
         ORDER BY module, produit, ecran
         """,
         (rs, rowNum) ->
