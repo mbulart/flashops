@@ -33,6 +33,7 @@ interface ProvinceStat {
 }
 
 let geojsonCache: Promise<GeoJson> | null = null;
+let africaCache: Promise<GeoJson> | null = null;
 
 @Component({
   selector: 'app-rdc-province-map',
@@ -54,8 +55,18 @@ let geojsonCache: Promise<GeoJson> | null = null;
       :host-context([data-bs-theme='dark']) .rdc-map {
         background: #111827;
       }
-      :host ::ng-deep .leaflet-control-attribution {
+      :host ::ng-deep .leaflet-control-attribution,
+      :host ::ng-deep .leaflet-zoom-box {
         display: none;
+      }
+      :host ::ng-deep .leaflet-container,
+      :host ::ng-deep .leaflet-container:focus,
+      :host ::ng-deep .leaflet-container :focus,
+      :host ::ng-deep .leaflet-interactive,
+      :host ::ng-deep svg,
+      :host ::ng-deep svg *,
+      :host ::ng-deep path {
+        outline: none !important;
       }
       :host-context([data-bs-theme='dark']) ::ng-deep .leaflet-bar a {
         background: #1f2937;
@@ -86,12 +97,14 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
   private readonly http = inject(HttpClient);
   private readonly theme = inject(ThemeService);
   private map?: L.Map;
+  private africa?: L.GeoJSON;
   private layer?: L.GeoJSON;
   private byKey = new Map<string, ProvinceStat>();
 
   constructor() {
     effect(() => {
       this.theme.mode();
+      this.africa?.setStyle(() => this.africaStyle());
       this.layer?.setStyle((feature) => this.styleOf(feature));
     });
   }
@@ -103,14 +116,21 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
       attributionControl: false,
       scrollWheelZoom: true,
       doubleClickZoom: true,
+      boxZoom: false,
+      keyboard: false,
       dragging: true,
     });
     this.rebuild();
-    void this.ensureGeo().then((geo) => {
+    void Promise.all([this.ensureGeo(), this.ensureAfrica()]).then(([geo, africa]) => {
       if (!this.map) return;
+      this.africa = L.geoJSON(africa as never, {
+        interactive: false,
+        style: () => this.africaStyle(),
+      }).addTo(this.map);
       this.layer = L.geoJSON(geo as never, {
         style: (feature) => this.styleOf(feature),
         onEachFeature: (feature, layer) => {
+          layer.on('click', () => blurPath(layer));
           layer.on('mouseover', () => {
             (layer as L.Path).setStyle({ weight: 2 });
             layer
@@ -125,9 +145,9 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
           });
         },
       }).addTo(this.map);
-      const bounds = this.layer.getBounds();
+      const bounds = this.africa.getBounds();
       if (bounds.isValid()) {
-        this.map.fitBounds(bounds, { padding: [12, 12], animate: false });
+        this.map.fitBounds(bounds, { padding: [8, 8], animate: false });
       }
     });
   }
@@ -142,7 +162,19 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
   ngOnDestroy(): void {
     this.map?.remove();
     this.map = undefined;
+    this.africa = undefined;
     this.layer = undefined;
+  }
+
+  private africaStyle(): L.PathOptions {
+    const dark = this.theme.mode() === 'dark';
+    return {
+      interactive: false,
+      color: dark ? '#1f2937' : '#9ca3af',
+      weight: 0.6,
+      fillColor: dark ? '#030712' : '#b7bcc4',
+      fillOpacity: 1,
+    };
   }
 
   private rebuild(): void {
@@ -203,19 +235,38 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
   }
 
   private ensureGeo(): Promise<GeoJson> {
-    if (!geojsonCache) {
-      geojsonCache = new Promise((resolve, reject) => {
-        this.http.get<GeoJson>('/rdc-provinces.geojson').subscribe({
-          next: (data) => resolve(data),
-          error: (err) => {
-            geojsonCache = null;
-            reject(err);
-          },
-        });
-      });
-    }
-    return geojsonCache;
+    return loadGeo(this.http, '/rdc-provinces.geojson', () => geojsonCache, (p) => (geojsonCache = p));
   }
+
+  private ensureAfrica(): Promise<GeoJson> {
+    return loadGeo(this.http, '/africa.geojson', () => africaCache, (p) => (africaCache = p));
+  }
+}
+
+function loadGeo(
+  http: HttpClient,
+  url: string,
+  read: () => Promise<GeoJson> | null,
+  write: (p: Promise<GeoJson> | null) => void,
+): Promise<GeoJson> {
+  const cached = read();
+  if (cached) return cached;
+  const pending = new Promise<GeoJson>((resolve, reject) => {
+    http.get<GeoJson>(url).subscribe({
+      next: (data) => resolve(data),
+      error: (err) => {
+        write(null);
+        reject(err);
+      },
+    });
+  });
+  write(pending);
+  return pending;
+}
+
+function blurPath(layer: L.Layer): void {
+  const el = (layer as L.Path).getElement();
+  if (el instanceof SVGElement) el.blur();
 }
 
 function fold(value: string): string {
