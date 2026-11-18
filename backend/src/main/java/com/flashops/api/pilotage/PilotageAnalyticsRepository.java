@@ -809,8 +809,8 @@ public class PilotageAnalyticsRepository {
   }
 
   /**
-   * Activité agrégée par province d’agence ({@code dim_agence.province}). Une ligne par province,
-   * sans charger les agences.
+   * Activité agrégée par province et ville d’agence. Quelques dizaines de lignes, sans charger les
+   * agences. Le service rapproche ensuite les anciens libellés (Katanga, Lubumbashi…) des 26 provinces.
    */
   public List<ZoneActiviteRow> loadZoneActivite(PilotageBundleQuery q) {
     try {
@@ -827,18 +827,22 @@ public class PilotageAnalyticsRepository {
   private List<ZoneActiviteRow> loadGrainZoneActivite(PilotageBundleQuery q) {
     Grain grain = resolveAgenceRankGrain(q);
     var scoped = PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
+    String province = cleaned("d", "province");
+    String ville = cleaned("d", "ville");
     String body =
         scoped.fromAndWhere()
-            + """
-             AND g.agence_id <> 0
-             AND coalesce(btrim(d.province), '') <> ''
-             GROUP BY btrim(d.province)
-            """;
+            + " AND g.agence_id <> 0 AND "
+            + province
+            + " <> '' GROUP BY "
+            + province
+            + ", "
+            + ville;
     String sql =
-        """
-        SELECT coalesce(nullif(btrim(d.province), ''), '') AS code,
-               coalesce(sum(g.nb), 0)::bigint AS nb,
-               """
+        "SELECT "
+            + province
+            + " AS code, "
+            + ville
+            + " AS ville, coalesce(sum(g.nb), 0)::bigint AS nb, "
             + PilotageMoneySql.sum("g", "montant", q)
             + " AS montant "
             + body;
@@ -855,23 +859,37 @@ public class PilotageAnalyticsRepository {
               " INNER JOIN pilotage.dim_agence AS ag ON ag.agence_id = f.agence_id WHERE ");
     }
     String ag = scoped.agenceAlias() != null ? scoped.agenceAlias() : "ag";
+    String province = cleaned(ag, "province");
+    String ville = cleaned(ag, "ville");
     String sql =
-        "SELECT coalesce(nullif(btrim("
-            + ag
-            + ".province), ''), '') AS code, count(*)::bigint AS nb, "
+        "SELECT "
+            + province
+            + " AS code, "
+            + ville
+            + " AS ville, count(*)::bigint AS nb, "
             + PilotageMoneySql.sum("f", "montant", q)
             + " AS montant "
             + from
-            + " AND f.agence_id <> 0 AND coalesce(btrim("
-            + ag
-            + ".province), '') <> '' GROUP BY btrim("
-            + ag
-            + ".province)";
+            + " AND f.agence_id <> 0 AND "
+            + province
+            + " <> '' GROUP BY "
+            + province
+            + ", "
+            + ville;
     return jdbc.query(sql, this::mapZoneActivite, scoped.args().toArray());
   }
 
+  private static String cleaned(String alias, String column) {
+    return "btrim(replace(replace(coalesce("
+        + alias
+        + "."
+        + column
+        + ", ''), chr(13), ''), chr(10), ''))";
+  }
+
   private ZoneActiviteRow mapZoneActivite(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
-    return new ZoneActiviteRow(rs.getString("code"), rs.getLong("nb"), rs.getBigDecimal("montant"));
+    return new ZoneActiviteRow(
+        rs.getString("code"), rs.getString("ville"), rs.getLong("nb"), rs.getBigDecimal("montant"));
   }
 
   /**
@@ -2006,7 +2024,7 @@ public class PilotageAnalyticsRepository {
       BigDecimal commissionAgent,
       BigDecimal commissionFcnAgent) {}
 
-  public record ZoneActiviteRow(String code, long nb, BigDecimal montant) {}
+  public record ZoneActiviteRow(String code, String ville, long nb, BigDecimal montant) {}
 
   public record AgenceGeoRow(
       int agenceId,

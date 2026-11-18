@@ -6,7 +6,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -30,9 +33,24 @@ public class PilotageAnalyticsService {
   public List<PilotageDtos.ZoneActivite> zoneActivite(PilotageBundleQuery q) {
     q = withMoneyContext(q);
     validate(q);
-    return repository.loadZoneActivite(q).stream()
-        .map(r -> new PilotageDtos.ZoneActivite(r.code(), r.nb(), r.montant()))
-        .toList();
+    Map<String, TotauxProvince> byName = new LinkedHashMap<>();
+    for (PilotageAnalyticsRepository.ZoneActiviteRow row : repository.loadZoneActivite(q)) {
+      String name = ProvinceGeoNames.resolve(row.code(), row.ville());
+      if (name == null) {
+        continue;
+      }
+      BigDecimal montant = row.montant() == null ? BigDecimal.ZERO : row.montant();
+      byName.merge(name, new TotauxProvince(row.nb(), montant), TotauxProvince::plus);
+    }
+    List<PilotageDtos.ZoneActivite> out = new ArrayList<>(byName.size());
+    byName.forEach((name, tot) -> out.add(new PilotageDtos.ZoneActivite(name, tot.volume(), tot.montant())));
+    return out;
+  }
+
+  private record TotauxProvince(long volume, BigDecimal montant) {
+    private TotauxProvince plus(TotauxProvince other) {
+      return new TotauxProvince(volume + other.volume, montant.add(other.montant));
+    }
   }
 
   public PilotageDtos.BundleResponse bundle(PilotageBundleQuery q) {
