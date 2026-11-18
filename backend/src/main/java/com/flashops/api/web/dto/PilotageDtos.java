@@ -160,6 +160,9 @@ public final class PilotageDtos {
   public record CouloirClassementPage(
       long total, int page, int size, java.util.List<CouloirRank> items) {}
 
+  public record ZoneActivite(
+      String code, long volume, java.math.BigDecimal montant) {}
+
   public record AgenceGeoPoint(
       int agenceId,
       @JsonProperty("code_agence") String codeAgence,

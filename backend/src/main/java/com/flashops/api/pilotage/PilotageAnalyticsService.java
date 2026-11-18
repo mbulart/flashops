@@ -27,6 +27,14 @@ public class PilotageAnalyticsService {
     this.appParameters = appParameters;
   }
 
+  public List<PilotageDtos.ZoneActivite> zoneActivite(PilotageBundleQuery q) {
+    q = withMoneyContext(q);
+    validate(q);
+    return repository.loadZoneActivite(q).stream()
+        .map(r -> new PilotageDtos.ZoneActivite(r.code(), r.nb(), r.montant()))
+        .toList();
+  }
+
   public PilotageDtos.BundleResponse bundle(PilotageBundleQuery q) {
     q = withMoneyContext(q);
     validate(q);

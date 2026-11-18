@@ -809,6 +809,74 @@ public class PilotageAnalyticsRepository {
   }
 
   /**
+   * Activité agrégée par code zone (quelques dizaines de lignes max). Sert la carte provinces
+   * sans charger les agences.
+   */
+  public List<ZoneActiviteRow> loadZoneActivite(PilotageBundleQuery q) {
+    try {
+      if (q.couloirOnFact()) {
+        return loadFaitZoneActivite(q);
+      }
+      return loadGrainZoneActivite(q);
+    } catch (DataAccessException ex) {
+      log.error("Activité zones pilotage indisponible", ex);
+      return List.of();
+    }
+  }
+
+  private List<ZoneActiviteRow> loadGrainZoneActivite(PilotageBundleQuery q) {
+    Grain grain = resolveAgenceRankGrain(q);
+    var scoped = PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
+    String body =
+        withAgenceGeo(scoped.fromAndWhere(), "d")
+            + """
+             AND g.agence_id <> 0
+             AND coalesce(btrim(zn.code), '') <> ''
+             GROUP BY zn.code
+            """;
+    String sql =
+        """
+        SELECT coalesce(nullif(btrim(zn.code), ''), '') AS code,
+               coalesce(sum(g.nb), 0)::bigint AS nb,
+               """
+            + PilotageMoneySql.sum("g", "montant", q)
+            + " AS montant "
+            + body;
+    return jdbc.query(sql, this::mapZoneActivite, scoped.args().toArray());
+  }
+
+  private List<ZoneActiviteRow> loadFaitZoneActivite(PilotageBundleQuery q) {
+    var scoped = PilotageSqlScope.buildFait(jdbc, q);
+    String from = scoped.fromAndWhere();
+    if (scoped.agenceAlias() == null) {
+      from =
+          from.replaceFirst(
+              " WHERE ",
+              " INNER JOIN pilotage.dim_agence AS ag ON ag.agence_id = f.agence_id WHERE ");
+    }
+    String ag = scoped.agenceAlias() != null ? scoped.agenceAlias() : "ag";
+    from = withAgenceGeo(from, ag);
+    String sql =
+        """
+        SELECT coalesce(nullif(btrim(zn.code), ''), '') AS code,
+               count(*)::bigint AS nb,
+               """
+            + PilotageMoneySql.sum("f", "montant", q)
+            + " AS montant "
+            + from
+            + """
+             AND f.agence_id <> 0
+             AND coalesce(btrim(zn.code), '') <> ''
+             GROUP BY zn.code
+            """;
+    return jdbc.query(sql, this::mapZoneActivite, scoped.args().toArray());
+  }
+
+  private ZoneActiviteRow mapZoneActivite(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+    return new ZoneActiviteRow(rs.getString("code"), rs.getLong("nb"), rs.getBigDecimal("montant"));
+  }
+
+  /**
    * Agences du périmètre avec coordonnées valides (carte). Tri montant DESC, plafond {@code limit}.
    */
   public List<AgenceGeoRow> loadGeoAgences(PilotageBundleQuery q, int limit) {
@@ -1939,6 +2007,8 @@ public class PilotageAnalyticsRepository {
       BigDecimal commissionFcn,
       BigDecimal commissionAgent,
       BigDecimal commissionFcnAgent) {}
+
+  public record ZoneActiviteRow(String code, long nb, BigDecimal montant) {}
 
   public record AgenceGeoRow(
       int agenceId,

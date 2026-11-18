@@ -8,6 +8,12 @@ export interface PilotageDomaineOption {
   label: string;
 }
 
+export interface PilotageZoneActivite {
+  code: string;
+  volume: number;
+  montant: number;
+}
+
 export interface PilotageMeta {
   domaines: PilotageDomaineOption[];
   devises: string[];

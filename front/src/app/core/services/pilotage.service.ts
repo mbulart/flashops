@@ -1,6 +1,6 @@
 import { HttpClient, HttpEventType, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { catchError, filter, map, tap } from 'rxjs';
+import { catchError, filter, map, tap, timeout } from 'rxjs';
 import { GeoReferentielService } from './geo-referentiel.service';
 import { Commune, Pays, Province, Territoire, Ville } from '../models/api.models';
 import {
@@ -33,6 +33,7 @@ import {
   PilotageTransactionDetail,
   PilotageTransactionListItem,
   PilotageTransactionsPage,
+  PilotageZoneActivite,
 } from '../models/pilotage.models';
 import { RuntimeConfigService } from './runtime-config.service';
 import { pilotageFilterProduitsByUiDomain } from '../../pages/pilotage/pilotage-filtres.config';
@@ -49,6 +50,24 @@ export class PilotageService {
 
   loadMeta() {
     return this.http.get<{ data: PilotageMeta }>(`${this.baseUrl}/meta`).pipe(map((r) => r.data));
+  }
+
+  /** Agrégat par code zone — une requête légère, plafond 4 s. */
+  loadZoneActivite(criteria: PilotageCriteria) {
+    return this.http
+      .get<{ data: PilotageZoneActivite[] }>(`${this.baseUrl}/zones-activite`, {
+        params: this.criteriaParams(criteria),
+      })
+      .pipe(
+        timeout(4000),
+        map((r) =>
+          (r.data ?? []).map((row) => ({
+            code: (row.code ?? '').trim(),
+            volume: Number(row.volume ?? 0),
+            montant: Number(row.montant ?? 0),
+          }))
+        )
+      );
   }
 
   loadFiltres(domaine: PilotageDomaine) {

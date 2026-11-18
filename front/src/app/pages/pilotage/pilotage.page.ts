@@ -41,6 +41,7 @@ import {
   PilotageJourFiltre,
   PilotageLocationLabels,
   PilotageReseauRef,
+  PilotageZoneActivite,
 } from '../../core/models/pilotage.models';
 import { AppSettingsService } from '../../core/services/app-settings.service';
 import { PilotageService } from '../../core/services/pilotage.service';
@@ -48,6 +49,7 @@ import { ThemeService } from '../../core/services/theme.service';
 import { ToastService } from '../../core/services/toast.service';
 import { HeatmapCalendarComponent } from '../../shared/components/heatmap-calendar/heatmap-calendar.component';
 import { GeoMapComponent } from '../../shared/components/geo-map/geo-map.component';
+import { RdcProvinceMapComponent } from './rdc-province-map.component';
 import type { HeatMetric, MapMetric } from '../../shared/utils/heat-scale.utils';
 import { PilotageAgencySelectComponent } from './components/pilotage-agency-select.component';
 import { PilotageAgencyModalComponent } from './components/pilotage-agency-modal.component';
@@ -107,6 +109,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
     EmptyStateComponent,
     HeatmapCalendarComponent,
     GeoMapComponent,
+    RdcProvinceMapComponent,
   ],
   template: `
     @if (openedAgency(); as agency) {
@@ -818,6 +821,39 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 />
               }
             </app-section-card>
+
+            <app-section-card
+              title="Provinces"
+              subtitle="26 provinces · surbrillance selon l’activité des zones"
+            >
+              <div actions class="pilotage-chart-toolbar">
+                <div class="btn-group btn-group-sm pilotage-chart-toggle" role="group" aria-label="Métrique provinces">
+                  <button
+                    type="button"
+                    class="btn"
+                    [class.btn-primary]="provinceMetric() === 'value'"
+                    [class.btn-outline-secondary]="provinceMetric() !== 'value'"
+                    (click)="provinceMetric.set('value')"
+                  >
+                    Montant
+                  </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    [class.btn-primary]="provinceMetric() === 'volume'"
+                    [class.btn-outline-secondary]="provinceMetric() !== 'volume'"
+                    (click)="provinceMetric.set('volume')"
+                  >
+                    Volume
+                  </button>
+                </div>
+              </div>
+              <app-rdc-province-map
+                [zones]="zoneActivite()"
+                [metric]="provinceMetric()"
+                [devise]="provinceDevise()"
+              />
+            </app-section-card>
           </div>
 
           <app-section-card [title]="rankingTitle()" [subtitle]="rankingSubtitle()">
@@ -1371,6 +1407,8 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   readonly productMetric = signal<'montant' | 'volume'>('montant');
   readonly heatmapMetric = signal<HeatMetric>('value');
   readonly mapMetric = signal<MapMetric>('value');
+  readonly provinceMetric = signal<HeatMetric>('value');
+  readonly zoneActivite = signal<PilotageZoneActivite[]>([]);
   readonly mapHeatMetric = computed((): HeatMetric => {
     const metric = this.mapMetric();
     return metric === 'presence' ? 'value' : metric;
@@ -2597,6 +2635,20 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
       });
   }
 
+  provinceDevise(): string {
+    const c = this.criteria();
+    if (!c) return 'USD';
+    const list = c.devises?.length ? c.devises : c.devise ? [c.devise] : [];
+    return this.displayDevise(list);
+  }
+
+  private refreshZoneActivite(c: PilotageCriteria): void {
+    this.pilotage.loadZoneActivite(c).subscribe({
+      next: (rows) => this.zoneActivite.set(rows),
+      error: () => this.zoneActivite.set([]),
+    });
+  }
+
   private refreshBundle(): void {
     const c = this.criteria();
     if (!c || !this.metaReady()) {
@@ -2609,6 +2661,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     }
     this.bundleLoading.set(true);
     this.bundleError.set(false);
+    this.refreshZoneActivite(c);
     this.reloadClassement({ resetPage: true });
     this.reloadCorridorClassement({ resetPage: true });
     this.pilotage.loadBundle(c).subscribe({
