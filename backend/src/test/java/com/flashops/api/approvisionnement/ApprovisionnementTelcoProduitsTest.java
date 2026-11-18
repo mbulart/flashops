@@ -1,5 +1,6 @@
 package com.flashops.api.approvisionnement;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,5 +26,14 @@ class ApprovisionnementTelcoProduitsTest {
     assertFalse(ApprovisionnementTelcoProduits.matches("TELCO", "0997822855", "RechargesUnites"));
     assertFalse(ApprovisionnementTelcoProduits.matches("TELCO", "TELCO", "RechargesMega"));
     assertFalse(ApprovisionnementTelcoProduits.matches("WU", "AIRTEL", "RechargesUnites"));
+  }
+
+  @Test
+  void regroupeLesTroisEcransSousLeMemeOperateur() {
+    assertEquals("VODACOM", ApprovisionnementTelcoProduits.operateur("VODACOM"));
+    assertEquals("VODACOM", ApprovisionnementTelcoProduits.operateur("VODACOMDATA"));
+    assertEquals("AIRTEL", ApprovisionnementTelcoProduits.operateur("AIRTELDATA"));
+    assertEquals("AFRICELL", ApprovisionnementTelcoProduits.operateur("AFRICELL"));
+    assertEquals("ORANGE", ApprovisionnementTelcoProduits.operateur("ORANGE"));
   }
 }

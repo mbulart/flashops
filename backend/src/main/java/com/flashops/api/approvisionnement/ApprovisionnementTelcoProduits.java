@@ -27,6 +27,15 @@ public final class ApprovisionnementTelcoProduits {
     return false;
   }
 
+  /** VODACOM, VODACOMDATA et VODACOM DATA → VODACOM. */
+  public static String operateur(String produit) {
+    String compact = compact(produit);
+    if (compact.endsWith("DATA") && compact.length() > 4) {
+      return compact.substring(0, compact.length() - 4);
+    }
+    return compact;
+  }
+
   public static String ecranLabel(String ecran) {
     String screen = ecran == null ? "" : ecran.trim();
     return switch (screen) {

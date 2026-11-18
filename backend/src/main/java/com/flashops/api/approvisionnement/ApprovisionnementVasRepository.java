@@ -110,7 +110,18 @@ public class ApprovisionnementVasRepository {
 
   /** Somme des montants réussis, CDF et FCN convertis en USD (1 USD = N). */
   public TotauxPeriode totauxConsommationUsd(
-      int produitId, Periode periode, BigDecimal tauxCdf, BigDecimal tauxFcn) {
+      java.util.Collection<Integer> produitIds, Periode periode, BigDecimal tauxCdf, BigDecimal tauxFcn) {
+    var ids = produitIds == null ? java.util.List.<Integer>of() : produitIds.stream().filter(id -> id != null && id > 0).distinct().toList();
+    if (ids.isEmpty()) {
+      return new TotauxPeriode(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+    String placeholders = String.join(",", ids.stream().map(id -> "?").toList());
+    var args = new java.util.ArrayList<Object>();
+    args.add(tauxFcn);
+    args.add(tauxCdf);
+    args.addAll(ids);
+    args.add(Date.valueOf(periode.debut()));
+    args.add(Date.valueOf(periode.fin()));
     return jdbc.query(
             """
             SELECT coalesce(sum(
@@ -122,7 +133,10 @@ public class ApprovisionnementVasRepository {
             ), 0) AS montant
             FROM pilotage.agg_operation_jour AS g
             JOIN pilotage.dim_devise AS d ON d.devise_id = g.devise_id
-            WHERE g.produit_id = ?
+            WHERE g.produit_id IN ("""
+                + placeholders
+                + """
+            )
               AND g.statut_uniforme = 'Succès'
               AND g.jour BETWEEN ? AND ?
             """,
@@ -130,11 +144,7 @@ public class ApprovisionnementVasRepository {
               BigDecimal montant = scale(rs.getBigDecimal("montant"));
               return new TotauxPeriode(BigDecimal.ZERO, BigDecimal.ZERO, montant);
             },
-            tauxFcn,
-            tauxCdf,
-            produitId,
-            Date.valueOf(periode.debut()),
-            Date.valueOf(periode.fin()))
+            args.toArray())
         .stream()
         .findFirst()
         .orElse(new TotauxPeriode(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));

@@ -29,8 +29,11 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -60,8 +63,10 @@ public class ApprovisionnementVasService {
   @Transactional(readOnly = true)
   public List<ProduitOption> listProduits(String canal) {
     String normalized = normalizeCanal(canal);
-    var rows = "telco".equals(normalized) ? repo.listProduitsTelco() : repo.listProduitsMobileMoney();
-    return rows.stream().map(p -> toProduitOption(p, normalized)).toList();
+    if ("telco".equals(normalized)) {
+      return listTelcoGroupes();
+    }
+    return repo.listProduitsMobileMoney().stream().map(p -> toProduitOption(p, normalized)).toList();
   }
 
   @Transactional(readOnly = true)
@@ -97,20 +102,20 @@ public class ApprovisionnementVasService {
   }
 
   private ConsommationCalculView calculerTelco(int produitId, LocalDate dateReference) {
-    ProduitMmRow produit =
-        repo.findProduitTelco(produitId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "produit invalide"));
+    List<ProduitMmRow> groupe = groupeTelco(produitId);
+    ProduitMmRow produit = ancreTelco(groupe);
     var periodes = ApprovisionnementPeriodes.resolve(dateReference);
     BigDecimal[] taux = requireTauxUsd();
-    TotauxPeriode j1 = repo.totauxConsommationUsd(produitId, periodes.j1(), taux[0], taux[1]);
-    TotauxPeriode j2 = repo.totauxConsommationUsd(produitId, periodes.j2(), taux[0], taux[1]);
+    var ids = groupe.stream().map(ProduitMmRow::produitId).toList();
+    TotauxPeriode j1 = repo.totauxConsommationUsd(ids, periodes.j1(), taux[0], taux[1]);
+    TotauxPeriode j2 = repo.totauxConsommationUsd(ids, periodes.j2(), taux[0], taux[1]);
     BigDecimal moyenne =
         ApprovisionnementVasRepository.moyenne(j1.consommation(), j2.consommation(), dateReference);
     return new ConsommationCalculView(
         dateReference,
         produit.produitId(),
         produit.produit(),
-        produitLibelle(produit, "telco"),
+        ApprovisionnementTelcoProduits.operateur(produit.produit()),
         "USD",
         toPeriodeView(periodes.j1(), j1),
         toPeriodeView(periodes.j2(), j2),
@@ -616,22 +621,26 @@ public class ApprovisionnementVasService {
         continue;
       }
       String devise = telco ? "USD" : normalizeDevise(line.devise());
-      String key = line.produitId() + "|" + devise;
+      List<ProduitMmRow> groupe = telco ? groupeTelco(line.produitId()) : List.of();
+      ProduitMmRow produit =
+          telco
+              ? ancreTelco(groupe)
+              : repo.findProduitMobileMoney(line.produitId())
+                  .orElseThrow(
+                      () -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "produit invalide"));
+      String key = produit.produitId() + "|" + devise;
       if (!seen.add(key)) {
         throw new ResponseStatusException(
             HttpStatus.BAD_REQUEST, "produit et devise déjà présents dans la demande");
       }
-      ProduitMmRow produit =
-          (telco ? repo.findProduitTelco(line.produitId()) : repo.findProduitMobileMoney(line.produitId()))
-              .orElseThrow(
-                  () -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "produit invalide"));
+      var ids = telco ? groupe.stream().map(ProduitMmRow::produitId).toList() : List.<Integer>of();
       TotauxPeriode j1 =
           telco
-              ? repo.totauxConsommationUsd(line.produitId(), periodes.j1(), taux[0], taux[1])
+              ? repo.totauxConsommationUsd(ids, periodes.j1(), taux[0], taux[1])
               : repo.totauxConsommation(line.produitId(), devise, periodes.j1());
       TotauxPeriode j2 =
           telco
-              ? repo.totauxConsommationUsd(line.produitId(), periodes.j2(), taux[0], taux[1])
+              ? repo.totauxConsommationUsd(ids, periodes.j2(), taux[0], taux[1])
               : repo.totauxConsommation(line.produitId(), devise, periodes.j2());
       BigDecimal moyenne =
           ApprovisionnementVasRepository.moyenne(j1.consommation(), j2.consommation(), dateRef);
@@ -643,8 +652,8 @@ public class ApprovisionnementVasService {
           demandeId,
           new LigneInsert(
               produit.produitId(),
-              produit.produit(),
-              produitLibelle(produit, canal),
+              telco ? ApprovisionnementTelcoProduits.operateur(produit.produit()) : produit.produit(),
+              telco ? ApprovisionnementTelcoProduits.operateur(produit.produit()) : produitLibelle(produit, canal),
               devise,
               dateRef,
               periodes.j1().debut(),
@@ -772,6 +781,51 @@ public class ApprovisionnementVasService {
         r.utilisateurId(),
         r.commentaire(),
         r.creeLe());
+  }
+
+  private List<ProduitOption> listTelcoGroupes() {
+    Map<String, List<ProduitMmRow>> groups = new LinkedHashMap<>();
+    for (ProduitMmRow row : repo.listProduitsTelco()) {
+      groups.computeIfAbsent(ApprovisionnementTelcoProduits.operateur(row.produit()), key -> new ArrayList<>())
+          .add(row);
+    }
+    return groups.entrySet().stream()
+        .sorted(Map.Entry.comparingByKey())
+        .map(
+            entry -> {
+              ProduitMmRow anchor = ancreTelco(entry.getValue());
+              return new ProduitOption(
+                  anchor.produitId(),
+                  entry.getKey(),
+                  entry.getKey(),
+                  anchor.module(),
+                  "",
+                  "");
+            })
+        .toList();
+  }
+
+  private List<ProduitMmRow> groupeTelco(int produitId) {
+    ProduitMmRow one =
+        repo.findProduitTelco(produitId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "produit invalide"));
+    String key = ApprovisionnementTelcoProduits.operateur(one.produit());
+    List<ProduitMmRow> groupe =
+        repo.listProduitsTelco().stream()
+            .filter(row -> key.equals(ApprovisionnementTelcoProduits.operateur(row.produit())))
+            .toList();
+    if (groupe.isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "produit invalide");
+    }
+    return groupe;
+  }
+
+  private static ProduitMmRow ancreTelco(List<ProduitMmRow> groupe) {
+    return groupe.stream()
+        .min(
+            Comparator.comparingInt((ProduitMmRow row) -> "RechargesUnites".equals(row.ecran()) ? 0 : 1)
+                .thenComparingInt(ProduitMmRow::produitId))
+        .orElseThrow();
   }
 
   private ProduitOption toProduitOption(ProduitMmRow p, String canal) {

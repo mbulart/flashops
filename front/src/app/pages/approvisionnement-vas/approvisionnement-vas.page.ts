@@ -72,7 +72,7 @@ interface SoldeSeuilRow {
     @if (mode() === 'list') {
       <app-page-header
         [title]="canal() === 'telco' ? 'Approvisionnement TELCO' : 'Approvisionnement MOMO'"
-        [subtitle]="canal() === 'telco' ? 'Recharges unités, data et mega, converties en USD' : 'Demandes de recharge Mobile Money'"
+        [subtitle]="canal() === 'telco' ? 'Un opérateur regroupe unités, data et mega. USD, CDF et FCN sont additionnés en USD.' : 'Demandes de recharge Mobile Money'"
       >
         <div actions>
           @if (canExport()) {
@@ -1138,19 +1138,10 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   }
 
   labelProduit(p: ApprovisionnementVasProduit): string {
-    const raw = (p.operateur || p.produit_libelle || '').replace(/DATA$/i, '');
-    const brand = pilotagePartenaireLabel(raw || p.operateur);
-    const name = /DATA$/i.test(p.operateur || '') ? `${brand} Data` : brand;
-    if (this.canal() !== 'telco') return pilotagePartenaireLabel(p.produit_libelle || p.operateur);
-    const screen =
-      p.ecran === 'RechargesUnites'
-        ? 'Recharges unités'
-        : p.ecran === 'RechargesMega'
-          ? 'Recharges mega'
-          : p.ecran === 'MobileMoney'
-            ? 'Mobile money'
-            : '';
-    return screen ? `${name} · ${screen}` : name;
+    if (this.canal() === 'telco') {
+      return pilotagePartenaireLabel((p.operateur || p.produit_libelle || '').replace(/DATA$/i, ''));
+    }
+    return pilotagePartenaireLabel(p.produit_libelle || p.operateur);
   }
 
   statutLabel(statut: string): string {
