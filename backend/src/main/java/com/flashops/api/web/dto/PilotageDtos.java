@@ -160,6 +160,7 @@ public final class PilotageDtos {
   public record CouloirClassementPage(
       long total, int page, int size, java.util.List<CouloirRank> items) {}
 
+  /** {@code code} = libellé province de l’agence ({@code dim_agence.province}). */
   public record ZoneActivite(
       String code, long volume, java.math.BigDecimal montant) {}
 

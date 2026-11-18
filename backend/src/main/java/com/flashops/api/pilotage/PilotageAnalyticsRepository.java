@@ -809,7 +809,7 @@ public class PilotageAnalyticsRepository {
   }
 
   /**
-   * Activité agrégée par code zone (quelques dizaines de lignes max). Sert la carte provinces
+   * Activité agrégée par province d’agence ({@code dim_agence.province}). Une ligne par province,
    * sans charger les agences.
    */
   public List<ZoneActiviteRow> loadZoneActivite(PilotageBundleQuery q) {
@@ -819,7 +819,7 @@ public class PilotageAnalyticsRepository {
       }
       return loadGrainZoneActivite(q);
     } catch (DataAccessException ex) {
-      log.error("Activité zones pilotage indisponible", ex);
+      log.error("Activité provinces pilotage indisponible", ex);
       return List.of();
     }
   }
@@ -828,15 +828,15 @@ public class PilotageAnalyticsRepository {
     Grain grain = resolveAgenceRankGrain(q);
     var scoped = PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
     String body =
-        withAgenceGeo(scoped.fromAndWhere(), "d")
+        scoped.fromAndWhere()
             + """
              AND g.agence_id <> 0
-             AND coalesce(btrim(zn.code), '') <> ''
-             GROUP BY zn.code
+             AND coalesce(btrim(d.province), '') <> ''
+             GROUP BY btrim(d.province)
             """;
     String sql =
         """
-        SELECT coalesce(nullif(btrim(zn.code), ''), '') AS code,
+        SELECT coalesce(nullif(btrim(d.province), ''), '') AS code,
                coalesce(sum(g.nb), 0)::bigint AS nb,
                """
             + PilotageMoneySql.sum("g", "montant", q)
@@ -855,20 +855,18 @@ public class PilotageAnalyticsRepository {
               " INNER JOIN pilotage.dim_agence AS ag ON ag.agence_id = f.agence_id WHERE ");
     }
     String ag = scoped.agenceAlias() != null ? scoped.agenceAlias() : "ag";
-    from = withAgenceGeo(from, ag);
     String sql =
-        """
-        SELECT coalesce(nullif(btrim(zn.code), ''), '') AS code,
-               count(*)::bigint AS nb,
-               """
+        "SELECT coalesce(nullif(btrim("
+            + ag
+            + ".province), ''), '') AS code, count(*)::bigint AS nb, "
             + PilotageMoneySql.sum("f", "montant", q)
             + " AS montant "
             + from
-            + """
-             AND f.agence_id <> 0
-             AND coalesce(btrim(zn.code), '') <> ''
-             GROUP BY zn.code
-            """;
+            + " AND f.agence_id <> 0 AND coalesce(btrim("
+            + ag
+            + ".province), '') <> '' GROUP BY btrim("
+            + ag
+            + ".province)";
     return jdbc.query(sql, this::mapZoneActivite, scoped.args().toArray());
   }
 

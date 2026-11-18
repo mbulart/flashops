@@ -7,33 +7,29 @@ import {
   OnDestroy,
   SimpleChanges,
   ViewChild,
+  effect,
   inject,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import * as L from 'leaflet';
 import { PilotageZoneActivite } from '../../core/models/pilotage.models';
+import { ThemeService } from '../../core/services/theme.service';
 import { HeatMetric, heatIntensity, mapHeatColor, mapHeatStrokeColor } from '../../shared/utils/heat-scale.utils';
 
-/** Codes zone réseau → noms GeoJSON (shapeName). */
-const ZONE_PROVINCES: Record<string, string[]> = {
-  EST_1: ['North Kivu', 'Ituri'],
-  EST_2: ['South Kivu', 'Maniema'],
-  KATANGA: ['Haut-Katanga', 'Haut-Lomami', 'Lualaba', 'Tanganyika'],
-  KONGO_CENTRAL: ['Kongo-Central'],
-  KIN_1: ['Kinshasa'],
-  KIN_2: ['Kinshasa'],
-  KIN_3: ['Kinshasa'],
-  KIN_4: ['Kinshasa'],
+/** Variantes d’orthographe → clé GeoJSON pliée. */
+const ALIASES: Record<string, string> = {
+  nordkivu: 'northkivu',
+  sudkivu: 'southkivu',
+  hautuele: 'upperuele',
+  basuele: 'loweruele',
+  kasaicentral: 'centralkasai',
+  kasaicentre: 'centralkasai',
 };
-
-const IDLE = '#f3f4f6';
-const IDLE_STROKE = '#d1d5db';
 
 interface ProvinceStat {
   name: string;
   volume: number;
   montant: number;
-  zones: string[];
 }
 
 let geojsonCache: Promise<GeoJson> | null = null;
@@ -51,12 +47,31 @@ let geojsonCache: Promise<GeoJson> | null = null;
       .rdc-map {
         height: 100%;
         width: 100%;
-        background: #fafafa;
+        background: #f4f4f5;
         border-radius: 0.75rem;
         overflow: hidden;
       }
+      :host-context([data-bs-theme='dark']) .rdc-map {
+        background: #111827;
+      }
       :host ::ng-deep .leaflet-control-attribution {
         display: none;
+      }
+      :host-context([data-bs-theme='dark']) ::ng-deep .leaflet-bar a {
+        background: #1f2937;
+        color: #e5e7eb;
+        border-color: #374151;
+      }
+      :host-context([data-bs-theme='dark']) ::ng-deep .leaflet-bar a:hover {
+        background: #374151;
+      }
+      :host-context([data-bs-theme='dark']) ::ng-deep .leaflet-tooltip {
+        background: #1f2937;
+        color: #f9fafb;
+        border: 1px solid #374151;
+      }
+      :host-context([data-bs-theme='dark']) ::ng-deep .leaflet-tooltip-top:before {
+        border-top-color: #1f2937;
       }
     `,
   ],
@@ -69,16 +84,25 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
   @ViewChild('host', { static: true }) hostRef!: ElementRef<HTMLDivElement>;
 
   private readonly http = inject(HttpClient);
+  private readonly theme = inject(ThemeService);
   private map?: L.Map;
   private layer?: L.GeoJSON;
-  private byName = new Map<string, ProvinceStat>();
+  private byKey = new Map<string, ProvinceStat>();
+
+  constructor() {
+    effect(() => {
+      this.theme.mode();
+      this.layer?.setStyle((feature) => this.styleOf(feature));
+    });
+  }
 
   ngAfterViewInit(): void {
     const host = this.hostRef.nativeElement;
     this.map = L.map(host, {
-      zoomControl: false,
+      zoomControl: true,
       attributionControl: false,
-      scrollWheelZoom: false,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
       dragging: true,
     });
     this.rebuild();
@@ -89,9 +113,11 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
         onEachFeature: (feature, layer) => {
           layer.on('mouseover', () => {
             (layer as L.Path).setStyle({ weight: 2 });
-            layer.bindTooltip(this.tooltip(String(feature?.properties?.['name'] ?? '')), {
-              sticky: true,
-            }).openTooltip();
+            layer
+              .bindTooltip(this.tooltip(String(feature?.properties?.['name'] ?? '')), {
+                sticky: true,
+              })
+              .openTooltip();
           });
           layer.on('mouseout', () => {
             (layer as L.Path).setStyle(this.styleOf(feature));
@@ -122,26 +148,25 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
   private rebuild(): void {
     const acc = new Map<string, ProvinceStat>();
     for (const row of this.zones) {
-      const code = (row.code || '').trim().toUpperCase();
-      const provinces = ZONE_PROVINCES[code];
-      if (!provinces) continue;
-      for (const name of provinces) {
-        const cur = acc.get(name) ?? { name, volume: 0, montant: 0, zones: [] };
-        cur.volume += Number(row.volume) || 0;
-        cur.montant += Number(row.montant) || 0;
-        if (!cur.zones.includes(code)) cur.zones.push(code);
-        acc.set(name, cur);
-      }
+      const key = geoKey(row.code || '');
+      if (!key) continue;
+      const cur = acc.get(key) ?? { name: row.code.trim(), volume: 0, montant: 0 };
+      cur.volume += Number(row.volume) || 0;
+      cur.montant += Number(row.montant) || 0;
+      acc.set(key, cur);
     }
-    this.byName = acc;
+    this.byKey = acc;
   }
 
   private styleOf(feature: GeoJsonFeature | undefined): L.PathOptions {
-    const name = String(feature?.properties?.['name'] ?? '');
-    const stat = this.byName.get(name);
+    const dark = this.theme.mode() === 'dark';
+    const idle = dark ? '#1f2937' : '#e5e7eb';
+    const idleStroke = dark ? '#4b5563' : '#9ca3af';
+    const key = geoKey(String(feature?.properties?.['name'] ?? ''));
+    const stat = this.byKey.get(key);
     const value = stat ? (this.metric === 'volume' ? stat.volume : stat.montant) : 0;
     if (!stat || value <= 0) {
-      return { color: IDLE_STROKE, weight: 1, fillColor: IDLE, fillOpacity: 1 };
+      return { color: idleStroke, weight: 1, fillColor: idle, fillOpacity: 1 };
     }
     const { min, max } = this.extent();
     const intensity = heatIntensity(value, min, max);
@@ -156,7 +181,7 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
   private extent(): { min: number; max: number } {
     let min = Number.POSITIVE_INFINITY;
     let max = 0;
-    for (const stat of this.byName.values()) {
+    for (const stat of this.byKey.values()) {
       const value = this.metric === 'volume' ? stat.volume : stat.montant;
       if (value <= 0) continue;
       min = Math.min(min, value);
@@ -166,13 +191,15 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
     return { min, max };
   }
 
-  private tooltip(name: string): string {
-    const stat = this.byName.get(name);
-    const label = provinceLabel(name);
-    if (!stat) return `${label}<br>Aucune activité sur les zones mappées`;
+  private tooltip(geoName: string): string {
+    const label = provinceLabel(geoName);
+    const stat = this.byKey.get(geoKey(geoName));
+    if (!stat || (stat.volume <= 0 && stat.montant <= 0)) {
+      return `${label}<br>Aucune activité`;
+    }
     const vol = stat.volume.toLocaleString('fr-FR');
     const mont = stat.montant.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
-    return `${label}<br>${vol} op. · ${mont} ${this.devise}<br>${stat.zones.join(', ')}`;
+    return `${label}<br>Volume ${vol}<br>Valeur ${mont} ${this.devise}`;
   }
 
   private ensureGeo(): Promise<GeoJson> {
@@ -191,11 +218,29 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
   }
 }
 
+function fold(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function geoKey(value: string): string {
+  const folded = fold(value);
+  return ALIASES[folded] ?? folded;
+}
+
 function provinceLabel(geoName: string): string {
   const labels: Record<string, string> = {
     'North Kivu': 'Nord-Kivu',
     'South Kivu': 'Sud-Kivu',
     'Kongo-Central': 'Kongo Central',
+    'Upper Uele': 'Haut-Uélé',
+    'Lower Uele': 'Bas-Uélé',
+    'Central Kasai': 'Kasaï-Central',
+    'Kasai-Oriental': 'Kasaï-Oriental',
+    'Mai-Ndombe': 'Maï-Ndombe',
   };
   return labels[geoName] ?? geoName;
 }

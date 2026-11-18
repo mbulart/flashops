@@ -2014,7 +2014,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
 
   agencyMapSubtitle(): string {
     if (this.mapMetric() === 'provinces') {
-      return '26 provinces · surbrillance selon l’activité des zones';
+      return 'Totaux volume et valeur des agences, regroupés par province';
     }
     const n = this.agencyMapPoints().length;
     if (this.mapMetric() === 'presence') {
