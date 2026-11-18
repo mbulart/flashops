@@ -119,6 +119,9 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
       boxZoom: false,
       keyboard: false,
       dragging: true,
+      zoomSnap: 0.25,
+      zoomDelta: 0.25,
+      wheelPxPerZoomLevel: 180,
     });
     this.rebuild();
     void Promise.all([this.ensureGeo(), this.ensureAfrica()]).then(([geo, africa]) => {
@@ -145,11 +148,19 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
           });
         },
       }).addTo(this.map);
-      const bounds = this.africa.getBounds();
-      if (bounds.isValid()) {
-        this.map.fitBounds(bounds, { padding: [8, 8], animate: false });
-      }
+      this.fitRdc();
+      requestAnimationFrame(() => this.fitRdc());
     });
+  }
+
+  /** La RDC entière, calée sur la carte. L’Afrique reste visible seulement autour. */
+  private fitRdc(): void {
+    if (!this.map || !this.layer) return;
+    this.map.invalidateSize();
+    const bounds = this.layer.getBounds();
+    if (bounds.isValid()) {
+      this.map.fitBounds(bounds, { padding: [2, 2], animate: false });
+    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
