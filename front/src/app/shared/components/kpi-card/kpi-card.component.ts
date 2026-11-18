@@ -37,8 +37,15 @@ import { SkeletonComponent } from '../skeleton/skeleton.component';
               {{ delta > 0 ? '+' : '' }}{{ delta | number: '1.1-1' }}%
             </span>
           }
-          @if (metaLine) {
-            <span class="kpi-card-meta" [attr.title]="metaLine">{{ metaLine }}</span>
+          @if (amountsLine || hint) {
+            <span class="kpi-card-meta" [attr.title]="metaTitle || metaLine">
+              @if (amountsLine) {
+                <span class="kpi-card-meta-line">{{ amountsLine }}</span>
+              }
+              @if (hint) {
+                <span class="kpi-card-meta-line">{{ hint }}</span>
+              }
+            </span>
           }
         } @else if (growthMetric) {
           @if (delta != null) {
@@ -103,13 +110,19 @@ export class KpiCardComponent {
   @Input() referenceLabel = '';
   @Input() ecartLabel = '';
   @Input() hint = '';
+  /** Infobulle du détail (montants exacts). */
+  @Input() metaTitle = '';
   @Input() delta: number | null = null;
   @Input() deltaHint = '';
   @Input() icon = 'bi bi-graph-up';
   @Input() variant: 'primary' | 'secondary' | 'muted' = 'primary';
   @Input() loading = false;
 
+  get amountsLine(): string {
+    return [this.referenceLabel, this.ecartLabel].filter(Boolean).join(' · ');
+  }
+
   get metaLine(): string {
-    return [this.referenceLabel, this.ecartLabel, this.hint].filter(Boolean).join(' · ');
+    return [this.amountsLine, this.hint].filter(Boolean).join(' · ');
   }
 }

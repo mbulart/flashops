@@ -553,9 +553,10 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 [valueTitle]="formatValeurFr(b.kpis.montant, b.devise)"
                 [statut]="b.kpis.momStatut"
                 [delta]="b.kpis.momMontantPct"
-                [referenceLabel]="compareAmountLabel(b.kpis.momReference, b.devise)"
-                [ecartLabel]="compareEcartLabel(b.kpis.momEcart, b.devise)"
+                [referenceLabel]="compareAmountLabel(b.kpis.momReference)"
+                [ecartLabel]="compareEcartLabel(b.kpis.momEcart)"
                 [hint]="compactPeriode(b.kpis.momPeriode)"
+                [metaTitle]="compareDetailTitle(b.kpis.momReference, b.kpis.momEcart, b.kpis.momPeriode, b.devise)"
                 [loading]="false"
               />
               <app-kpi-card
@@ -566,9 +567,10 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 [valueTitle]="formatValeurFr(b.kpis.montant, b.devise)"
                 [statut]="b.kpis.yoyStatut"
                 [delta]="b.kpis.yoyMontantPct"
-                [referenceLabel]="compareAmountLabel(b.kpis.yoyReference, b.devise)"
-                [ecartLabel]="compareEcartLabel(b.kpis.yoyEcart, b.devise)"
+                [referenceLabel]="compareAmountLabel(b.kpis.yoyReference)"
+                [ecartLabel]="compareEcartLabel(b.kpis.yoyEcart)"
                 [hint]="compactPeriode(b.kpis.yoyPeriode)"
+                [metaTitle]="compareDetailTitle(b.kpis.yoyReference, b.kpis.yoyEcart, b.kpis.yoyPeriode, b.devise)"
                 [loading]="false"
               />
             }
@@ -2543,9 +2545,39 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     return formatNumberFr(n);
   }
 
-  compareAmountLabel(amount: number | null, devise: string): string {
+  compareAmountLabel(amount: number | null): string {
     if (amount == null) return '';
-    return `vs ${this.formatPilotageMontant(amount, devise)}`;
+    return `vs ${this.compactMontant(amount)}`;
+  }
+
+  compareDetailTitle(
+    reference: number | null,
+    ecart: number | null,
+    periode: string,
+    devise: string
+  ): string {
+    const parts: string[] = [];
+    if (reference != null) parts.push(`Référence ${formatValeurFr(reference, devise)}`);
+    if (ecart != null) {
+      const sign = ecart > 0 ? '+' : ecart < 0 ? '−' : '';
+      parts.push(`Écart ${sign}${formatValeurFr(Math.abs(ecart), devise)}`);
+    }
+    if (periode) parts.push(periode);
+    return parts.join(' · ');
+  }
+
+  /** Montant court, sans devise : 32,42 M, 413 k. */
+  private compactMontant(amount: number): string {
+    const abs = Math.abs(amount);
+    let body: string;
+    if (abs >= 1_000_000) {
+      body = formatNumberFr(abs, { notation: 'compact', maximumFractionDigits: 2 });
+    } else if (abs >= 1_000) {
+      body = `${formatNumberFr(abs / 1_000, { maximumFractionDigits: abs >= 100_000 ? 0 : 1 })} k`;
+    } else {
+      body = formatNumberFr(abs, { maximumFractionDigits: abs >= 100 ? 0 : 2 });
+    }
+    return amount < 0 ? `−${body}` : body;
   }
 
   compactPeriode(label: string): string {
@@ -2560,9 +2592,9 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     return `${d1} ${month1} ${year1} – ${d2} ${month2} ${year2}`;
   }
 
-  compareEcartLabel(amount: number | null, devise: string): string {
+  compareEcartLabel(amount: number | null): string {
     if (amount == null) return '';
-    const text = this.formatPilotageMontant(Math.abs(amount), devise);
+    const text = this.compactMontant(Math.abs(amount));
     if (amount > 0) return `+${text}`;
     if (amount < 0) return `−${text}`;
     return text;

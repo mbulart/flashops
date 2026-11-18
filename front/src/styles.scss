@@ -785,10 +785,14 @@ fieldset:disabled .btn-primary {
 
 .kpi-card-meta {
   display: block;
-  margin-top: 0.12rem;
+  margin-top: 0.1rem;
   font-size: 0.68rem;
   line-height: 1.15;
   color: var(--text-muted);
+}
+
+.kpi-card-meta-line {
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
