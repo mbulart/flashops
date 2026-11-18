@@ -764,7 +764,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
             </app-section-card>
 
             <app-section-card
-              title="Carte des agences"
+              [title]="mapMetric() === 'provinces' ? 'Provinces' : 'Carte des agences'"
               [subtitle]="agencyMapSubtitle()"
             >
               <div actions class="pilotage-chart-toolbar">
@@ -799,9 +799,25 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                   >
                     Présence
                   </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    [class.btn-primary]="mapMetric() === 'provinces'"
+                    [class.btn-outline-secondary]="mapMetric() !== 'provinces'"
+                    [disabled]="bundleLoading()"
+                    (click)="mapMetric.set('provinces')"
+                  >
+                    Provinces
+                  </button>
                 </div>
               </div>
-              @if (bundleLoading() || (mapMetric() === 'presence' && !allGeoReady())) {
+              @if (mapMetric() === 'provinces') {
+                <app-rdc-province-map
+                  [zones]="zoneActivite()"
+                  metric="value"
+                  [devise]="provinceDevise()"
+                />
+              } @else if (bundleLoading() || (mapMetric() === 'presence' && !allGeoReady())) {
                 <div class="pilotage-section-skeleton">
                   <app-skeleton type="chart" height="18rem" />
                 </div>
@@ -820,39 +836,6 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                   message="Aucune agence du périmètre n’a de latitude / longitude."
                 />
               }
-            </app-section-card>
-
-            <app-section-card
-              title="Provinces"
-              subtitle="26 provinces · surbrillance selon l’activité des zones"
-            >
-              <div actions class="pilotage-chart-toolbar">
-                <div class="btn-group btn-group-sm pilotage-chart-toggle" role="group" aria-label="Métrique provinces">
-                  <button
-                    type="button"
-                    class="btn"
-                    [class.btn-primary]="provinceMetric() === 'value'"
-                    [class.btn-outline-secondary]="provinceMetric() !== 'value'"
-                    (click)="provinceMetric.set('value')"
-                  >
-                    Montant
-                  </button>
-                  <button
-                    type="button"
-                    class="btn"
-                    [class.btn-primary]="provinceMetric() === 'volume'"
-                    [class.btn-outline-secondary]="provinceMetric() !== 'volume'"
-                    (click)="provinceMetric.set('volume')"
-                  >
-                    Volume
-                  </button>
-                </div>
-              </div>
-              <app-rdc-province-map
-                [zones]="zoneActivite()"
-                [metric]="provinceMetric()"
-                [devise]="provinceDevise()"
-              />
             </app-section-card>
           </div>
 
@@ -1407,11 +1390,10 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   readonly productMetric = signal<'montant' | 'volume'>('montant');
   readonly heatmapMetric = signal<HeatMetric>('value');
   readonly mapMetric = signal<MapMetric>('value');
-  readonly provinceMetric = signal<HeatMetric>('value');
   readonly zoneActivite = signal<PilotageZoneActivite[]>([]);
   readonly mapHeatMetric = computed((): HeatMetric => {
     const metric = this.mapMetric();
-    return metric === 'presence' ? 'value' : metric;
+    return metric === 'value' || metric === 'volume' ? metric : 'value';
   });
   readonly allGeoAgences = signal<PilotageAgenceGeoPoint[]>([]);
   readonly allGeoReady = signal(false);
@@ -2031,6 +2013,9 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   }
 
   agencyMapSubtitle(): string {
+    if (this.mapMetric() === 'provinces') {
+      return '26 provinces · surbrillance selon l’activité des zones';
+    }
     const n = this.agencyMapPoints().length;
     if (this.mapMetric() === 'presence') {
       if (!n) return 'Toutes les agences géolocalisées du périmètre';

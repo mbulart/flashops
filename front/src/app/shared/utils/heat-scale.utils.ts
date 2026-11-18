@@ -6,7 +6,7 @@ const HEAT_STOPS: [number, number, number][] = [
 ];
 
 export type HeatMetric = 'value' | 'volume';
-export type MapMetric = HeatMetric | 'presence';
+export type MapMetric = HeatMetric | 'presence' | 'provinces';
 
 export function heatColor(intensity: number): string {
   const x = Math.min(1, Math.max(0, intensity));
