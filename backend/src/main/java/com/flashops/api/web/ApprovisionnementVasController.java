@@ -46,9 +46,9 @@ public class ApprovisionnementVasController {
   }
 
   @GetMapping("/produits")
-  public Map<String, List<ProduitOption>> produits() {
+  public Map<String, List<ProduitOption>> produits(@RequestParam(required = false) String canal) {
     requireAny(AuthSupport.currentUserId(), "approvisionnement.vas.lire");
-    return Map.of("data", service.listProduits());
+    return Map.of("data", service.listProduits(canal));
   }
 
   @GetMapping("/consommations")
@@ -56,15 +56,16 @@ public class ApprovisionnementVasController {
       @RequestParam("produit_id") int produitId,
       @RequestParam String devise,
       @RequestParam("date_reference") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-          LocalDate dateReference) {
+          LocalDate dateReference,
+      @RequestParam(required = false) String canal) {
     requireAny(AuthSupport.currentUserId(), "approvisionnement.vas.lire");
-    return Map.of("data", service.calculer(produitId, devise, dateReference));
+    return Map.of("data", service.calculer(produitId, devise, dateReference, canal));
   }
 
   @GetMapping("/dashboard")
-  public Map<String, DashboardKpiView> dashboard() {
+  public Map<String, DashboardKpiView> dashboard(@RequestParam(required = false) String canal) {
     requireAny(AuthSupport.currentUserId(), "approvisionnement.vas.lire");
-    return Map.of("data", service.dashboard());
+    return Map.of("data", service.dashboard(canal));
   }
 
   @GetMapping("/soldes")
@@ -127,9 +128,10 @@ public class ApprovisionnementVasController {
   @GetMapping
   public Map<String, List<DemandeListItem>> list(
       @RequestParam(required = false) String statut,
-      @RequestParam(defaultValue = "100") int limit) {
+      @RequestParam(defaultValue = "100") int limit,
+      @RequestParam(required = false) String canal) {
     requireAny(AuthSupport.currentUserId(), "approvisionnement.vas.lire");
-    return Map.of("data", service.list(statut, limit));
+    return Map.of("data", service.list(statut, limit, canal));
   }
 
   @GetMapping("/{id}")

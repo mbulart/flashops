@@ -65,8 +65,15 @@ interface SoldeSeuilRow {
     PdfPreviewModalComponent,
   ],
   template: `
+    <nav class="appro-switch" aria-label="Type de demande">
+      <a routerLink="/approvisionnement-vas/momo" [class.is-active]="canal() === 'momo'">Appro. MOMO</a>
+      <a routerLink="/approvisionnement-vas/telco" [class.is-active]="canal() === 'telco'">Appro. TELCO</a>
+    </nav>
     @if (mode() === 'list') {
-      <app-page-header title="Approvisionnement VAS" subtitle="Demandes de recharge Mobile Money">
+      <app-page-header
+        [title]="canal() === 'telco' ? 'Approvisionnement TELCO' : 'Approvisionnement MOMO'"
+        [subtitle]="canal() === 'telco' ? 'Recharges unités, data et mega, converties en USD' : 'Demandes de recharge Mobile Money'"
+      >
         <div actions>
           @if (canExport()) {
             <button type="button" class="btn btn-outline-secondary btn-sm me-2" (click)="exportDemandesExcel()" [disabled]="exporting()">
@@ -77,7 +84,7 @@ interface SoldeSeuilRow {
             </button>
           }
           @if (canCreate()) {
-            <a class="btn btn-primary btn-sm" routerLink="/approvisionnement-vas/nouvelle">
+            <a class="btn btn-primary btn-sm" [routerLink]="['/approvisionnement-vas', canal(), 'nouvelle']">
               <i class="bi bi-plus-lg me-1"></i>Nouvelle demande
             </a>
           }
@@ -88,9 +95,11 @@ interface SoldeSeuilRow {
         <div class="col-6 col-lg-3">
           <app-kpi-card label="Proposé USD" [value]="formatAmount(kpi()?.total_propose_usd)" icon="bi bi-currency-dollar" [loading]="loadingList()" />
         </div>
-        <div class="col-6 col-lg-3">
-          <app-kpi-card label="Proposé CDF" [value]="formatAmount(kpi()?.total_propose_cdf)" icon="bi bi-cash-stack" [loading]="loadingList()" />
-        </div>
+        @if (canal() === 'momo') {
+          <div class="col-6 col-lg-3">
+            <app-kpi-card label="Proposé CDF" [value]="formatAmount(kpi()?.total_propose_cdf)" icon="bi bi-cash-stack" [loading]="loadingList()" />
+          </div>
+        }
         <div class="col-6 col-lg-3">
           <app-kpi-card label="Payé USD" [value]="formatAmount(kpi()?.total_paye_usd)" icon="bi bi-check2-circle" variant="primary" [loading]="loadingList()" />
         </div>
@@ -117,8 +126,8 @@ interface SoldeSeuilRow {
         </div>
         <div class="col-6 col-lg-3">
           <app-kpi-card
-            label="Validé USD / CDF"
-            [value]="kpi() ? formatAmount(kpi()!.total_valide_usd) + ' / ' + formatAmount(kpi()!.total_valide_cdf) : '—'"
+            [label]="canal() === 'telco' ? 'Validé USD' : 'Validé USD / CDF'"
+            [value]="kpi() ? (canal() === 'telco' ? formatAmount(kpi()!.total_valide_usd) : formatAmount(kpi()!.total_valide_usd) + ' / ' + formatAmount(kpi()!.total_valide_cdf)) : '—'"
             icon="bi bi-shield-check"
             [loading]="loadingList()"
           />
@@ -168,7 +177,9 @@ interface SoldeSeuilRow {
                 <label class="form-label form-label-sm">Devise</label>
                 <select class="form-select form-select-sm" [(ngModel)]="soldeDevise">
                   <option value="USD">USD</option>
-                  <option value="CDF">CDF</option>
+                  @if (canal() === 'momo') {
+                    <option value="CDF">CDF</option>
+                  }
                 </select>
               </div>
               <div class="col-md-2">
@@ -199,7 +210,7 @@ interface SoldeSeuilRow {
       <app-section-card title="Demandes">
         @if (canCreate()) {
           <div actions>
-            <a class="btn btn-primary btn-sm" routerLink="/approvisionnement-vas/nouvelle">
+            <a class="btn btn-primary btn-sm" [routerLink]="['/approvisionnement-vas', canal(), 'nouvelle']">
               <i class="bi bi-plus-lg me-1"></i>Nouvelle demande
             </a>
           </div>
@@ -334,10 +345,10 @@ interface SoldeSeuilRow {
     } @else {
       <app-page-header
         [title]="demandeId() ? 'Demande #' + demandeId() : 'Nouvelle demande'"
-        subtitle="Consommations J-1 / J-2 calculées automatiquement (Mobile Money)"
+        [subtitle]="canal() === 'telco' ? 'Consommations J-1 / J-2 en USD (CDF et FCN convertis)' : 'Consommations J-1 / J-2 calculées automatiquement (Mobile Money)'"
       >
         <div actions>
-          <a class="btn btn-outline-secondary btn-sm" routerLink="/approvisionnement-vas">Retour</a>
+          <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/approvisionnement-vas', canal()]">Retour</a>
         </div>
       </app-page-header>
 
@@ -449,16 +460,20 @@ interface SoldeSeuilRow {
                           }
                         </td>
                         <td style="min-width: 5.5rem">
-                          <select
-                            class="form-select form-select-sm appro-input"
-                            [name]="'dev-' + line.key"
-                            [(ngModel)]="line.devise"
-                            (ngModelChange)="refreshLine(line)"
-                            [disabled]="!canEditContent()"
-                          >
-                            <option value="USD">USD</option>
-                            <option value="CDF">CDF</option>
-                          </select>
+                          @if (canal() === 'telco') {
+                            <span class="badge text-bg-light border">USD</span>
+                          } @else {
+                            <select
+                              class="form-select form-select-sm appro-input"
+                              [name]="'dev-' + line.key"
+                              [(ngModel)]="line.devise"
+                              (ngModelChange)="refreshLine(line)"
+                              [disabled]="!canEditContent()"
+                            >
+                              <option value="USD">USD</option>
+                              <option value="CDF">CDF</option>
+                            </select>
+                          }
                         </td>
                         <td class="text-end mono">
                           @if (line.loading) {
@@ -735,6 +750,28 @@ interface SoldeSeuilRow {
     .hist-badge.text-bg-secondary-subtle {
       font-weight: 600;
     }
+    .appro-switch {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 0.85rem;
+    }
+    .appro-switch a {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35rem 0.8rem;
+      border-radius: 999px;
+      border: 1px solid var(--bs-border-color);
+      color: var(--bs-secondary-color);
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 600;
+      background: var(--bs-body-bg);
+    }
+    .appro-switch a.is-active {
+      color: #fff;
+      background: var(--bs-primary);
+      border-color: var(--bs-primary);
+    }
   `,
 })
 export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
@@ -754,6 +791,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   readonly demandes = signal<ApprovisionnementVasDemandeListItem[]>([]);
   readonly produits = signal<ApprovisionnementVasProduit[]>([]);
   readonly lignes = signal<ApprovisionnementVasLigneForm[]>([]);
+  readonly canal = signal<'momo' | 'telco'>('momo');
   readonly historique = signal<ApprovisionnementVasHistorique[]>([]);
   readonly paiements = signal<ApprovisionnementVasPaiement[]>([]);
   readonly kpi = signal<ApprovisionnementVasDashboard | null>(null);
@@ -942,7 +980,8 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
         });
       }
     }
-    return [...map.values()]
+    const ids = new Set(this.produitsList().map((p) => p.produit_id));
+    return [...map.values()].filter((row) => ids.has(row.produit_id))
       .map((row) => {
         let niveau: SoldeSeuilRow['niveau'] = 'ok';
         if (row.solde != null && row.seuil_critique != null && row.solde <= row.seuil_critique) {
@@ -1099,7 +1138,19 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   }
 
   labelProduit(p: ApprovisionnementVasProduit): string {
-    return pilotagePartenaireLabel(p.produit_libelle || p.operateur);
+    const raw = (p.operateur || p.produit_libelle || '').replace(/DATA$/i, '');
+    const brand = pilotagePartenaireLabel(raw || p.operateur);
+    const name = /DATA$/i.test(p.operateur || '') ? `${brand} Data` : brand;
+    if (this.canal() !== 'telco') return pilotagePartenaireLabel(p.produit_libelle || p.operateur);
+    const screen =
+      p.ecran === 'RechargesUnites'
+        ? 'Recharges unités'
+        : p.ecran === 'RechargesMega'
+          ? 'Recharges mega'
+          : p.ecran === 'MobileMoney'
+            ? 'Mobile money'
+            : '';
+    return screen ? `${name} · ${screen}` : name;
   }
 
   statutLabel(statut: string): string {
@@ -1152,7 +1203,8 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   onProduitChange(line: ApprovisionnementVasLigneForm): void {
     const p = this.produits().find((x) => x.produit_id === line.produit_id);
     line.operateur = p?.operateur ?? '';
-    line.produit_libelle = p?.produit_libelle ?? '';
+    line.produit_libelle = p ? this.labelProduit(p) : '';
+    if (this.canal() === 'telco') line.devise = 'USD';
     void this.refreshLine(line);
   }
 
@@ -1170,7 +1222,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
     this.lignes.update((rows) => [...rows]);
     try {
       const calc = await firstValueFrom(
-        this.api.calculerConsommation(line.produit_id, line.devise, this.dateReference)
+        this.api.calculerConsommation(line.produit_id, this.canal() === 'telco' ? 'USD' : line.devise, this.dateReference, this.canal())
       );
       line.operateur = calc.operateur;
       line.produit_libelle = calc.produit_libelle;
@@ -1207,9 +1259,10 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
         date_reference: this.dateReference,
         statut: this.demandeId() ? this.statut : 'brouillon',
         commentaire: this.commentaire?.trim() || null,
+        canal: this.canal(),
         lignes: this.lignes().map((l) => ({
           produit_id: l.produit_id!,
-          devise: l.devise,
+          devise: this.canal() === 'telco' ? 'USD' : l.devise,
           libelle_solde: l.libelle_solde?.trim() || 'Solde à 08h',
           solde_08h: l.solde_08h,
           montant_propose: l.montant_propose,
@@ -1420,15 +1473,16 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
     this.loadingList.set(true);
     try {
       const [demandes, kpi, alertes, produits] = await Promise.all([
-        firstValueFrom(this.api.list(100, this.filtreStatut || undefined)),
-        firstValueFrom(this.api.dashboard()),
+        firstValueFrom(this.api.list(100, this.filtreStatut || undefined, this.canal())),
+        firstValueFrom(this.api.dashboard(this.canal())),
         firstValueFrom(this.api.alertesSoldes()).catch(() => [] as ApprovisionnementVasSoldeAlerte[]),
-        firstValueFrom(this.api.produits()).catch(() => [] as ApprovisionnementVasProduit[]),
+        firstValueFrom(this.api.produits(this.canal())).catch(() => [] as ApprovisionnementVasProduit[]),
       ]);
       this.demandes.set(demandes);
       this.kpi.set(kpi);
-      this.alertes.set(alertes);
       this.produitsList.set(produits);
+      const ids = new Set(produits.map((p) => p.produit_id));
+      this.alertes.set(alertes.filter((a) => ids.has(a.produit_id)));
       void this.refreshSoldesSeuils().catch(() => undefined);
     } catch {
       this.toast.error('Chargement des demandes impossible');
@@ -1439,7 +1493,9 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
 
   private async bootstrap(): Promise<void> {
     const url = this.router.url.split('?')[0];
-    if (url.endsWith('/approvisionnement-vas/nouvelle')) {
+    this.canal.set(url.includes('/approvisionnement-vas/telco') ? 'telco' : 'momo');
+    if (this.canal() === 'telco') this.soldeDevise = 'USD';
+    if (url.endsWith('/nouvelle')) {
       this.mode.set('form');
       this.demandeId.set(null);
       await this.initNewForm();
@@ -1461,7 +1517,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   private async initNewForm(): Promise<void> {
     this.loadingForm.set(true);
     try {
-      this.produits.set(await firstValueFrom(this.api.produits()));
+      this.produits.set(await firstValueFrom(this.api.produits(this.canal())));
       this.dateReference = this.todayIso();
       this.statut = 'brouillon';
       this.commentaire = '';
@@ -1480,11 +1536,17 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
     this.loadingForm.set(true);
     try {
       const [produits, demande, paiements] = await Promise.all([
-        firstValueFrom(this.api.produits()),
+        firstValueFrom(this.api.produits(this.canal())),
         firstValueFrom(this.api.get(id)),
         firstValueFrom(this.api.paiementsDemande(id)).catch(() => [] as ApprovisionnementVasPaiement[]),
       ]);
-      this.produits.set(produits);
+      const demandeCanal = demande.canal === 'telco' || demande.canal === 'momo' ? demande.canal : this.canal();
+      if (demandeCanal !== this.canal()) {
+        this.canal.set(demandeCanal);
+        this.produits.set(await firstValueFrom(this.api.produits(demandeCanal)));
+      } else {
+        this.produits.set(produits);
+      }
       this.dateReference = demande.date_reference;
       this.statut = demande.statut;
       this.commentaire = demande.commentaire ?? '';
@@ -1519,7 +1581,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
       );
     } catch {
       this.toast.error('Chargement de la demande impossible');
-      await this.router.navigate(['/approvisionnement-vas']);
+      await this.router.navigate(['/approvisionnement-vas', this.canal()]);
     } finally {
       this.loadingForm.set(false);
     }

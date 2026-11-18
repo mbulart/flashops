@@ -121,6 +121,7 @@ export interface ApprovisionnementVasDemande {
   delai_heures?: number;
   lignes: ApprovisionnementVasLigne[];
   historique?: ApprovisionnementVasHistorique[];
+  canal?: 'momo' | 'telco';
 }
 
 export interface ApprovisionnementVasDemandeListItem {
@@ -133,6 +134,7 @@ export interface ApprovisionnementVasDemandeListItem {
   en_retard?: boolean;
   total_propose_usd?: number;
   total_propose_cdf?: number;
+  canal?: 'momo' | 'telco';
 }
 
 export interface ApprovisionnementVasLigneInput {
@@ -149,6 +151,7 @@ export interface ApprovisionnementVasDemandeInput {
   commentaire?: string | null;
   statut?: ApprovisionnementVasStatut;
   lignes: ApprovisionnementVasLigneInput[];
+  canal?: 'momo' | 'telco';
 }
 
 export interface ApprovisionnementVasDashboard {

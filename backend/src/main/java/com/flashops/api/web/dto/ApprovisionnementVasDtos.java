@@ -45,7 +45,8 @@ public final class ApprovisionnementVasDtos {
       @JsonProperty("date_reference") LocalDate dateReference,
       String commentaire,
       String statut,
-      List<LigneInput> lignes) {}
+      List<LigneInput> lignes,
+      String canal) {}
 
   public record TransitionInput(String statut, String commentaire, @JsonProperty("motif_rejet") String motifRejet) {}
 
@@ -181,7 +182,8 @@ public final class ApprovisionnementVasDtos {
       @JsonProperty("en_retard") boolean enRetard,
       @JsonProperty("delai_heures") BigDecimal delaiHeures,
       List<LigneView> lignes,
-      List<HistoriqueStatutView> historique) {}
+      List<HistoriqueStatutView> historique,
+      String canal) {}
 
   public record DemandeListItem(
       Long id,
@@ -192,5 +194,6 @@ public final class ApprovisionnementVasDtos {
       @JsonProperty("soumise_le") Instant soumiseLe,
       @JsonProperty("en_retard") boolean enRetard,
       @JsonProperty("total_propose_usd") BigDecimal totalProposeUsd,
-      @JsonProperty("total_propose_cdf") BigDecimal totalProposeCdf) {}
+      @JsonProperty("total_propose_cdf") BigDecimal totalProposeCdf,
+      String canal) {}
 }

@@ -54,11 +54,28 @@ public class ApprovisionnementVasService {
 
   @Transactional(readOnly = true)
   public List<ProduitOption> listProduits() {
-    return repo.listProduitsMobileMoney().stream().map(this::toProduitOption).toList();
+    return listProduits("momo");
+  }
+
+  @Transactional(readOnly = true)
+  public List<ProduitOption> listProduits(String canal) {
+    String normalized = normalizeCanal(canal);
+    var rows = "telco".equals(normalized) ? repo.listProduitsTelco() : repo.listProduitsMobileMoney();
+    return rows.stream().map(p -> toProduitOption(p, normalized)).toList();
   }
 
   @Transactional(readOnly = true)
   public ConsommationCalculView calculer(int produitId, String devise, LocalDate dateReference) {
+    return calculer(produitId, devise, dateReference, null);
+  }
+
+  @Transactional(readOnly = true)
+  public ConsommationCalculView calculer(
+      int produitId, String devise, LocalDate dateReference, String canal) {
+    String normalized = canal == null || canal.isBlank() ? null : normalizeCanal(canal);
+    if ("telco".equals(normalized) || (normalized == null && repo.findProduitTelco(produitId).isPresent() && repo.findProduitMobileMoney(produitId).isEmpty())) {
+      return calculerTelco(produitId, dateReference);
+    }
     String devisenorm = normalizeDevise(devise);
     ProduitMmRow produit =
         repo.findProduitMobileMoney(produitId)
@@ -72,8 +89,29 @@ public class ApprovisionnementVasService {
         dateReference,
         produit.produitId(),
         produit.produit(),
-        produitLibelle(produit),
+        produitLibelle(produit, "momo"),
         devisenorm,
+        toPeriodeView(periodes.j1(), j1),
+        toPeriodeView(periodes.j2(), j2),
+        moyenne);
+  }
+
+  private ConsommationCalculView calculerTelco(int produitId, LocalDate dateReference) {
+    ProduitMmRow produit =
+        repo.findProduitTelco(produitId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "produit invalide"));
+    var periodes = ApprovisionnementPeriodes.resolve(dateReference);
+    BigDecimal[] taux = requireTauxUsd();
+    TotauxPeriode j1 = repo.totauxConsommationUsd(produitId, periodes.j1(), taux[0], taux[1]);
+    TotauxPeriode j2 = repo.totauxConsommationUsd(produitId, periodes.j2(), taux[0], taux[1]);
+    BigDecimal moyenne =
+        ApprovisionnementVasRepository.moyenne(j1.consommation(), j2.consommation(), dateReference);
+    return new ConsommationCalculView(
+        dateReference,
+        produit.produitId(),
+        produit.produit(),
+        produitLibelle(produit, "telco"),
+        "USD",
         toPeriodeView(periodes.j1(), j1),
         toPeriodeView(periodes.j2(), j2),
         moyenne);
@@ -81,11 +119,17 @@ public class ApprovisionnementVasService {
 
   @Transactional(readOnly = true)
   public List<DemandeListItem> list(String statut, int limit) {
+    return list(statut, limit, "momo");
+  }
+
+  @Transactional(readOnly = true)
+  public List<DemandeListItem> list(String statut, int limit, String canal) {
     BigDecimal delai = repo.delaiTraitementHeures();
     Instant now = Instant.now();
     String statutFilter =
         statut == null || statut.isBlank() ? null : ApprovisionnementVasStatuts.normalize(statut);
-    return repo.listDemandes(statutFilter, limit).stream()
+    String normalized = normalizeCanal(canal);
+    return repo.listDemandes(statutFilter, limit, normalized).stream()
         .map(
             r ->
                 new DemandeListItem(
@@ -97,7 +141,8 @@ public class ApprovisionnementVasService {
                     r.soumiseLe(),
                     isEnRetard(r.statut(), r.soumiseLe(), r.creeLe(), delai, now),
                     r.totalProposeUsd(),
-                    r.totalProposeCdf()))
+                    r.totalProposeCdf(),
+                    r.canal()))
         .toList();
   }
 
@@ -119,11 +164,13 @@ public class ApprovisionnementVasService {
           HttpStatus.BAD_REQUEST, "création limitée à brouillon ou soumise");
     }
     List<LigneInput> lignes = requireLignes(input);
+    String canal = normalizeCanal(input.canal());
     Instant now = Instant.now();
     long id =
-        repo.insertDemande(dateRef, ApprovisionnementVasStatuts.BROUILLON, trimToNull(input.commentaire()), actorId, now);
+        repo.insertDemande(
+            dateRef, ApprovisionnementVasStatuts.BROUILLON, trimToNull(input.commentaire()), actorId, now, canal);
     repo.insertHistorique(id, null, ApprovisionnementVasStatuts.BROUILLON, actorId, "Création", now);
-    persistLignes(id, dateRef, lignes);
+    persistLignes(id, dateRef, lignes, canal);
     if (ApprovisionnementVasStatuts.SOUMISE.equals(statut)) {
       transitionStatut(
           id,
@@ -147,7 +194,7 @@ public class ApprovisionnementVasService {
     Instant now = Instant.now();
     repo.updateDemandeContent(id, dateRef, trimToNull(input.commentaire()), actorId, now);
     repo.deleteLignes(id);
-    persistLignes(id, dateRef, lignes);
+    persistLignes(id, dateRef, lignes, normalizeCanal(existing.canal()));
     if (input.statut() != null
         && !input.statut().isBlank()
         && !ApprovisionnementVasStatuts.normalize(input.statut()).equals(existing.statut())) {
@@ -340,10 +387,8 @@ public class ApprovisionnementVasService {
 
   @Transactional
   public ReleveSoldeView createReleve(int actorId, ReleveSoldeInput input) {
-    String devise = normalizeDevise(input.devise());
-    ProduitMmRow produit =
-        repo.findProduitMobileMoney(input.produitId())
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "produit invalide"));
+    ProduitMmRow produit = requireProduit(input.produitId());
+    String devise = "telco".equals(canalOf(produit)) ? "USD" : normalizeDevise(input.devise());
     BigDecimal solde = nullableScale(input.solde());
     if (solde == null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "solde requis");
@@ -354,7 +399,7 @@ public class ApprovisionnementVasService {
         repo.insertReleveSolde(
             produit.produitId(),
             produit.produit(),
-            produitLibelle(produit),
+            produitLibelle(produit, canalOf(produit)),
             devise,
             solde,
             releveLe,
@@ -371,7 +416,7 @@ public class ApprovisionnementVasService {
                     id,
                     produit.produitId(),
                     produit.produit(),
-                    produitLibelle(produit),
+                    produitLibelle(produit, canalOf(produit)),
                     devise,
                     solde,
                     releveLe,
@@ -387,10 +432,8 @@ public class ApprovisionnementVasService {
 
   @Transactional
   public SeuilAlerteView upsertSeuil(int actorId, SeuilAlerteInput input) {
-    String devise = normalizeDevise(input.devise());
-    ProduitMmRow produit =
-        repo.findProduitMobileMoney(input.produitId())
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "produit invalide"));
+    ProduitMmRow produit = requireProduit(input.produitId());
+    String devise = "telco".equals(canalOf(produit)) ? "USD" : normalizeDevise(input.devise());
     BigDecimal attention = nullableScale(input.seuilAttention());
     BigDecimal critique = nullableScale(input.seuilCritique());
     if (attention == null || critique == null) {
@@ -400,7 +443,7 @@ public class ApprovisionnementVasService {
     repo.upsertSeuil(
         produit.produitId(),
         produit.produit(),
-        produitLibelle(produit),
+        produitLibelle(produit, canalOf(produit)),
         devise,
         attention,
         critique,
@@ -489,11 +532,17 @@ public class ApprovisionnementVasService {
 
   @Transactional(readOnly = true)
   public DashboardKpiView dashboard() {
-    DashboardAggRow agg = repo.dashboardAgg();
+    return dashboard("momo");
+  }
+
+  @Transactional(readOnly = true)
+  public DashboardKpiView dashboard(String canal) {
+    String normalized = normalizeCanal(canal);
+    DashboardAggRow agg = repo.dashboardAgg(normalized);
     BigDecimal delai = repo.delaiTraitementHeures();
     Instant now = Instant.now();
     int nbRetard = 0;
-    for (DemandeHeaderRow d : repo.listOuvertesPourDelai()) {
+    for (DemandeHeaderRow d : repo.listOuvertesPourDelai(normalized)) {
       if (isEnRetard(d.statut(), d.soumiseLe(), d.creeLe(), delai, now)) {
         nbRetard++;
       }
@@ -505,16 +554,17 @@ public class ApprovisionnementVasService {
         agg.valideCdf(),
         agg.payeUsd(),
         agg.payeCdf(),
-        repo.countByStatut(ApprovisionnementVasStatuts.BROUILLON),
+        repo.countByStatut(ApprovisionnementVasStatuts.BROUILLON, normalized),
         repo.countStatutsIn(
             List.of(
                 ApprovisionnementVasStatuts.SOUMISE,
                 ApprovisionnementVasStatuts.EN_ATTENTE_VALIDATION,
                 ApprovisionnementVasStatuts.VALIDEE,
                 ApprovisionnementVasStatuts.EN_ATTENTE_PAIEMENT,
-                ApprovisionnementVasStatuts.PARTIELLEMENT_PAYEE)),
+                ApprovisionnementVasStatuts.PARTIELLEMENT_PAYEE),
+            normalized),
         nbRetard,
-        repo.countByStatut(ApprovisionnementVasStatuts.PAYEE),
+        repo.countByStatut(ApprovisionnementVasStatuts.PAYEE, normalized),
         delai);
   }
 
@@ -556,25 +606,33 @@ public class ApprovisionnementVasService {
     }
   }
 
-  private void persistLignes(long demandeId, LocalDate dateRef, List<LigneInput> lignes) {
+  private void persistLignes(long demandeId, LocalDate dateRef, List<LigneInput> lignes, String canal) {
     Set<String> seen = new HashSet<>();
     var periodes = ApprovisionnementPeriodes.resolve(dateRef);
+    boolean telco = "telco".equals(canal);
+    BigDecimal[] taux = telco ? requireTauxUsd() : null;
     for (LigneInput line : lignes) {
       if (line == null) {
         continue;
       }
-      String devise = normalizeDevise(line.devise());
+      String devise = telco ? "USD" : normalizeDevise(line.devise());
       String key = line.produitId() + "|" + devise;
       if (!seen.add(key)) {
         throw new ResponseStatusException(
             HttpStatus.BAD_REQUEST, "produit et devise déjà présents dans la demande");
       }
       ProduitMmRow produit =
-          repo.findProduitMobileMoney(line.produitId())
+          (telco ? repo.findProduitTelco(line.produitId()) : repo.findProduitMobileMoney(line.produitId()))
               .orElseThrow(
                   () -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "produit invalide"));
-      TotauxPeriode j1 = repo.totauxConsommation(line.produitId(), devise, periodes.j1());
-      TotauxPeriode j2 = repo.totauxConsommation(line.produitId(), devise, periodes.j2());
+      TotauxPeriode j1 =
+          telco
+              ? repo.totauxConsommationUsd(line.produitId(), periodes.j1(), taux[0], taux[1])
+              : repo.totauxConsommation(line.produitId(), devise, periodes.j1());
+      TotauxPeriode j2 =
+          telco
+              ? repo.totauxConsommationUsd(line.produitId(), periodes.j2(), taux[0], taux[1])
+              : repo.totauxConsommation(line.produitId(), devise, periodes.j2());
       BigDecimal moyenne =
           ApprovisionnementVasRepository.moyenne(j1.consommation(), j2.consommation(), dateRef);
       String libelle =
@@ -586,7 +644,7 @@ public class ApprovisionnementVasService {
           new LigneInsert(
               produit.produitId(),
               produit.produit(),
-              produitLibelle(produit),
+              produitLibelle(produit, canal),
               devise,
               dateRef,
               periodes.j1().debut(),
@@ -645,7 +703,8 @@ public class ApprovisionnementVasService {
                         h.utilisateurId(),
                         h.commentaire(),
                         h.creeLe()))
-            .toList());
+            .toList(),
+        normalizeCanal(header.canal()));
   }
 
   private LigneView toLigneView(LigneRow r) {
@@ -715,9 +774,40 @@ public class ApprovisionnementVasService {
         r.creeLe());
   }
 
-  private ProduitOption toProduitOption(ProduitMmRow p) {
+  private ProduitOption toProduitOption(ProduitMmRow p, String canal) {
     return new ProduitOption(
-        p.produitId(), p.produit(), produitLibelle(p), p.module(), p.ecran(), p.partenaire());
+        p.produitId(), p.produit(), produitLibelle(p, canal), p.module(), p.ecran(), p.partenaire());
+  }
+
+  private ProduitMmRow requireProduit(int produitId) {
+    return repo.findProduitMobileMoney(produitId)
+        .or(() -> repo.findProduitTelco(produitId))
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "produit invalide"));
+  }
+
+  private static String canalOf(ProduitMmRow produit) {
+    return ApprovisionnementTelcoProduits.matches(produit.module(), produit.produit(), produit.ecran())
+        ? "telco"
+        : "momo";
+  }
+
+  private BigDecimal[] requireTauxUsd() {
+    BigDecimal[] taux = repo.tauxChangeUsd();
+    if (taux[0] == null || taux[0].compareTo(BigDecimal.ZERO) <= 0 || taux[1] == null || taux[1].compareTo(BigDecimal.ZERO) <= 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "taux USD manquant");
+    }
+    return taux;
+  }
+
+  private static String normalizeCanal(String canal) {
+    String value = canal == null ? "" : canal.trim().toLowerCase(Locale.ROOT);
+    if (value.isEmpty() || "momo".equals(value)) {
+      return "momo";
+    }
+    if ("telco".equals(value)) {
+      return "telco";
+    }
+    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "canal invalide");
   }
 
   private static ConsommationPeriodeView toPeriodeView(
@@ -745,13 +835,18 @@ public class ApprovisionnementVasService {
     return Duration.between(start, now).toMinutes() > minutes;
   }
 
-  private static String produitLibelle(ProduitMmRow p) {
+  private static String produitLibelle(ProduitMmRow p, String canal) {
     String base = p.produit() == null ? "" : p.produit().trim();
     String partenaire = p.partenaire() == null ? "" : p.partenaire().trim();
-    if (partenaire.isBlank() || partenaire.equalsIgnoreCase(base)) {
-      return base;
+    String label =
+        partenaire.isBlank() || partenaire.equalsIgnoreCase(base) ? base : base + " (" + partenaire + ")";
+    if ("telco".equals(canal)) {
+      String ecran = ApprovisionnementTelcoProduits.ecranLabel(p.ecran());
+      if (!ecran.isBlank()) {
+        return label + " · " + ecran;
+      }
     }
-    return base + " (" + partenaire + ")";
+    return label;
   }
 
   private static LocalDate requireDate(DemandeInput input) {

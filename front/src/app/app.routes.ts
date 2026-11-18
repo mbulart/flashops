@@ -36,6 +36,11 @@ export const routes: Routes = [
       },
       {
         path: 'approvisionnement-vas',
+        redirectTo: 'approvisionnement-vas/momo',
+        pathMatch: 'full',
+      },
+      {
+        path: 'approvisionnement-vas/momo',
         loadComponent: () =>
           import('./pages/approvisionnement-vas/approvisionnement-vas.page').then(
             (m) => m.ApprovisionnementVasPageComponent
@@ -43,7 +48,23 @@ export const routes: Routes = [
         canActivate: [permissionGuard('approvisionnement.vas.lire')],
       },
       {
-        path: 'approvisionnement-vas/nouvelle',
+        path: 'approvisionnement-vas/momo/nouvelle',
+        loadComponent: () =>
+          import('./pages/approvisionnement-vas/approvisionnement-vas.page').then(
+            (m) => m.ApprovisionnementVasPageComponent
+          ),
+        canActivate: [permissionGuard('approvisionnement.vas.ecrire')],
+      },
+      {
+        path: 'approvisionnement-vas/telco',
+        loadComponent: () =>
+          import('./pages/approvisionnement-vas/approvisionnement-vas.page').then(
+            (m) => m.ApprovisionnementVasPageComponent
+          ),
+        canActivate: [permissionGuard('approvisionnement.vas.lire')],
+      },
+      {
+        path: 'approvisionnement-vas/telco/nouvelle',
         loadComponent: () =>
           import('./pages/approvisionnement-vas/approvisionnement-vas.page').then(
             (m) => m.ApprovisionnementVasPageComponent

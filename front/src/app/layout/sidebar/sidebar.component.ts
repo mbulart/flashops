@@ -161,9 +161,15 @@ export class SidebarComponent implements OnInit {
           permission: 'dashboard.voir',
         },
         {
-          label: 'Approvisionnement VAS',
-          path: '/approvisionnement-vas',
-          icon: 'bi bi-wallet2',
+          label: 'Appro. MOMO',
+          path: '/approvisionnement-vas/momo',
+          icon: 'bi bi-phone',
+          permission: 'approvisionnement.vas.lire',
+        },
+        {
+          label: 'Appro. TELCO',
+          path: '/approvisionnement-vas/telco',
+          icon: 'bi bi-reception-4',
           permission: 'approvisionnement.vas.lire',
         },
       ],

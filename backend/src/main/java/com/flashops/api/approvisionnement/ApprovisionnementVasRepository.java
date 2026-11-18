@@ -37,6 +37,23 @@ public class ApprovisionnementVasRepository {
         )
       """;
 
+  private static final String SQL_PRODUIT_TELCO =
+      """
+      SELECT produit_id, module, produit, ecran, coalesce(partenaire, '') AS partenaire
+      FROM pilotage.dim_produit
+      WHERE produit_id <> 0
+        AND upper(btrim(module)) = 'TELCO'
+        AND btrim(produit) !~ '^[0-9]+$'
+        AND upper(btrim(produit)) <> 'TELCO'
+        AND (
+          btrim(ecran) = 'RechargesUnites'
+          OR (
+            btrim(ecran) IN ('RechargesMega', 'MobileMoney')
+            AND upper(regexp_replace(btrim(produit), '[\\s_-]+', '', 'g')) LIKE '%DATA%'
+          )
+        )
+      """;
+
   public List<ProduitMmRow> listProduitsMobileMoney() {
     return jdbc.query(
         SQL_PRODUIT_MM + " ORDER BY produit, partenaire",
@@ -62,6 +79,81 @@ public class ApprovisionnementVasRepository {
                     rs.getString("partenaire")),
             produitId);
     return rows.stream().findFirst();
+  }
+
+  public List<ProduitMmRow> listProduitsTelco() {
+    return jdbc.query(
+        SQL_PRODUIT_TELCO + " ORDER BY ecran, produit",
+        (rs, i) ->
+            new ProduitMmRow(
+                rs.getInt("produit_id"),
+                rs.getString("module"),
+                rs.getString("produit"),
+                rs.getString("ecran"),
+                rs.getString("partenaire")));
+  }
+
+  public Optional<ProduitMmRow> findProduitTelco(int produitId) {
+    var rows =
+        jdbc.query(
+            SQL_PRODUIT_TELCO + " AND produit_id = ?",
+            (rs, i) ->
+                new ProduitMmRow(
+                    rs.getInt("produit_id"),
+                    rs.getString("module"),
+                    rs.getString("produit"),
+                    rs.getString("ecran"),
+                    rs.getString("partenaire")),
+            produitId);
+    return rows.stream().findFirst();
+  }
+
+  /** Somme des montants réussis, CDF et FCN convertis en USD (1 USD = N). */
+  public TotauxPeriode totauxConsommationUsd(
+      int produitId, Periode periode, BigDecimal tauxCdf, BigDecimal tauxFcn) {
+    return jdbc.query(
+            """
+            SELECT coalesce(sum(
+              CASE
+                WHEN upper(btrim(d.code)) = 'USD' THEN g.montant
+                WHEN upper(btrim(d.code)) IN ('FCN', 'FC') THEN g.montant / NULLIF(?::numeric, 0)
+                ELSE g.montant / NULLIF(?::numeric, 0)
+              END
+            ), 0) AS montant
+            FROM pilotage.agg_operation_jour AS g
+            JOIN pilotage.dim_devise AS d ON d.devise_id = g.devise_id
+            WHERE g.produit_id = ?
+              AND g.statut_uniforme = 'Succès'
+              AND g.jour BETWEEN ? AND ?
+            """,
+            (rs, i) -> {
+              BigDecimal montant = scale(rs.getBigDecimal("montant"));
+              return new TotauxPeriode(BigDecimal.ZERO, BigDecimal.ZERO, montant);
+            },
+            tauxFcn,
+            tauxCdf,
+            produitId,
+            Date.valueOf(periode.debut()),
+            Date.valueOf(periode.fin()))
+        .stream()
+        .findFirst()
+        .orElse(new TotauxPeriode(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+  }
+
+  public BigDecimal[] tauxChangeUsd() {
+    return jdbc.query(
+            """
+            SELECT taux_change_usd_cdf, taux_change_usd_fcn
+            FROM parametres_application
+            WHERE id = 1
+            """,
+            (rs, i) ->
+                new BigDecimal[] {
+                  rs.getBigDecimal("taux_change_usd_cdf"), rs.getBigDecimal("taux_change_usd_fcn")
+                })
+        .stream()
+        .findFirst()
+        .orElse(new BigDecimal[] {BigDecimal.ZERO, BigDecimal.valueOf(1000)});
   }
 
   public TotauxPeriode totauxConsommation(int produitId, String devise, Periode periode) {
@@ -108,7 +200,7 @@ public class ApprovisionnementVasRepository {
     return v == null ? BigDecimal.valueOf(2) : v;
   }
 
-  public List<DemandeListRow> listDemandes(String statut, int limit) {
+  public List<DemandeListRow> listDemandes(String statut, int limit, String canal) {
     // Filtre optionnel côté Java : Postgres ne peut pas typer "? IS NULL" si le bind est null.
     String sql =
         """
@@ -117,19 +209,21 @@ public class ApprovisionnementVasRepository {
                coalesce((SELECT sum(l.montant_propose) FROM lignes_demande_approvisionnement_vas l
                          WHERE l.demande_id = d.id AND l.devise = 'USD'), 0) AS total_propose_usd,
                coalesce((SELECT sum(l.montant_propose) FROM lignes_demande_approvisionnement_vas l
-                         WHERE l.demande_id = d.id AND l.devise = 'CDF'), 0) AS total_propose_cdf
+                         WHERE l.demande_id = d.id AND l.devise = 'CDF'), 0) AS total_propose_cdf,
+               d.canal
         FROM demandes_approvisionnement_vas d
+        WHERE d.canal = ?
         """
-            + (statut == null ? "" : " WHERE d.statut = ? ")
+            + (statut == null ? "" : " AND d.statut = ? ")
             + """
         ORDER BY d.date_reference DESC, d.id DESC
         LIMIT ?
         """;
     int lim = Math.max(1, Math.min(limit, 500));
     if (statut == null) {
-      return jdbc.query(sql, DEMANDE_LIST_ROW, lim);
+      return jdbc.query(sql, DEMANDE_LIST_ROW, canal, lim);
     }
-    return jdbc.query(sql, DEMANDE_LIST_ROW, statut, lim);
+    return jdbc.query(sql, DEMANDE_LIST_ROW, canal, statut, lim);
   }
 
   public Optional<DemandeHeaderRow> findDemande(long id) {
@@ -139,7 +233,7 @@ public class ApprovisionnementVasRepository {
             SELECT id, date_reference, statut, commentaire, motif_rejet,
                    cree_par, cree_le, modifie_par, modifie_le,
                    soumise_par, soumise_le, validee_par, validee_le,
-                   rejetee_par, rejetee_le
+                   rejetee_par, rejetee_le, canal
             FROM demandes_approvisionnement_vas
             WHERE id = ?
             """,
@@ -184,7 +278,12 @@ public class ApprovisionnementVasRepository {
   }
 
   public long insertDemande(
-      LocalDate dateReference, String statut, String commentaire, Integer creePar, Instant now) {
+      LocalDate dateReference,
+      String statut,
+      String commentaire,
+      Integer creePar,
+      Instant now,
+      String canal) {
     var keys = new GeneratedKeyHolder();
     jdbc.update(
         con -> {
@@ -192,8 +291,8 @@ public class ApprovisionnementVasRepository {
               con.prepareStatement(
                   """
                   INSERT INTO demandes_approvisionnement_vas
-                    (date_reference, statut, commentaire, cree_par, cree_le, modifie_par, modifie_le)
-                  VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (date_reference, statut, commentaire, cree_par, cree_le, modifie_par, modifie_le, canal)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                   """,
                   Statement.RETURN_GENERATED_KEYS);
           ps.setDate(1, Date.valueOf(dateReference));
@@ -203,6 +302,7 @@ public class ApprovisionnementVasRepository {
           ps.setTimestamp(5, Timestamp.from(now));
           setNullableInt(ps, 6, creePar);
           ps.setTimestamp(7, Timestamp.from(now));
+          ps.setString(8, canal);
           return ps;
         },
         keys);
@@ -610,7 +710,7 @@ public class ApprovisionnementVasRepository {
     return rows.stream().findFirst();
   }
 
-  public DashboardAggRow dashboardAgg() {
+  public DashboardAggRow dashboardAgg(String canal) {
     return jdbc.query(
             """
             SELECT
@@ -623,6 +723,7 @@ public class ApprovisionnementVasRepository {
             FROM lignes_demande_approvisionnement_vas l
             JOIN demandes_approvisionnement_vas d ON d.id = l.demande_id
             WHERE d.statut <> 'annulee'
+              AND d.canal = ?
             """,
             (rs, i) ->
                 new DashboardAggRow(
@@ -631,7 +732,8 @@ public class ApprovisionnementVasRepository {
                     scale(rs.getBigDecimal("valide_usd")),
                     scale(rs.getBigDecimal("valide_cdf")),
                     scale(rs.getBigDecimal("paye_usd")),
-                    scale(rs.getBigDecimal("paye_cdf"))))
+                    scale(rs.getBigDecimal("paye_cdf"))),
+            canal)
         .stream()
         .findFirst()
         .orElse(
@@ -644,42 +746,49 @@ public class ApprovisionnementVasRepository {
                 BigDecimal.ZERO));
   }
 
-  public int countByStatut(String statut) {
+  public int countByStatut(String statut, String canal) {
     Integer n =
         jdbc.queryForObject(
-            "SELECT count(*)::int FROM demandes_approvisionnement_vas WHERE statut = ?",
+            "SELECT count(*)::int FROM demandes_approvisionnement_vas WHERE statut = ? AND canal = ?",
             Integer.class,
-            statut);
+            statut,
+            canal);
     return n == null ? 0 : n;
   }
 
-  public int countStatutsIn(List<String> statuts) {
+  public int countStatutsIn(List<String> statuts, String canal) {
     if (statuts == null || statuts.isEmpty()) {
       return 0;
     }
     String placeholders = String.join(",", statuts.stream().map(s -> "?").toList());
-    Object[] args = statuts.toArray();
+    Object[] args = new Object[statuts.size() + 1];
+    for (int i = 0; i < statuts.size(); i++) {
+      args[i] = statuts.get(i);
+    }
+    args[statuts.size()] = canal;
     Integer n =
         jdbc.queryForObject(
             "SELECT count(*)::int FROM demandes_approvisionnement_vas WHERE statut IN ("
                 + placeholders
-                + ")",
+                + ") AND canal = ?",
             Integer.class,
             args);
     return n == null ? 0 : n;
   }
 
-  public List<DemandeHeaderRow> listOuvertesPourDelai() {
+  public List<DemandeHeaderRow> listOuvertesPourDelai(String canal) {
     return jdbc.query(
         """
         SELECT id, date_reference, statut, commentaire, motif_rejet,
                cree_par, cree_le, modifie_par, modifie_le,
                soumise_par, soumise_le, validee_par, validee_le,
-               rejetee_par, rejetee_le
+               rejetee_par, rejetee_le, canal
         FROM demandes_approvisionnement_vas
         WHERE statut IN ('soumise', 'en_attente_validation', 'validee', 'en_attente_paiement', 'partiellement_payee')
+          AND canal = ?
         """,
-        DEMANDE_HEADER);
+        DEMANDE_HEADER,
+        canal);
   }
 
   public static BigDecimal scale(BigDecimal v) {
@@ -714,7 +823,8 @@ public class ApprovisionnementVasRepository {
                   ? null
                   : rs.getTimestamp("soumise_le").toInstant(),
               scale(rs.getBigDecimal("total_propose_usd")),
-              scale(rs.getBigDecimal("total_propose_cdf")));
+              scale(rs.getBigDecimal("total_propose_cdf")),
+              rs.getString("canal"));
 
   private static final RowMapper<DemandeHeaderRow> DEMANDE_HEADER =
       (rs, i) ->
@@ -739,7 +849,8 @@ public class ApprovisionnementVasRepository {
               (Integer) rs.getObject("rejetee_par"),
               rs.getTimestamp("rejetee_le") == null
                   ? null
-                  : rs.getTimestamp("rejetee_le").toInstant());
+                  : rs.getTimestamp("rejetee_le").toInstant(),
+              rs.getString("canal"));
 
   private static final RowMapper<LigneRow> LIGNE_ROW =
       (rs, i) ->
@@ -809,7 +920,8 @@ public class ApprovisionnementVasRepository {
       Instant creeLe,
       Instant soumiseLe,
       BigDecimal totalProposeUsd,
-      BigDecimal totalProposeCdf) {}
+      BigDecimal totalProposeCdf,
+      String canal) {}
 
   public record DemandeHeaderRow(
       long id,
@@ -826,7 +938,8 @@ public class ApprovisionnementVasRepository {
       Integer valideePar,
       Instant valideeLe,
       Integer rejeteePar,
-      Instant rejeteeLe) {}
+      Instant rejeteeLe,
+      String canal) {}
 
   public record LigneRow(
       long id,

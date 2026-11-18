@@ -26,30 +26,33 @@ export class ApprovisionnementVasService {
     return `${this.runtime.apiUrl}/approvisionnement-vas`;
   }
 
-  produits() {
+  produits(canal: 'momo' | 'telco' = 'momo') {
+    const params = new HttpParams().set('canal', canal);
     return this.http
-      .get<{ data: ApprovisionnementVasProduit[] }>(`${this.baseUrl}/produits`)
+      .get<{ data: ApprovisionnementVasProduit[] }>(`${this.baseUrl}/produits`, { params })
       .pipe(map((r) => r.data ?? []));
   }
 
-  calculerConsommation(produitId: number, devise: string, dateReference: string) {
+  calculerConsommation(produitId: number, devise: string, dateReference: string, canal: 'momo' | 'telco' = 'momo') {
     const params = new HttpParams()
       .set('produit_id', String(produitId))
       .set('devise', devise)
-      .set('date_reference', dateReference);
+      .set('date_reference', dateReference)
+      .set('canal', canal);
     return this.http
       .get<{ data: ApprovisionnementVasConsommation }>(`${this.baseUrl}/consommations`, { params })
       .pipe(map((r) => r.data));
   }
 
-  dashboard() {
+  dashboard(canal: 'momo' | 'telco' = 'momo') {
+    const params = new HttpParams().set('canal', canal);
     return this.http
-      .get<{ data: ApprovisionnementVasDashboard }>(`${this.baseUrl}/dashboard`)
+      .get<{ data: ApprovisionnementVasDashboard }>(`${this.baseUrl}/dashboard`, { params })
       .pipe(map((r) => r.data));
   }
 
-  list(limit = 100, statut?: string) {
-    let params = new HttpParams().set('limit', String(limit));
+  list(limit = 100, statut?: string, canal: 'momo' | 'telco' = 'momo') {
+    let params = new HttpParams().set('limit', String(limit)).set('canal', canal);
     if (statut) params = params.set('statut', statut);
     return this.http
       .get<{ data: ApprovisionnementVasDemandeListItem[] }>(this.baseUrl, { params })
