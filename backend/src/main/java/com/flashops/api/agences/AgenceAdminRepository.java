@@ -310,6 +310,16 @@ public class AgenceAdminRepository {
       where.append(" AND last_tx.derniere_tx >= (CURRENT_DATE - ?::int) ");
       args.add(q.activityDays());
     }
+    if (q.inactiveSinceDays() != null && q.inactiveSinceDays() > 0) {
+      // A eu de l'activité, puis silence depuis au moins N jours.
+      where.append(
+          """
+           AND last_tx.premiere_tx IS NOT NULL
+           AND last_tx.derniere_tx IS NOT NULL
+           AND last_tx.derniere_tx < (CURRENT_DATE - ?::int)
+          """);
+      args.add(q.inactiveSinceDays());
+    }
     if (q.statutActivites() != null && !q.statutActivites().isEmpty()) {
       List<String> clean =
           q.statutActivites().stream()

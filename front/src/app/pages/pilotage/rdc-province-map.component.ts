@@ -2,6 +2,8 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  HostBinding,
+  HostListener,
   Input,
   OnChanges,
   OnDestroy,
@@ -9,6 +11,7 @@ import {
   ViewChild,
   effect,
   inject,
+  signal,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import * as L from 'leaflet';
@@ -38,22 +41,112 @@ let africaCache: Promise<GeoJson> | null = null;
 @Component({
   selector: 'app-rdc-province-map',
   standalone: true,
-  template: `<div #host class="rdc-map"></div>`,
+  template: `
+    <div class="rdc-shell" [class.rdc-shell--expanded]="expanded()" [class.rdc-shell--fullscreen]="fullscreen()">
+      <div class="rdc-toolbar">
+        <button
+          type="button"
+          class="rdc-btn"
+          (click)="toggleExpanded($event)"
+          [attr.aria-label]="expanded() ? 'Compresser la carte' : 'Étendre la carte'"
+          [title]="expanded() ? 'Compresser' : 'Étendre'"
+        >
+          <i class="bi" [class.bi-arrows-angle-contract]="expanded()" [class.bi-arrows-angle-expand]="!expanded()"></i>
+          <span>{{ expanded() ? 'Compresser' : 'Étendre' }}</span>
+        </button>
+        <button
+          type="button"
+          class="rdc-btn"
+          (click)="toggleFullscreen($event)"
+          [attr.aria-label]="fullscreen() ? 'Quitter le plein écran' : 'Plein écran'"
+          [title]="fullscreen() ? 'Quitter (Échap)' : 'Plein écran'"
+        >
+          <i class="bi" [class.bi-fullscreen-exit]="fullscreen()" [class.bi-fullscreen]="!fullscreen()"></i>
+          <span>{{ fullscreen() ? 'Réduire' : 'Plein écran' }}</span>
+        </button>
+      </div>
+      @if (fullscreen()) {
+        <div class="rdc-fs-hint">Échap ou Réduire pour quitter</div>
+      }
+      <div #host class="rdc-map"></div>
+    </div>
+  `,
   styles: [
     `
       :host {
         display: block;
         height: 22rem;
+        transition: height 0.2s ease;
+      }
+      :host.rdc-host--expanded:not(.rdc-host--fullscreen) {
+        height: 36rem;
+      }
+      :host.rdc-host--fullscreen {
+        height: 0;
+      }
+      .rdc-shell {
+        position: relative;
+        height: 100%;
+        width: 100%;
+      }
+      .rdc-shell--fullscreen {
+        position: fixed;
+        inset: 0;
+        z-index: 2100;
+        height: 100% !important;
+        background: var(--card-bg, #0f1115);
+        padding: 0.75rem;
+      }
+      .rdc-toolbar {
+        position: absolute;
+        top: 0.65rem;
+        right: 0.65rem;
+        z-index: 1000;
+        display: flex;
+        gap: 0.35rem;
+      }
+      .rdc-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.65rem;
+        border: 1px solid color-mix(in srgb, var(--card-border, #ccc) 80%, transparent);
+        border-radius: 0.4rem;
+        background: color-mix(in srgb, var(--card-bg, #fff) 92%, transparent);
+        color: inherit;
+        font-size: 0.8rem;
+        font-weight: 600;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+        cursor: pointer;
+      }
+      .rdc-btn:hover {
+        filter: brightness(1.05);
+      }
+      .rdc-fs-hint {
+        position: absolute;
+        top: 0.75rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+        padding: 0.25rem 0.65rem;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--card-bg, #fff) 88%, transparent);
+        font-size: 0.75rem;
+        color: var(--bs-secondary-color, #6c757d);
+        pointer-events: none;
       }
       .rdc-map {
         height: 100%;
         width: 100%;
-        background: #f4f4f5;
+        background: #e8eaed;
         border-radius: 0.75rem;
         overflow: hidden;
       }
+      .rdc-shell--fullscreen .rdc-map {
+        border-radius: 0.4rem;
+      }
       :host-context([data-bs-theme='dark']) .rdc-map {
-        background: #111827;
+        background: #0b1220;
       }
       :host ::ng-deep .leaflet-control-attribution,
       :host ::ng-deep .leaflet-zoom-box {
@@ -100,6 +193,20 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
   private africa?: L.GeoJSON;
   private layer?: L.GeoJSON;
   private byKey = new Map<string, ProvinceStat>();
+  private sizeTimer?: ReturnType<typeof setTimeout>;
+
+  readonly expanded = signal(false);
+  readonly fullscreen = signal(false);
+
+  @HostBinding('class.rdc-host--expanded')
+  get hostExpanded(): boolean {
+    return this.expanded();
+  }
+
+  @HostBinding('class.rdc-host--fullscreen')
+  get hostFullscreen(): boolean {
+    return this.fullscreen();
+  }
 
   constructor() {
     effect(() => {
@@ -111,6 +218,8 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
 
   ngAfterViewInit(): void {
     const host = this.hostRef.nativeElement;
+    // Padding large : garde une version vectorielle hors viewport pendant le pan latéral.
+    const renderer = L.canvas({ padding: 1.25 });
     this.map = L.map(host, {
       zoomControl: true,
       attributionControl: false,
@@ -122,6 +231,9 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
       zoomSnap: 0.25,
       zoomDelta: 0.25,
       wheelPxPerZoomLevel: 180,
+      renderer,
+      fadeAnimation: false,
+      markerZoomAnimation: false,
     });
     this.rebuild();
     void Promise.all([this.ensureGeo(), this.ensureAfrica()]).then(([geo, africa]) => {
@@ -129,9 +241,11 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
       this.africa = L.geoJSON(africa as never, {
         interactive: false,
         style: () => this.africaStyle(),
+        renderer,
       }).addTo(this.map);
       this.layer = L.geoJSON(geo as never, {
         style: (feature) => this.styleOf(feature),
+        renderer,
         onEachFeature: (feature, layer) => {
           layer.on('click', () => blurPath(layer));
           layer.on('mouseover', () => {
@@ -163,6 +277,38 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
     }
   }
 
+  toggleExpanded(ev?: Event): void {
+    ev?.stopPropagation();
+    if (this.fullscreen()) {
+      this.fullscreen.set(false);
+    }
+    this.expanded.update((v) => !v);
+    this.scheduleResize();
+  }
+
+  toggleFullscreen(ev?: Event): void {
+    ev?.stopPropagation();
+    this.fullscreen.update((v) => !v);
+    if (this.fullscreen()) this.expanded.set(true);
+    this.scheduleResize();
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (!this.fullscreen()) return;
+    this.fullscreen.set(false);
+    this.scheduleResize();
+  }
+
+  private scheduleResize(): void {
+    if (this.sizeTimer != null) clearTimeout(this.sizeTimer);
+    this.sizeTimer = setTimeout(() => {
+      this.sizeTimer = undefined;
+      this.map?.invalidateSize({ animate: false });
+    }, 60);
+    requestAnimationFrame(() => this.map?.invalidateSize({ animate: false }));
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['zones'] || changes['metric'] || changes['devise']) {
       this.rebuild();
@@ -171,6 +317,7 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
   }
 
   ngOnDestroy(): void {
+    if (this.sizeTimer != null) clearTimeout(this.sizeTimer);
     this.map?.remove();
     this.map = undefined;
     this.africa = undefined;
@@ -277,7 +424,7 @@ function loadGeo(
 
 function blurPath(layer: L.Layer): void {
   const el = (layer as L.Path).getElement();
-  if (el instanceof SVGElement) el.blur();
+  if (el instanceof SVGElement || el instanceof HTMLElement) el.blur();
 }
 
 function fold(value: string): string {

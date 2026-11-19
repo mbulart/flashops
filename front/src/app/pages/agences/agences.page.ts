@@ -84,12 +84,30 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
             />
           </div>
           <div class="filter-field">
-            <label class="form-label" for="ag-activity">Activité</label>
-            <select id="ag-activity" class="form-select form-select-sm" [(ngModel)]="draftActivityDays">
+            <label class="form-label" for="ag-activity">Activité récente</label>
+            <select id="ag-activity" class="form-select form-select-sm" [(ngModel)]="draftActivityDays" (ngModelChange)="onActivityDaysChange()">
               <option [ngValue]="null">Toutes</option>
               <option [ngValue]="30">≤ 30 jours</option>
               <option [ngValue]="60">≤ 60 jours</option>
               <option [ngValue]="90">≤ 90 jours</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label class="form-label" for="ag-inactive">Sans mouvement depuis</label>
+            <select
+              id="ag-inactive"
+              class="form-select form-select-sm"
+              [(ngModel)]="draftInactiveSinceDays"
+              (ngModelChange)="onInactiveSinceChange()"
+              title="Agences qui ont eu des mouvements puis plus rien depuis cette durée"
+            >
+              <option [ngValue]="null">—</option>
+              <option [ngValue]="3">3 jours</option>
+              <option [ngValue]="7">7 jours</option>
+              <option [ngValue]="15">15 jours</option>
+              <option [ngValue]="30">1 mois</option>
+              <option [ngValue]="60">2 mois</option>
+              <option [ngValue]="90">3 mois</option>
             </select>
           </div>
           <div class="filter-field">
@@ -439,6 +457,7 @@ export class AgencesPageComponent implements OnInit {
   readonly pageSizes = [25, 50, 100];
 
   draftActivityDays: number | null = null;
+  draftInactiveSinceDays: number | null = null;
   draftStatutActivite = '';
   draftSansCoords = false;
   draftIdentifiant = '';
@@ -526,8 +545,17 @@ export class AgencesPageComponent implements OnInit {
     this.loadZones(this.draftRegionId);
   }
 
+  onActivityDaysChange(): void {
+    if (this.draftActivityDays != null) this.draftInactiveSinceDays = null;
+  }
+
+  onInactiveSinceChange(): void {
+    if (this.draftInactiveSinceDays != null) this.draftActivityDays = null;
+  }
+
   resetFilters(): void {
     this.draftActivityDays = null;
+    this.draftInactiveSinceDays = null;
     this.draftStatutActivite = '';
     this.draftSansCoords = false;
     this.draftIdentifiant = '';
@@ -745,6 +773,7 @@ export class AgencesPageComponent implements OnInit {
       commune: this.draftCommune.trim() || undefined,
       categorie: this.draftCategorie.trim() || undefined,
       activity_days: this.draftActivityDays,
+      inactive_since_days: this.draftInactiveSinceDays,
       statut_activite: this.draftStatutActivite.trim()
         ? [this.draftStatutActivite.trim()]
         : undefined,

@@ -62,6 +62,8 @@ export interface AgenceAdminFilters {
   pays?: string;
   categorie?: string;
   activity_days?: number | null;
+  /** Sans mouvement depuis au moins N jours (après avoir eu de l'activité). */
+  inactive_since_days?: number | null;
   /** Nouveau | Actif | Inactif */
   statut_activite?: string[];
   from?: string;

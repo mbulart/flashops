@@ -65,6 +65,7 @@ export class AgencesService {
     set('pays', filters.pays);
     set('categorie', filters.categorie);
     set('activity_days', filters.activity_days);
+    set('inactive_since_days', filters.inactive_since_days);
     for (const s of filters.statut_activite ?? []) {
       if (s) params = params.append('statut_activite', s);
     }

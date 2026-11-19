@@ -334,6 +334,13 @@ type MapEngine = 'google' | 'leaflet';
       :host ::ng-deep .geo-map-tile-freeze--out {
         opacity: 0;
       }
+      /* Sous-couche légère : reste visible dans les bandes latérales en attendant HOT. */
+      :host ::ng-deep .geo-map-tiles-lite {
+        filter: saturate(0.7) contrast(0.92);
+      }
+      :host ::ng-deep .geo-map-tiles-main img {
+        background: transparent;
+      }
       /* Filet de sécurité si leaflet.css charge après le 1er paint. */
       :host ::ng-deep .leaflet-tile-pane,
       :host ::ng-deep .leaflet-map-pane,
@@ -400,6 +407,7 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   private leafletMap?: L.Map;
   private leafletTiles?: L.TileLayer;
+  private leafletTilesLite?: L.TileLayer;
   private leafletLayer?: L.LayerGroup;
   private googleMap?: google.maps.Map;
   private googleMarkers: google.maps.Marker[] = [];
@@ -631,14 +639,29 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.patchLeafletIntegerSize(this.leafletMap);
     this.leafletMap.setView([-4.325, 15.322], 5);
 
-    // Pas tile.openstreetmap.org (usage app déconseillé / trous). OSM-FR HOT + secours Esri.
+    // Sous-couche légère (Carto) : comble les bandes blanches au pan latéral avant HOT.
+    const lite = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20,
+      attribution: '',
+      subdomains: 'abcd',
+      updateWhenIdle: false,
+      updateWhenZooming: false,
+      keepBuffer: 16,
+      className: 'geo-map-tiles-lite',
+      crossOrigin: true,
+    });
+    this.leafletTilesLite = lite;
+    lite.addTo(this.leafletMap);
+
+    // Couche détaillée OSM-FR HOT + secours Esri.
     const tiles = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
       maxZoom: 20,
       attribution: '',
       subdomains: 'abc',
       updateWhenIdle: false,
       updateWhenZooming: false,
-      keepBuffer: 8,
+      keepBuffer: 12,
+      className: 'geo-map-tiles-main',
       crossOrigin: true,
     });
     this.leafletTiles = tiles;
@@ -697,18 +720,32 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   private ensureTileFreeze(map: L.Map): void {
     if (this.destroyed || this.tileFreeze) return;
-    const canvas = this.captureVisibleTiles(map);
-    if (!canvas) return;
-    canvas.className = 'geo-map-tile-freeze';
+    const capture = this.captureVisibleTiles(map);
+    if (!capture) return;
     const size = map.getSize();
-    canvas.style.width = `${size.x}px`;
-    canvas.style.height = `${size.y}px`;
+    // Étendre le freeze pour couvrir les bandes latérales au pan (version légère floue).
+    const padX = Math.ceil(size.x * 0.85);
+    const padY = Math.ceil(size.y * 0.85);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.floor(size.x) + padX * 2);
+    canvas.height = Math.max(1, Math.floor(size.y) + padY * 2);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#e8eef5';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.filter = 'blur(3px) saturate(0.8) brightness(0.98)';
+    ctx.drawImage(capture, 0, 0, canvas.width, canvas.height);
+    ctx.filter = 'none';
+    ctx.drawImage(capture, padX, padY);
+    canvas.className = 'geo-map-tile-freeze';
+    canvas.style.width = `${canvas.width}px`;
+    canvas.style.height = `${canvas.height}px`;
     map.getContainer().appendChild(canvas);
     this.tileFreeze = {
       canvas,
       zoom: map.getZoom(),
       center: map.getCenter(),
-      size,
+      size: L.point(canvas.width, canvas.height),
     };
     this.syncTileFreezeTransform(map);
   }
