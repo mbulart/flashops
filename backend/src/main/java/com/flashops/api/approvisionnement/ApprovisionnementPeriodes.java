@@ -38,8 +38,7 @@ public final class ApprovisionnementPeriodes {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, "aucune demande opérationnelle le week-end");
     }
-    // Colonnes UI : en-têtes J-1 / J-2 inchangés ; les périodes ci-dessous
-    // sont déjà dans l’ordre affiché (pivot métier demandé).
+    // J-1 = période la plus récente avant la date de référence ; J-2 = période précédente.
     return switch (dow) {
       case MONDAY ->
           // J-1 = vendredi + samedi + dimanche ; J-2 = jeudi
@@ -47,19 +46,19 @@ public final class ApprovisionnementPeriodes {
               range(dateReference.minusDays(3), dateReference.minusDays(1)),
               single(dateReference.minusDays(4)));
       case TUESDAY ->
-          // J-1 = vendredi + samedi + dimanche ; J-2 = lundi
+          // J-1 = lundi ; J-2 = vendredi + samedi + dimanche
           new Periodes(
-              range(dateReference.minusDays(4), dateReference.minusDays(2)),
-              single(dateReference.minusDays(1)));
+              single(dateReference.minusDays(1)),
+              range(dateReference.minusDays(4), dateReference.minusDays(2)));
       case WEDNESDAY ->
-          // J-1 = lundi ; J-2 = mardi
-          new Periodes(single(dateReference.minusDays(2)), single(dateReference.minusDays(1)));
+          // J-1 = mardi ; J-2 = lundi
+          new Periodes(single(dateReference.minusDays(1)), single(dateReference.minusDays(2)));
       case THURSDAY ->
-          // J-1 = mardi ; J-2 = mercredi
-          new Periodes(single(dateReference.minusDays(2)), single(dateReference.minusDays(1)));
+          // J-1 = mercredi ; J-2 = mardi
+          new Periodes(single(dateReference.minusDays(1)), single(dateReference.minusDays(2)));
       case FRIDAY ->
-          // J-1 = mercredi ; J-2 = jeudi
-          new Periodes(single(dateReference.minusDays(2)), single(dateReference.minusDays(1)));
+          // J-1 = jeudi ; J-2 = mercredi
+          new Periodes(single(dateReference.minusDays(1)), single(dateReference.minusDays(2)));
       default ->
           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "jour de référence invalide");
     };
