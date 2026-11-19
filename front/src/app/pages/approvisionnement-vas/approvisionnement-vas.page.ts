@@ -72,7 +72,7 @@ interface SoldeSeuilRow {
     @if (mode() === 'list') {
       <app-page-header
         [title]="canal() === 'telco' ? 'Approvisionnement TELCO' : 'Approvisionnement MOMO'"
-        [subtitle]="canal() === 'telco' ? 'Un opérateur regroupe unités, data et mega. USD, CDF et FCN sont additionnés en USD.' : 'Demandes de recharge Mobile Money'"
+        [subtitle]="canal() === 'telco' ? 'Un opérateur = recharges unités. SUCCESS uniquement, CDF et FCN convertis en USD.' : 'Demandes de recharge Mobile Money'"
       >
         <div actions>
           @if (canExport()) {
@@ -347,7 +347,7 @@ interface SoldeSeuilRow {
     } @else {
       <app-page-header
         [title]="demandeId() ? demandeCode() : 'Nouvelle demande'"
-        [subtitle]="canal() === 'telco' ? 'Consommations J-1 / J-2 en USD (CDF et FCN convertis)' : 'Consommations J-1 / J-2 calculées automatiquement (Mobile Money)'"
+        [subtitle]="canal() === 'telco' ? 'J-1 / J-2 = recharges unités SUCCESS, converties en USD' : 'Consommations J-1 / J-2 calculées automatiquement (Mobile Money)'"
       >
         <div actions>
           <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/approvisionnement-vas', canal()]">Retour</a>

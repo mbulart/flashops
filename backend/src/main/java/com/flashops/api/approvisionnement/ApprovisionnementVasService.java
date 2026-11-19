@@ -106,7 +106,7 @@ public class ApprovisionnementVasService {
     ProduitMmRow produit = ancreTelco(groupe);
     var periodes = ApprovisionnementPeriodes.resolve(dateReference);
     BigDecimal[] taux = requireTauxUsd();
-    var ids = groupe.stream().map(ProduitMmRow::produitId).toList();
+    var ids = idsConsommationTelco(groupe);
     TotauxPeriode j1 = repo.totauxConsommationUsd(ids, periodes.j1(), taux[0], taux[1]);
     TotauxPeriode j2 = repo.totauxConsommationUsd(ids, periodes.j2(), taux[0], taux[1]);
     BigDecimal moyenne =
@@ -634,7 +634,7 @@ public class ApprovisionnementVasService {
         throw new ResponseStatusException(
             HttpStatus.BAD_REQUEST, "produit et devise déjà présents dans la demande");
       }
-      var ids = telco ? groupe.stream().map(ProduitMmRow::produitId).toList() : List.<Integer>of();
+      var ids = telco ? idsConsommationTelco(groupe) : List.<Integer>of();
       TotauxPeriode j1 =
           telco
               ? repo.totauxConsommationUsd(ids, periodes.j1(), taux[0], taux[1])
@@ -828,6 +828,23 @@ public class ApprovisionnementVasService {
             Comparator.comparingInt((ProduitMmRow row) -> "RechargesUnites".equals(row.ecran()) ? 0 : 1)
                 .thenComparingInt(ProduitMmRow::produitId))
         .orElseThrow();
+  }
+
+  /**
+   * Consommation TELCO = recharges unités de l’opérateur (SUCCESS), USD + CDF/FCN convertis. Les
+   * écrans mega/mobile money DATA restent dans le catalogue opérateur mais ne rentrent pas dans J-1/J-2.
+   */
+  private static List<Integer> idsConsommationTelco(List<ProduitMmRow> groupe) {
+    var ids =
+        groupe.stream()
+            .filter(row -> "RechargesUnites".equals(row.ecran()))
+            .map(ProduitMmRow::produitId)
+            .distinct()
+            .toList();
+    if (!ids.isEmpty()) {
+      return ids;
+    }
+    return List.of(ancreTelco(groupe).produitId());
   }
 
   private ProduitOption toProduitOption(ProduitMmRow p, String canal) {
