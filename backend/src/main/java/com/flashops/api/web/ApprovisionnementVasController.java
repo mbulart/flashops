@@ -14,6 +14,7 @@ import com.flashops.api.web.dto.ApprovisionnementVasDtos.ReleveSoldeInput;
 import com.flashops.api.web.dto.ApprovisionnementVasDtos.ReleveSoldeView;
 import com.flashops.api.web.dto.ApprovisionnementVasDtos.SeuilAlerteInput;
 import com.flashops.api.web.dto.ApprovisionnementVasDtos.SeuilAlerteView;
+import com.flashops.api.web.dto.ApprovisionnementVasDtos.SituationRechargeInput;
 import com.flashops.api.web.dto.ApprovisionnementVasDtos.SoldeAlerteView;
 import com.flashops.api.web.dto.ApprovisionnementVasDtos.TransitionInput;
 import java.time.LocalDate;
@@ -202,6 +203,28 @@ public class ApprovisionnementVasController {
     int userId = AuthSupport.currentUserId();
     requireAny(userId, "approvisionnement.vas.payer", "approvisionnement.vas.ecrire");
     return Map.of("data", service.createPaiement(ligneId, userId, body));
+  }
+
+  @PutMapping("/{id}/situation-recharge")
+  public Map<String, DemandeView> updateSituation(
+      @PathVariable long id, @RequestBody SituationRechargeInput body) {
+    int userId = AuthSupport.currentUserId();
+    requireAny(
+        userId,
+        "approvisionnement.vas.modifier",
+        "approvisionnement.vas.ecrire",
+        "approvisionnement.vas.creer");
+    return Map.of("data", service.updateSituation(id, userId, body));
+  }
+
+  @DeleteMapping("/situations-historique/{historiqueId}")
+  public Map<String, Object> deleteSituationHistorique(@PathVariable long historiqueId) {
+    int userId = AuthSupport.currentUserId();
+    if (!permissions.isSuperAdmin(userId)) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "réservé au SUPER_ADMIN");
+    }
+    service.deleteSituationHistorique(historiqueId);
+    return Map.of("ok", true);
   }
 
   private void requireAny(int userId, String... codes) {

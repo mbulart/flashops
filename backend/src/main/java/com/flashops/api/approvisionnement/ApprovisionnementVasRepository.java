@@ -260,7 +260,7 @@ public class ApprovisionnementVasRepository {
                depots_j1, retraits_j1, consommation_j1,
                depots_j2, retraits_j2, consommation_j2, moyenne,
                libelle_solde, solde_08h, montant_propose, montant_valide,
-               coalesce(montant_paye, 0) AS montant_paye
+               coalesce(montant_paye, 0) AS montant_paye, situation_recharge
         FROM lignes_demande_approvisionnement_vas
         WHERE demande_id = ?
         ORDER BY id
@@ -278,7 +278,7 @@ public class ApprovisionnementVasRepository {
                    depots_j1, retraits_j1, consommation_j1,
                    depots_j2, retraits_j2, consommation_j2, moyenne,
                    libelle_solde, solde_08h, montant_propose, montant_valide,
-                   coalesce(montant_paye, 0) AS montant_paye
+                   coalesce(montant_paye, 0) AS montant_paye, situation_recharge
             FROM lignes_demande_approvisionnement_vas
             WHERE id = ?
             """,
@@ -439,8 +439,9 @@ public class ApprovisionnementVasRepository {
                     j1_debut, j1_fin, j2_debut, j2_fin,
                     depots_j1, retraits_j1, consommation_j1,
                     depots_j2, retraits_j2, consommation_j2, moyenne,
-                    libelle_solde, solde_08h, montant_propose, montant_valide, montant_paye
-                  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    libelle_solde, solde_08h, montant_propose, montant_valide, montant_paye,
+                    situation_recharge
+                  ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                   """,
                   Statement.RETURN_GENERATED_KEYS);
           int i = 1;
@@ -466,6 +467,7 @@ public class ApprovisionnementVasRepository {
           ps.setBigDecimal(i++, row.montantPropose());
           ps.setBigDecimal(i++, row.montantValide());
           ps.setBigDecimal(i++, row.montantPaye());
+          ps.setString(i++, row.situationRecharge());
           return ps;
         },
         keys);
@@ -474,6 +476,119 @@ public class ApprovisionnementVasRepository {
       throw new IllegalStateException("ligne id manquant");
     }
     return ((Number) map.get("id")).longValue();
+  }
+
+  public void updateLigneSituation(long ligneId, String situationRecharge) {
+    jdbc.update(
+        """
+        UPDATE lignes_demande_approvisionnement_vas
+        SET situation_recharge = ?
+        WHERE id = ?
+        """,
+        situationRecharge,
+        ligneId);
+  }
+
+  public long insertSituationHistorique(
+      long demandeId,
+      Long ligneId,
+      int produitId,
+      String operateur,
+      String produitLibelle,
+      String devise,
+      String texte,
+      Integer utilisateurId,
+      Instant now) {
+    var keys = new GeneratedKeyHolder();
+    jdbc.update(
+        con -> {
+          PreparedStatement ps =
+              con.prepareStatement(
+                  """
+                  INSERT INTO historique_situation_recharge_vas
+                    (demande_id, ligne_id, produit_id, operateur, produit_libelle, devise,
+                     texte, utilisateur_id, cree_le)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  """,
+                  Statement.RETURN_GENERATED_KEYS);
+          ps.setLong(1, demandeId);
+          if (ligneId == null) {
+            ps.setObject(2, null);
+          } else {
+            ps.setLong(2, ligneId);
+          }
+          ps.setInt(3, produitId);
+          ps.setString(4, operateur);
+          ps.setString(5, produitLibelle);
+          ps.setString(6, devise);
+          ps.setString(7, texte);
+          setNullableInt(ps, 8, utilisateurId);
+          ps.setTimestamp(9, Timestamp.from(now));
+          return ps;
+        },
+        keys);
+    var map = keys.getKeys();
+    if (map == null || map.get("id") == null) {
+      throw new IllegalStateException("historique situation id manquant");
+    }
+    return ((Number) map.get("id")).longValue();
+  }
+
+  public List<SituationHistoriqueRow> listSituationsHistorique(long demandeId) {
+    return jdbc.query(
+        """
+        SELECT h.id, h.demande_id, h.ligne_id, h.produit_id, h.operateur, h.produit_libelle,
+               h.devise, h.texte, h.utilisateur_id, u.nom_complet, h.cree_le
+        FROM historique_situation_recharge_vas h
+        LEFT JOIN utilisateurs u ON u.id = h.utilisateur_id
+        WHERE h.demande_id = ?
+        ORDER BY h.cree_le DESC, h.id DESC
+        """,
+        (rs, i) ->
+            new SituationHistoriqueRow(
+                rs.getLong("id"),
+                rs.getLong("demande_id"),
+                rs.getObject("ligne_id") == null ? null : rs.getLong("ligne_id"),
+                rs.getInt("produit_id"),
+                rs.getString("operateur"),
+                rs.getString("produit_libelle"),
+                rs.getString("devise"),
+                rs.getString("texte"),
+                (Integer) rs.getObject("utilisateur_id"),
+                rs.getString("nom_complet"),
+                rs.getTimestamp("cree_le").toInstant()),
+        demandeId);
+  }
+
+  public Optional<SituationHistoriqueRow> findSituationHistorique(long id) {
+    var rows =
+        jdbc.query(
+            """
+            SELECT h.id, h.demande_id, h.ligne_id, h.produit_id, h.operateur, h.produit_libelle,
+                   h.devise, h.texte, h.utilisateur_id, u.nom_complet, h.cree_le
+            FROM historique_situation_recharge_vas h
+            LEFT JOIN utilisateurs u ON u.id = h.utilisateur_id
+            WHERE h.id = ?
+            """,
+            (rs, i) ->
+                new SituationHistoriqueRow(
+                    rs.getLong("id"),
+                    rs.getLong("demande_id"),
+                    rs.getObject("ligne_id") == null ? null : rs.getLong("ligne_id"),
+                    rs.getInt("produit_id"),
+                    rs.getString("operateur"),
+                    rs.getString("produit_libelle"),
+                    rs.getString("devise"),
+                    rs.getString("texte"),
+                    (Integer) rs.getObject("utilisateur_id"),
+                    rs.getString("nom_complet"),
+                    rs.getTimestamp("cree_le").toInstant()),
+            id);
+    return rows.stream().findFirst();
+  }
+
+  public void deleteSituationHistorique(long id) {
+    jdbc.update("DELETE FROM historique_situation_recharge_vas WHERE id = ?", id);
   }
 
   public long insertPaiement(
@@ -889,7 +1004,8 @@ public class ApprovisionnementVasRepository {
               rs.getBigDecimal("solde_08h"),
               rs.getBigDecimal("montant_propose"),
               rs.getBigDecimal("montant_valide"),
-              rs.getBigDecimal("montant_paye"));
+              rs.getBigDecimal("montant_paye"),
+              rs.getString("situation_recharge"));
 
   private static final RowMapper<PaiementRow> PAIEMENT_ROW =
       (rs, i) ->
@@ -978,7 +1094,8 @@ public class ApprovisionnementVasRepository {
       BigDecimal solde08h,
       BigDecimal montantPropose,
       BigDecimal montantValide,
-      BigDecimal montantPaye) {}
+      BigDecimal montantPaye,
+      String situationRecharge) {}
 
   public record LigneInsert(
       int produitId,
@@ -1001,7 +1118,21 @@ public class ApprovisionnementVasRepository {
       BigDecimal solde08h,
       BigDecimal montantPropose,
       BigDecimal montantValide,
-      BigDecimal montantPaye) {}
+      BigDecimal montantPaye,
+      String situationRecharge) {}
+
+  public record SituationHistoriqueRow(
+      long id,
+      long demandeId,
+      Long ligneId,
+      int produitId,
+      String operateur,
+      String produitLibelle,
+      String devise,
+      String texte,
+      Integer utilisateurId,
+      String utilisateurNom,
+      Instant creeLe) {}
 
   public record HistoriqueRow(
       long id,

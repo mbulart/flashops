@@ -39,7 +39,26 @@ public final class ApprovisionnementVasDtos {
       @JsonProperty("libelle_solde") String libelleSolde,
       @JsonProperty("solde_08h") BigDecimal solde08h,
       @JsonProperty("montant_propose") BigDecimal montantPropose,
-      @JsonProperty("montant_valide") BigDecimal montantValide) {}
+      @JsonProperty("montant_valide") BigDecimal montantValide,
+      @JsonProperty("situation_recharge") String situationRecharge) {}
+
+  public record SituationRechargeInput(
+      @JsonProperty("produit_id") int produitId,
+      String devise,
+      @JsonProperty("situation_recharge") String situationRecharge) {}
+
+  public record SituationHistoriqueView(
+      Long id,
+      @JsonProperty("demande_id") long demandeId,
+      @JsonProperty("ligne_id") Long ligneId,
+      @JsonProperty("produit_id") int produitId,
+      String operateur,
+      @JsonProperty("produit_libelle") String produitLibelle,
+      String devise,
+      String texte,
+      @JsonProperty("utilisateur_id") Integer utilisateurId,
+      @JsonProperty("utilisateur_nom") String utilisateurNom,
+      @JsonProperty("cree_le") Instant creeLe) {}
 
   public record DemandeInput(
       @JsonProperty("date_reference") LocalDate dateReference,
@@ -161,7 +180,8 @@ public final class ApprovisionnementVasDtos {
       @JsonProperty("montant_propose") BigDecimal montantPropose,
       @JsonProperty("montant_valide") BigDecimal montantValide,
       @JsonProperty("montant_paye") BigDecimal montantPaye,
-      @JsonProperty("reste_a_payer") BigDecimal resteAPayer) {}
+      @JsonProperty("reste_a_payer") BigDecimal resteAPayer,
+      @JsonProperty("situation_recharge") String situationRecharge) {}
 
   public record DemandeView(
       Long id,
@@ -184,7 +204,8 @@ public final class ApprovisionnementVasDtos {
       List<LigneView> lignes,
       List<HistoriqueStatutView> historique,
       String canal,
-      String code) {}
+      String code,
+      @JsonProperty("historique_situations") List<SituationHistoriqueView> historiqueSituations) {}
 
   public record DemandeListItem(
       Long id,

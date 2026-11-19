@@ -53,6 +53,20 @@ export interface ApprovisionnementVasHistorique {
   cree_le: string;
 }
 
+export interface ApprovisionnementVasSituationHistorique {
+  id: number;
+  demande_id: number;
+  ligne_id?: number | null;
+  produit_id: number;
+  operateur: string;
+  produit_libelle: string;
+  devise: string;
+  texte: string;
+  utilisateur_id?: number | null;
+  utilisateur_nom?: string | null;
+  cree_le: string;
+}
+
 export interface ApprovisionnementVasPaiement {
   id: number;
   ligne_id: number;
@@ -99,6 +113,7 @@ export interface ApprovisionnementVasLigne {
   montant_valide: number | null;
   montant_paye: number | null;
   reste_a_payer?: number | null;
+  situation_recharge?: string | null;
 }
 
 export interface ApprovisionnementVasDemande {
@@ -121,6 +136,7 @@ export interface ApprovisionnementVasDemande {
   delai_heures?: number;
   lignes: ApprovisionnementVasLigne[];
   historique?: ApprovisionnementVasHistorique[];
+  historique_situations?: ApprovisionnementVasSituationHistorique[];
   canal?: 'momo' | 'telco';
   code?: string;
 }
@@ -146,6 +162,7 @@ export interface ApprovisionnementVasLigneInput {
   solde_08h?: number | null;
   montant_propose?: number | null;
   montant_valide?: number | null;
+  situation_recharge?: string | null;
 }
 
 export interface ApprovisionnementVasDemandeInput {
@@ -227,6 +244,8 @@ export interface ApprovisionnementVasLigneForm {
   montant_valide: number | null;
   montant_paye: number | null;
   reste_a_payer: number | null;
+  situation_recharge: string;
   loading: boolean;
   error: string | null;
+  saving_situation?: boolean;
 }

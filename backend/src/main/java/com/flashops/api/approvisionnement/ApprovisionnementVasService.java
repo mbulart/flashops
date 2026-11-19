@@ -23,8 +23,11 @@ import com.flashops.api.web.dto.ApprovisionnementVasDtos.ReleveSoldeInput;
 import com.flashops.api.web.dto.ApprovisionnementVasDtos.ReleveSoldeView;
 import com.flashops.api.web.dto.ApprovisionnementVasDtos.SeuilAlerteInput;
 import com.flashops.api.web.dto.ApprovisionnementVasDtos.SeuilAlerteView;
+import com.flashops.api.web.dto.ApprovisionnementVasDtos.SituationHistoriqueView;
+import com.flashops.api.web.dto.ApprovisionnementVasDtos.SituationRechargeInput;
 import com.flashops.api.web.dto.ApprovisionnementVasDtos.SoldeAlerteView;
 import com.flashops.api.web.dto.ApprovisionnementVasDtos.TransitionInput;
+import java.util.Objects;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -157,7 +160,8 @@ public class ApprovisionnementVasService {
     DemandeHeaderRow header =
         repo.findDemande(id)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "demande introuvable"));
-    return toDemandeView(header, repo.listLignes(id), repo.listHistorique(id));
+    return toDemandeView(
+        header, repo.listLignes(id), repo.listHistorique(id), repo.listSituationsHistorique(id));
   }
 
   @Transactional
@@ -176,7 +180,7 @@ public class ApprovisionnementVasService {
         repo.insertDemande(
             dateRef, ApprovisionnementVasStatuts.BROUILLON, trimToNull(input.commentaire()), actorId, now, canal);
     repo.insertHistorique(id, null, ApprovisionnementVasStatuts.BROUILLON, actorId, "Création", now);
-    persistLignes(id, dateRef, lignes, canal);
+    persistLignes(id, dateRef, lignes, canal, actorId, Map.of());
     if (ApprovisionnementVasStatuts.SOUMISE.equals(statut)) {
       transitionStatut(
           id,
@@ -198,9 +202,15 @@ public class ApprovisionnementVasService {
     LocalDate dateRef = requireDate(input);
     List<LigneInput> lignes = requireLignes(input);
     Instant now = Instant.now();
+    Map<String, String> anciennesSituations = new HashMap<>();
+    for (LigneRow old : repo.listLignes(id)) {
+      anciennesSituations.put(
+          old.produitId() + "|" + old.devise(),
+          old.situationRecharge() == null ? "" : old.situationRecharge().trim());
+    }
     repo.updateDemandeContent(id, dateRef, trimToNull(input.commentaire()), actorId, now);
     repo.deleteLignes(id);
-    persistLignes(id, dateRef, lignes, normalizeCanal(existing.canal()));
+    persistLignes(id, dateRef, lignes, normalizeCanal(existing.canal()), actorId, anciennesSituations);
     if (input.statut() != null
         && !input.statut().isBlank()
         && !ApprovisionnementVasStatuts.normalize(input.statut()).equals(existing.statut())) {
@@ -612,11 +622,18 @@ public class ApprovisionnementVasService {
     }
   }
 
-  private void persistLignes(long demandeId, LocalDate dateRef, List<LigneInput> lignes, String canal) {
+  private void persistLignes(
+      long demandeId,
+      LocalDate dateRef,
+      List<LigneInput> lignes,
+      String canal,
+      int actorId,
+      Map<String, String> anciennesSituations) {
     Set<String> seen = new HashSet<>();
     var periodes = ApprovisionnementPeriodes.resolve(dateRef);
     boolean telco = "telco".equals(canal);
     BigDecimal[] taux = telco ? requireTauxUsd() : null;
+    Instant now = Instant.now();
     for (LigneInput line : lignes) {
       if (line == null) {
         continue;
@@ -649,37 +666,100 @@ public class ApprovisionnementVasService {
           line.libelleSolde() == null || line.libelleSolde().isBlank()
               ? "Solde à 08h"
               : line.libelleSolde().trim();
-      repo.insertLigne(
-          demandeId,
-          new LigneInsert(
-              produit.produitId(),
-              telco ? ApprovisionnementTelcoProduits.operateur(produit.produit()) : produit.produit(),
-              telco ? ApprovisionnementTelcoProduits.operateur(produit.produit()) : produitLibelle(produit, canal),
-              devise,
-              dateRef,
-              periodes.j1().debut(),
-              periodes.j1().fin(),
-              periodes.j2().debut(),
-              periodes.j2().fin(),
-              ApprovisionnementVasRepository.scale(j1.depots()),
-              ApprovisionnementVasRepository.scale(j1.retraits()),
-              ApprovisionnementVasRepository.scale(j1.consommation()),
-              ApprovisionnementVasRepository.scale(j2.depots()),
-              ApprovisionnementVasRepository.scale(j2.retraits()),
-              ApprovisionnementVasRepository.scale(j2.consommation()),
-              moyenne,
-              libelle,
-              nullableScale(line.solde08h()),
-              nullableScale(line.montantPropose()),
-              nullableScale(line.montantValide()),
-              BigDecimal.ZERO));
+      String operateur =
+          telco ? ApprovisionnementTelcoProduits.operateur(produit.produit()) : produit.produit();
+      String produitLibelle =
+          telco
+              ? ApprovisionnementTelcoProduits.operateur(produit.produit())
+              : produitLibelle(produit, canal);
+      String situation = trimToNull(line.situationRecharge());
+      long ligneId =
+          repo.insertLigne(
+              demandeId,
+              new LigneInsert(
+                  produit.produitId(),
+                  operateur,
+                  produitLibelle,
+                  devise,
+                  dateRef,
+                  periodes.j1().debut(),
+                  periodes.j1().fin(),
+                  periodes.j2().debut(),
+                  periodes.j2().fin(),
+                  ApprovisionnementVasRepository.scale(j1.depots()),
+                  ApprovisionnementVasRepository.scale(j1.retraits()),
+                  ApprovisionnementVasRepository.scale(j1.consommation()),
+                  ApprovisionnementVasRepository.scale(j2.depots()),
+                  ApprovisionnementVasRepository.scale(j2.retraits()),
+                  ApprovisionnementVasRepository.scale(j2.consommation()),
+                  moyenne,
+                  libelle,
+                  nullableScale(line.solde08h()),
+                  nullableScale(line.montantPropose()),
+                  nullableScale(line.montantValide()),
+                  BigDecimal.ZERO,
+                  situation));
+      String ancienne = anciennesSituations.getOrDefault(key, "");
+      String nouvelle = situation == null ? "" : situation;
+      if (!nouvelle.isBlank() && !Objects.equals(ancienne, nouvelle)) {
+        repo.insertSituationHistorique(
+            demandeId,
+            ligneId,
+            produit.produitId(),
+            operateur,
+            produitLibelle,
+            devise,
+            nouvelle,
+            actorId,
+            now);
+      }
     }
+  }
+
+  @Transactional
+  public DemandeView updateSituation(long demandeId, int actorId, SituationRechargeInput input) {
+    if (input == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "situation requise");
+    }
+    repo.findDemande(demandeId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "demande introuvable"));
+    String devise = normalizeDevise(input.devise());
+    String texte = trimToNull(input.situationRecharge());
+    LigneRow ligne =
+        repo.listLignes(demandeId).stream()
+            .filter(l -> l.produitId() == input.produitId() && devise.equals(l.devise()))
+            .findFirst()
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "ligne introuvable"));
+    String ancienne = ligne.situationRecharge() == null ? "" : ligne.situationRecharge().trim();
+    String nouvelle = texte == null ? "" : texte;
+    repo.updateLigneSituation(ligne.id(), texte);
+    if (!nouvelle.isBlank() && !Objects.equals(ancienne, nouvelle)) {
+      repo.insertSituationHistorique(
+          demandeId,
+          ligne.id(),
+          ligne.produitId(),
+          ligne.operateur(),
+          ligne.produitLibelle(),
+          ligne.devise(),
+          nouvelle,
+          actorId,
+          Instant.now());
+    }
+    return get(demandeId);
+  }
+
+  @Transactional
+  public void deleteSituationHistorique(long historiqueId) {
+    repo.findSituationHistorique(historiqueId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "historique introuvable"));
+    repo.deleteSituationHistorique(historiqueId);
   }
 
   private DemandeView toDemandeView(
       DemandeHeaderRow header,
       List<LigneRow> lignes,
-      List<ApprovisionnementVasRepository.HistoriqueRow> historique) {
+      List<ApprovisionnementVasRepository.HistoriqueRow> historique,
+      List<ApprovisionnementVasRepository.SituationHistoriqueRow> situations) {
     BigDecimal delai = repo.delaiTraitementHeures();
     boolean retard =
         isEnRetard(header.statut(), header.soumiseLe(), header.creeLe(), delai, Instant.now());
@@ -715,7 +795,24 @@ public class ApprovisionnementVasService {
                         h.creeLe()))
             .toList(),
         normalizeCanal(header.canal()),
-        header.code());
+        header.code(),
+        situations.stream().map(this::toSituationView).toList());
+  }
+
+  private SituationHistoriqueView toSituationView(
+      ApprovisionnementVasRepository.SituationHistoriqueRow h) {
+    return new SituationHistoriqueView(
+        h.id(),
+        h.demandeId(),
+        h.ligneId(),
+        h.produitId(),
+        h.operateur(),
+        h.produitLibelle(),
+        h.devise(),
+        h.texte(),
+        h.utilisateurId(),
+        h.utilisateurNom(),
+        h.creeLe());
   }
 
   private LigneView toLigneView(LigneRow r) {
@@ -754,7 +851,8 @@ public class ApprovisionnementVasService {
         r.montantPropose(),
         r.montantValide(),
         paye,
-        reste);
+        reste,
+        r.situationRecharge());
   }
 
   private PaiementView toPaiementView(ApprovisionnementVasRepository.PaiementRow p) {

@@ -152,4 +152,14 @@ export class ApprovisionnementVasService {
   deleteSolde(id: number) {
     return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/soldes/${id}`);
   }
+
+  updateSituation(demandeId: number, body: { produit_id: number; devise: string; situation_recharge: string | null }) {
+    return this.http
+      .put<{ data: ApprovisionnementVasDemande }>(`${this.baseUrl}/${demandeId}/situation-recharge`, body)
+      .pipe(map((r) => r.data));
+  }
+
+  deleteSituationHistorique(historiqueId: number) {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/situations-historique/${historiqueId}`);
+  }
 }

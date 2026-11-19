@@ -10,6 +10,7 @@ import {
   ApprovisionnementVasDemandeListItem,
   ApprovisionnementVasHistorique,
   ApprovisionnementVasLigneForm,
+  ApprovisionnementVasSituationHistorique,
   ApprovisionnementVasModePaiement,
   ApprovisionnementVasPaiement,
   ApprovisionnementVasProduit,
@@ -441,6 +442,7 @@ interface SoldeSeuilRow {
                       <th class="text-end">Montant proposé</th>
                       <th class="text-end">Montant validé</th>
                       <th class="text-end">Montant payé</th>
+                      <th style="min-width: 12rem">Situation de la recharge</th>
                       @if (canEditContent()) {
                         <th></th>
                       }
@@ -531,6 +533,17 @@ interface SoldeSeuilRow {
                           />
                         </td>
                         <td class="text-end mono">{{ formatAmount(line.montant_paye) }}</td>
+                        <td>
+                          <textarea
+                            class="form-control form-control-sm appro-input"
+                            rows="2"
+                            [name]="'situation-' + line.key"
+                            [(ngModel)]="line.situation_recharge"
+                            (blur)="saveSituation(line)"
+                            [disabled]="line.saving_situation"
+                            placeholder="Situation de la recharge"
+                          ></textarea>
+                        </td>
                         @if (canEditContent()) {
                           <td class="text-end">
                             <button type="button" class="btn btn-outline-danger btn-sm" (click)="removeLine(i)" title="Retirer">
@@ -641,6 +654,60 @@ interface SoldeSeuilRow {
                     <button type="button" class="btn btn-outline-secondary btn-sm" (click)="exportPaiementsPdf()">Export paiements PDF</button>
                   </div>
                 }
+              }
+            </app-section-card>
+          </div>
+
+          <div class="mt-3">
+            <app-section-card title="Historique des situations de recharge">
+              @if (loadingForm()) {
+                <app-skeleton type="table" [rows]="3" [cols]="4" />
+              } @else {
+                <div class="table-responsive">
+                  <table class="table table-sm mb-0">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Produit</th>
+                        <th>Devise</th>
+                        <th>Situation</th>
+                        <th>Auteur</th>
+                        @if (isSuperAdmin()) {
+                          <th></th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (h of historiqueSituations(); track h.id) {
+                        <tr>
+                          <td>{{ h.cree_le | date: 'dd/MM/yyyy HH:mm' }}</td>
+                          <td>{{ h.produit_libelle || h.operateur }}</td>
+                          <td>{{ h.devise }}</td>
+                          <td style="white-space: pre-wrap">{{ h.texte }}</td>
+                          <td>{{ h.utilisateur_nom || '—' }}</td>
+                          @if (isSuperAdmin()) {
+                            <td class="text-end">
+                              <button
+                                type="button"
+                                class="btn btn-outline-danger btn-sm"
+                                title="Supprimer"
+                                (click)="deleteSituationHistorique(h.id)"
+                              >
+                                <i class="bi bi-trash"></i>
+                              </button>
+                            </td>
+                          }
+                        </tr>
+                      } @empty {
+                        <tr>
+                          <td [attr.colspan]="isSuperAdmin() ? 6 : 5" class="text-muted text-center py-3">
+                            Aucune situation enregistrée.
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
               }
             </app-section-card>
           </div>
@@ -802,6 +869,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   readonly lignes = signal<ApprovisionnementVasLigneForm[]>([]);
   readonly canal = signal<'momo' | 'telco'>('momo');
   readonly historique = signal<ApprovisionnementVasHistorique[]>([]);
+  readonly historiqueSituations = signal<ApprovisionnementVasSituationHistorique[]>([]);
   readonly paiements = signal<ApprovisionnementVasPaiement[]>([]);
   readonly kpi = signal<ApprovisionnementVasDashboard | null>(null);
   readonly alertes = signal<ApprovisionnementVasSoldeAlerte[]>([]);
@@ -1079,6 +1147,51 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
     return this.auth.can('approvisionnement.vas.exporter') || this.auth.can('approvisionnement.vas.lire');
   }
 
+  isSuperAdmin(): boolean {
+    return this.auth.roleCode() === 'SUPER_ADMIN';
+  }
+
+  async saveSituation(line: ApprovisionnementVasLigneForm): Promise<void> {
+    const demandeId = this.demandeId();
+    if (!demandeId || !line.produit_id) return;
+    line.saving_situation = true;
+    this.lignes.update((rows) => [...rows]);
+    try {
+      const saved = await firstValueFrom(
+        this.api.updateSituation(demandeId, {
+          produit_id: line.produit_id,
+          devise: this.canal() === 'telco' ? 'USD' : line.devise,
+          situation_recharge: line.situation_recharge?.trim() || null,
+        })
+      );
+      this.historiqueSituations.set(saved.historique_situations ?? []);
+      const refreshed = saved.lignes.find(
+        (l) => l.produit_id === line.produit_id && l.devise === (this.canal() === 'telco' ? 'USD' : line.devise)
+      );
+      if (refreshed) {
+        line.situation_recharge = refreshed.situation_recharge ?? '';
+        line.id = refreshed.id ?? line.id;
+      }
+      this.toast.success('Situation enregistrée');
+    } catch {
+      this.toast.error('Enregistrement de la situation impossible');
+    } finally {
+      line.saving_situation = false;
+      this.lignes.update((rows) => [...rows]);
+    }
+  }
+
+  async deleteSituationHistorique(id: number): Promise<void> {
+    if (!this.isSuperAdmin()) return;
+    try {
+      await firstValueFrom(this.api.deleteSituationHistorique(id));
+      this.historiqueSituations.update((rows) => rows.filter((h) => h.id !== id));
+      this.toast.success('Commentaire historisé supprimé');
+    } catch {
+      this.toast.error('Suppression impossible');
+    }
+  }
+
   canSoldes(): boolean {
     return this.auth.can('approvisionnement.vas.soldes.lire') || this.auth.can('approvisionnement.vas.lire');
   }
@@ -1267,6 +1380,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
           solde_08h: l.solde_08h,
           montant_propose: l.montant_propose,
           montant_valide: l.montant_valide,
+          situation_recharge: l.situation_recharge?.trim() || null,
         })),
       };
       const id = this.demandeId();
@@ -1537,6 +1651,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
       this.statut = 'brouillon';
       this.commentaire = '';
       this.historique.set([]);
+      this.historiqueSituations.set([]);
       this.paiements.set([]);
       this.enRetard.set(false);
       this.lignes.set([this.emptyLine()]);
@@ -1567,6 +1682,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
       this.statut = demande.statut;
       this.commentaire = demande.commentaire ?? '';
       this.historique.set(demande.historique ?? []);
+      this.historiqueSituations.set(demande.historique_situations ?? []);
       this.paiements.set(paiements);
       this.enRetard.set(!!demande.en_retard);
       this.delaiHeures.set(Number(demande.delai_heures ?? 2));
@@ -1591,8 +1707,10 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
           montant_valide: l.montant_valide,
           montant_paye: l.montant_paye,
           reste_a_payer: l.reste_a_payer ?? null,
+          situation_recharge: l.situation_recharge ?? '',
           loading: false,
           error: null,
+          saving_situation: false,
         }))
       );
     } catch {
@@ -1620,8 +1738,10 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
       montant_valide: null,
       montant_paye: null,
       reste_a_payer: null,
+      situation_recharge: '',
       loading: false,
       error: null,
+      saving_situation: false,
     };
   }
 
