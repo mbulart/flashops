@@ -241,11 +241,9 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
       this.africa = L.geoJSON(africa as never, {
         interactive: false,
         style: () => this.africaStyle(),
-        renderer,
       }).addTo(this.map);
       this.layer = L.geoJSON(geo as never, {
         style: (feature) => this.styleOf(feature),
-        renderer,
         onEachFeature: (feature, layer) => {
           layer.on('click', () => blurPath(layer));
           layer.on('mouseover', () => {
