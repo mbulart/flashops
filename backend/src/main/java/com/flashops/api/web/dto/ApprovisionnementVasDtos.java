@@ -183,7 +183,8 @@ public final class ApprovisionnementVasDtos {
       @JsonProperty("delai_heures") BigDecimal delaiHeures,
       List<LigneView> lignes,
       List<HistoriqueStatutView> historique,
-      String canal) {}
+      String canal,
+      String code) {}
 
   public record DemandeListItem(
       Long id,
@@ -195,5 +196,6 @@ public final class ApprovisionnementVasDtos {
       @JsonProperty("en_retard") boolean enRetard,
       @JsonProperty("total_propose_usd") BigDecimal totalProposeUsd,
       @JsonProperty("total_propose_cdf") BigDecimal totalProposeCdf,
-      String canal) {}
+      String canal,
+      String code) {}
 }

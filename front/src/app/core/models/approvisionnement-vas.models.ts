@@ -122,6 +122,7 @@ export interface ApprovisionnementVasDemande {
   lignes: ApprovisionnementVasLigne[];
   historique?: ApprovisionnementVasHistorique[];
   canal?: 'momo' | 'telco';
+  code?: string;
 }
 
 export interface ApprovisionnementVasDemandeListItem {
@@ -135,6 +136,7 @@ export interface ApprovisionnementVasDemandeListItem {
   total_propose_usd?: number;
   total_propose_cdf?: number;
   canal?: 'momo' | 'telco';
+  code?: string;
 }
 
 export interface ApprovisionnementVasLigneInput {

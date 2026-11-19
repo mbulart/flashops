@@ -231,12 +231,13 @@ interface SoldeSeuilRow {
           </div>
         </div>
         @if (loadingList()) {
-          <app-skeleton type="table" [rows]="6" [cols]="7" />
+          <app-skeleton type="table" [rows]="6" [cols]="8" />
         } @else {
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
               <thead>
                 <tr>
+                  <th>Code</th>
                   <th>Date de référence</th>
                   <th>Statut</th>
                   <th class="text-end">Lignes</th>
@@ -249,6 +250,7 @@ interface SoldeSeuilRow {
               <tbody>
                 @for (d of demandes(); track d.id) {
                   <tr [class.table-warning]="d.en_retard">
+                    <td class="mono">{{ codeDemande(d) }}</td>
                     <td>{{ d.date_reference | date: 'dd/MM/yyyy' }}</td>
                     <td>
                       <app-status-badge [label]="statutLabel(d.statut)" />
@@ -266,7 +268,7 @@ interface SoldeSeuilRow {
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="7" class="text-muted text-center py-4">Aucune demande pour le moment.</td>
+                    <td colspan="8" class="text-muted text-center py-4">Aucune demande pour le moment.</td>
                   </tr>
                 }
               </tbody>
@@ -344,7 +346,7 @@ interface SoldeSeuilRow {
       }
     } @else {
       <app-page-header
-        [title]="demandeId() ? 'Demande #' + demandeId() : 'Nouvelle demande'"
+        [title]="demandeId() ? demandeCode() : 'Nouvelle demande'"
         [subtitle]="canal() === 'telco' ? 'Consommations J-1 / J-2 en USD (CDF et FCN convertis)' : 'Consommations J-1 / J-2 calculées automatiquement (Mobile Money)'"
       >
         <div actions>
@@ -364,6 +366,12 @@ interface SoldeSeuilRow {
             <app-skeleton type="table" [rows]="2" [cols]="3" />
           } @else {
             <div class="row g-3">
+              @if (demandeId()) {
+                <div class="col-md-4">
+                  <label class="form-label" for="code-demande">Code</label>
+                  <input id="code-demande" class="form-control form-control-sm appro-input mono" [value]="demandeCode()" readonly />
+                </div>
+              }
               <div class="col-md-4">
                 <label class="form-label" for="date-ref">Date de référence</label>
                 <input
@@ -783,6 +791,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
 
   readonly mode = signal<'list' | 'form'>('list');
   readonly demandeId = signal<number | null>(null);
+  readonly demandeCode = signal('');
   readonly loadingList = signal(true);
   readonly loadingForm = signal(false);
   readonly saving = signal(false);
@@ -1329,18 +1338,26 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  codeDemande(d: { id: number; code?: string | null; canal?: string | null; date_reference?: string | null }): string {
+    const existing = (d.code || '').trim();
+    if (existing) return existing;
+    const canal = (d.canal || this.canal()) === 'telco' ? 'TELCO' : 'MOMO';
+    const year = (d.date_reference || '').slice(0, 4) || String(new Date().getFullYear());
+    return `${canal}-${year}-${String(d.id).padStart(6, '0')}`;
+  }
+
   async exportDemandesExcel(): Promise<void> {
     this.exporting.set(true);
     try {
       await exportExcel({
-        filename: `approvisionnement-vas-${this.todayIso()}.xlsx`,
-        title: 'Approvisionnement VAS — Demandes',
+        filename: `approvisionnement-${this.canal()}-${this.todayIso()}.xlsx`,
+        title: `Approvisionnement ${this.canal() === 'telco' ? 'TELCO' : 'MOMO'} — Demandes`,
         brand: this.exportBrand(),
         sheets: [
           {
             name: 'Demandes',
             columns: [
-              { key: 'id', label: 'id' },
+              { key: 'code', label: 'code' },
               { key: 'date_reference', label: 'date_reference' },
               { key: 'statut', label: 'statut' },
               { key: 'nb_lignes', label: 'nb_lignes' },
@@ -1349,7 +1366,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
               { key: 'en_retard', label: 'en_retard' },
               { key: 'cree_le', label: 'cree_le' },
             ],
-            rows: this.demandes().map((d) => ({ ...d })),
+            rows: this.demandes().map((d) => ({ ...d, code: this.codeDemande(d) })),
           },
         ],
       });
@@ -1364,15 +1381,15 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
   async exportDemandesPdf(): Promise<void> {
     try {
       await this.openPdfPreview({
-        title: 'Approvisionnement VAS — Demandes',
-        filename: `approvisionnement-vas-${this.todayIso()}.pdf`,
+        title: `Approvisionnement ${this.canal() === 'telco' ? 'TELCO' : 'MOMO'} — Demandes`,
+        filename: `approvisionnement-${this.canal()}-${this.todayIso()}.pdf`,
         orientation: 'landscape',
         brand: this.exportBrand(),
         sections: [
           {
             title: 'Demandes',
             columns: [
-              { key: 'id', label: 'ID' },
+              { key: 'code', label: 'Code' },
               { key: 'date_reference', label: 'Date réf.' },
               { key: 'statut', label: 'Statut' },
               { key: 'nb_lignes', label: 'Lignes' },
@@ -1381,7 +1398,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
               { key: 'retard', label: 'Retard' },
             ],
             rows: this.demandes().map((d) => ({
-              id: d.id,
+              code: this.codeDemande(d),
               date_reference: d.date_reference,
               statut: this.statutLabel(d.statut),
               nb_lignes: d.nb_lignes,
@@ -1400,14 +1417,16 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
 
   async exportPaiementsExcel(): Promise<void> {
     try {
+      const code = this.demandeCode() || `demande-${this.demandeId()}`;
       await exportExcel({
-        filename: `paiements-demande-${this.demandeId()}.xlsx`,
-        title: `Paiements demande #${this.demandeId()}`,
+        filename: `paiements-${code}.xlsx`,
+        title: `Paiements ${code}`,
         brand: this.exportBrand(),
         sheets: [
           {
             name: 'Paiements',
             columns: [
+              { key: 'demande', label: 'demande' },
               { key: 'id', label: 'id' },
               { key: 'ligne_id', label: 'ligne_id' },
               { key: 'date_paiement', label: 'date_paiement' },
@@ -1416,7 +1435,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
               { key: 'mode_paiement', label: 'mode_paiement' },
               { key: 'reference_paiement', label: 'reference' },
             ],
-            rows: this.paiements().map((p) => ({ ...p })),
+            rows: this.paiements().map((p) => ({ ...p, demande: code })),
           },
         ],
       });
@@ -1428,14 +1447,16 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
 
   async exportPaiementsPdf(): Promise<void> {
     try {
+      const code = this.demandeCode() || `demande-${this.demandeId()}`;
       await this.openPdfPreview({
-        title: `Paiements demande #${this.demandeId()}`,
-        filename: `paiements-demande-${this.demandeId()}.pdf`,
+        title: `Paiements ${code}`,
+        filename: `paiements-${code}.pdf`,
         brand: this.exportBrand(),
         sections: [
           {
-            title: 'Paiements',
+            title: code,
             columns: [
+              { key: 'demande', label: 'Demande' },
               { key: 'date_paiement', label: 'Date' },
               { key: 'ligne_id', label: 'Ligne' },
               { key: 'montant', label: 'Montant' },
@@ -1444,6 +1465,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
               { key: 'reference_paiement', label: 'Référence' },
             ],
             rows: this.paiements().map((p) => ({
+              demande: code,
               date_paiement: p.date_paiement,
               ligne_id: p.ligne_id,
               montant: this.formatAmount(p.montant),
@@ -1502,6 +1524,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
     }
     this.mode.set('list');
     this.demandeId.set(null);
+    this.demandeCode.set('');
     await this.loadList();
   }
 
@@ -1509,6 +1532,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
     this.loadingForm.set(true);
     try {
       this.produits.set(await firstValueFrom(this.api.produits(this.canal())));
+      this.demandeCode.set('');
       this.dateReference = this.todayIso();
       this.statut = 'brouillon';
       this.commentaire = '';
@@ -1538,6 +1562,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
       } else {
         this.produits.set(produits);
       }
+      this.demandeCode.set(this.codeDemande(demande));
       this.dateReference = demande.date_reference;
       this.statut = demande.statut;
       this.commentaire = demande.commentaire ?? '';

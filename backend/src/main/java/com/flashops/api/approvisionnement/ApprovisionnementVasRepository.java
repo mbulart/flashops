@@ -214,7 +214,7 @@ public class ApprovisionnementVasRepository {
     // Filtre optionnel côté Java : Postgres ne peut pas typer "? IS NULL" si le bind est null.
     String sql =
         """
-        SELECT d.id, d.date_reference, d.statut, d.cree_le, d.soumise_le,
+        SELECT d.id, d.date_reference, d.statut, d.cree_le, d.soumise_le, d.code,
                (SELECT count(*)::int FROM lignes_demande_approvisionnement_vas l WHERE l.demande_id = d.id) AS nb_lignes,
                coalesce((SELECT sum(l.montant_propose) FROM lignes_demande_approvisionnement_vas l
                          WHERE l.demande_id = d.id AND l.devise = 'USD'), 0) AS total_propose_usd,
@@ -243,7 +243,7 @@ public class ApprovisionnementVasRepository {
             SELECT id, date_reference, statut, commentaire, motif_rejet,
                    cree_par, cree_le, modifie_par, modifie_le,
                    soumise_par, soumise_le, validee_par, validee_le,
-                   rejetee_par, rejetee_le, canal
+                   rejetee_par, rejetee_le, canal, code
             FROM demandes_approvisionnement_vas
             WHERE id = ?
             """,
@@ -792,7 +792,7 @@ public class ApprovisionnementVasRepository {
         SELECT id, date_reference, statut, commentaire, motif_rejet,
                cree_par, cree_le, modifie_par, modifie_le,
                soumise_par, soumise_le, validee_par, validee_le,
-               rejetee_par, rejetee_le, canal
+               rejetee_par, rejetee_le, canal, code
         FROM demandes_approvisionnement_vas
         WHERE statut IN ('soumise', 'en_attente_validation', 'validee', 'en_attente_paiement', 'partiellement_payee')
           AND canal = ?
@@ -834,7 +834,8 @@ public class ApprovisionnementVasRepository {
                   : rs.getTimestamp("soumise_le").toInstant(),
               scale(rs.getBigDecimal("total_propose_usd")),
               scale(rs.getBigDecimal("total_propose_cdf")),
-              rs.getString("canal"));
+              rs.getString("canal"),
+              rs.getString("code"));
 
   private static final RowMapper<DemandeHeaderRow> DEMANDE_HEADER =
       (rs, i) ->
@@ -860,7 +861,8 @@ public class ApprovisionnementVasRepository {
               rs.getTimestamp("rejetee_le") == null
                   ? null
                   : rs.getTimestamp("rejetee_le").toInstant(),
-              rs.getString("canal"));
+              rs.getString("canal"),
+              rs.getString("code"));
 
   private static final RowMapper<LigneRow> LIGNE_ROW =
       (rs, i) ->
@@ -931,7 +933,8 @@ public class ApprovisionnementVasRepository {
       Instant soumiseLe,
       BigDecimal totalProposeUsd,
       BigDecimal totalProposeCdf,
-      String canal) {}
+      String canal,
+      String code) {}
 
   public record DemandeHeaderRow(
       long id,
@@ -949,7 +952,8 @@ public class ApprovisionnementVasRepository {
       Instant valideeLe,
       Integer rejeteePar,
       Instant rejeteeLe,
-      String canal) {}
+      String canal,
+      String code) {}
 
   public record LigneRow(
       long id,

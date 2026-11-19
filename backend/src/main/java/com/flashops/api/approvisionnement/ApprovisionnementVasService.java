@@ -147,7 +147,8 @@ public class ApprovisionnementVasService {
                     isEnRetard(r.statut(), r.soumiseLe(), r.creeLe(), delai, now),
                     r.totalProposeUsd(),
                     r.totalProposeCdf(),
-                    r.canal()))
+                    r.canal(),
+                    r.code()))
         .toList();
   }
 
@@ -713,7 +714,8 @@ public class ApprovisionnementVasService {
                         h.commentaire(),
                         h.creeLe()))
             .toList(),
-        normalizeCanal(header.canal()));
+        normalizeCanal(header.canal()),
+        header.code());
   }
 
   private LigneView toLigneView(LigneRow r) {
