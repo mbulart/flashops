@@ -540,7 +540,7 @@ interface SoldeSeuilRow {
                             [name]="'situation-' + line.key"
                             [(ngModel)]="line.situation_recharge"
                             (blur)="saveSituation(line)"
-                            [disabled]="line.saving_situation"
+                            [disabled]="!!line.saving_situation"
                             placeholder="Situation de la recharge"
                           ></textarea>
                         </td>
