@@ -245,6 +245,8 @@ export interface ApprovisionnementVasLigneForm {
   montant_paye: number | null;
   reste_a_payer: number | null;
   situation_recharge: string;
+  /** Dernière valeur persistée — évite un save no-op au blur. */
+  situation_saved?: string;
   loading: boolean;
   error: string | null;
   saving_situation?: boolean;

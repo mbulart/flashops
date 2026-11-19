@@ -18,7 +18,7 @@ import { DocumentShareModalComponent } from '../document-share-modal/document-sh
   imports: [CommonModule, DocumentShareModalComponent],
   template: `
     @if (open) {
-      <div class="modal d-block pdf-preview-backdrop" tabindex="-1" style="background: rgba(0, 0, 0, 0.5)">
+      <div class="modal d-block pdf-preview-backdrop" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-lg-down">
           <div class="modal-content">
             <div class="modal-header">
@@ -62,6 +62,17 @@ import { DocumentShareModalComponent } from '../document-share-modal/document-sh
   `,
   styles: [
     `
+      :host {
+        display: contents;
+      }
+
+      .pdf-preview-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 2000;
+        background: rgba(0, 0, 0, 0.5);
+      }
+
       .pdf-preview-body {
         min-height: 70vh;
         background: #f3f4f6;

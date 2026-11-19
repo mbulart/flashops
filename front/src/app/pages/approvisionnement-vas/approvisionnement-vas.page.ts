@@ -539,7 +539,7 @@ interface SoldeSeuilRow {
                             rows="2"
                             [name]="'situation-' + line.key"
                             [(ngModel)]="line.situation_recharge"
-                            (blur)="saveSituation(line)"
+                            (blur)="onSituationBlur(line)"
                             [disabled]="!!line.saving_situation"
                             placeholder="Situation de la recharge"
                           ></textarea>
@@ -1151,9 +1151,17 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
     return this.auth.roleCode() === 'SUPER_ADMIN';
   }
 
+  /** Diffère le save : un blur avant un click (Export PDF, etc.) ne doit pas manger le click. */
+  onSituationBlur(line: ApprovisionnementVasLigneForm): void {
+    window.setTimeout(() => void this.saveSituation(line), 0);
+  }
+
   async saveSituation(line: ApprovisionnementVasLigneForm): Promise<void> {
     const demandeId = this.demandeId();
-    if (!demandeId || !line.produit_id) return;
+    if (!demandeId || !line.produit_id || line.saving_situation) return;
+    const next = line.situation_recharge?.trim() || '';
+    const prev = (line.situation_saved ?? '').trim();
+    if (next === prev) return;
     line.saving_situation = true;
     this.lignes.update((rows) => [...rows]);
     try {
@@ -1161,7 +1169,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
         this.api.updateSituation(demandeId, {
           produit_id: line.produit_id,
           devise: this.canal() === 'telco' ? 'USD' : line.devise,
-          situation_recharge: line.situation_recharge?.trim() || null,
+          situation_recharge: next || null,
         })
       );
       this.historiqueSituations.set(saved.historique_situations ?? []);
@@ -1172,6 +1180,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
         line.situation_recharge = refreshed.situation_recharge ?? '';
         line.id = refreshed.id ?? line.id;
       }
+      line.situation_saved = line.situation_recharge?.trim() || '';
       this.toast.success('Situation enregistrée');
     } catch {
       this.toast.error('Enregistrement de la situation impossible');
@@ -1708,6 +1717,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
           montant_paye: l.montant_paye,
           reste_a_payer: l.reste_a_payer ?? null,
           situation_recharge: l.situation_recharge ?? '',
+          situation_saved: (l.situation_recharge ?? '').trim(),
           loading: false,
           error: null,
           saving_situation: false,
@@ -1739,6 +1749,7 @@ export class ApprovisionnementVasPageComponent implements OnInit, OnDestroy {
       montant_paye: null,
       reste_a_payer: null,
       situation_recharge: '',
+      situation_saved: '',
       loading: false,
       error: null,
       saving_situation: false,
