@@ -14,7 +14,10 @@ public record AgenceAdminQuery(
     String pays,
     String categorie,
     Integer activityDays,
-    /** Agences avec historique, sans mouvement depuis au moins N jours. */
+    /**
+     * Tranche d'âge de la dernière transaction (jours). Ex. 7 → dernière TX il y a 7 à 15 j.
+     * Bornes : 3→[3,7), 7→[7,15), 15→[15,30), 30→[30,60), 60→[60,90), 90→[90,+∞).
+     */
     Integer inactiveSinceDays,
     /** Nouveau | Actif | Inactif — vide = pas de filtre. */
     List<String> statutActivites,

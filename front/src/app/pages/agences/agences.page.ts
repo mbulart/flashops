@@ -93,21 +93,21 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
             </select>
           </div>
           <div class="filter-field">
-            <label class="form-label" for="ag-inactive">Sans mouvement depuis</label>
+            <label class="form-label" for="ag-inactive">Dernière transaction</label>
             <select
               id="ag-inactive"
               class="form-select form-select-sm"
               [(ngModel)]="draftInactiveSinceDays"
               (ngModelChange)="onInactiveSinceChange()"
-              title="Agences qui ont eu des mouvements puis plus rien depuis cette durée"
+              title="Tranche d’âge de la dernière transaction (agences qui ont déjà eu de l’activité)"
             >
               <option [ngValue]="null">—</option>
-              <option [ngValue]="3">3 jours</option>
-              <option [ngValue]="7">7 jours</option>
-              <option [ngValue]="15">15 jours</option>
-              <option [ngValue]="30">1 mois</option>
-              <option [ngValue]="60">2 mois</option>
-              <option [ngValue]="90">3 mois</option>
+              <option [ngValue]="3">Il y a 3–7 jours</option>
+              <option [ngValue]="7">Il y a 7–15 jours</option>
+              <option [ngValue]="15">Il y a 15–30 jours</option>
+              <option [ngValue]="30">Il y a 1–2 mois</option>
+              <option [ngValue]="60">Il y a 2–3 mois</option>
+              <option [ngValue]="90">Il y a plus de 3 mois</option>
             </select>
           </div>
           <div class="filter-field">
