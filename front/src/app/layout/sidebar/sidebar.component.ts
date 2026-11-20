@@ -175,6 +175,29 @@ export class SidebarComponent implements OnInit {
       ],
     },
     {
+      label: 'Onboarding',
+      items: [
+        {
+          label: 'Candidatures',
+          path: '/onboarding/candidatures',
+          icon: 'bi bi-person-badge',
+          permission: 'onboarding.candidatures.lire',
+        },
+        {
+          label: 'Mes tâches',
+          path: '/onboarding/taches',
+          icon: 'bi bi-list-check',
+          permission: 'onboarding.taches.lire',
+        },
+        {
+          label: 'Administration',
+          path: '/onboarding/admin',
+          icon: 'bi bi-sliders',
+          permission: ['onboarding.admin', 'workflow.admin'],
+        },
+      ],
+    },
+    {
       label: 'Paramétrages',
       items: [
         {

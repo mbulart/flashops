@@ -32,8 +32,7 @@ public class PermissionGuard {
       return;
     }
     boolean ok =
-        permissions.findByRoleId(u.getRole().getId()).stream()
-            .anyMatch(p -> permissionCode.equals(p.getCode()));
+        permissions.findCodesForUser(userId).stream().anyMatch(permissionCode::equals);
     if (!ok) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "insufficient permissions");
     }

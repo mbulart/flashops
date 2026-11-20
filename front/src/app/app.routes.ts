@@ -14,6 +14,21 @@ export const routes: Routes = [
       import('./pages/public/agences-carte.page').then((m) => m.AgencesCartePageComponent),
   },
   {
+    path: 'devenir-distributeur',
+    loadComponent: () =>
+      import('./pages/public/onboarding-landing.page').then((m) => m.OnboardingLandingPageComponent),
+  },
+  {
+    path: 'devenir-distributeur/candidature',
+    loadComponent: () =>
+      import('./pages/public/onboarding-wizard.page').then((m) => m.OnboardingWizardPageComponent),
+  },
+  {
+    path: 'devenir-distributeur/suivi',
+    loadComponent: () =>
+      import('./pages/public/onboarding-suivi.page').then((m) => m.OnboardingSuiviPageComponent),
+  },
+  {
     path: '',
     component: MainLayoutComponent,
     canActivate: [authGuard],
@@ -82,6 +97,38 @@ export const routes: Routes = [
       {
         path: 'profil',
         loadComponent: () => import('./pages/profile/profile.page').then((m) => m.ProfilePageComponent),
+      },
+      {
+        path: 'onboarding/candidatures',
+        loadComponent: () =>
+          import('./pages/onboarding/onboarding-candidatures.page').then(
+            (m) => m.OnboardingCandidaturesPageComponent
+          ),
+        canActivate: [permissionGuard('onboarding.candidatures.lire')],
+      },
+      {
+        path: 'onboarding/candidatures/:id',
+        loadComponent: () =>
+          import('./pages/onboarding/onboarding-candidature-detail.page').then(
+            (m) => m.OnboardingCandidatureDetailPageComponent
+          ),
+        canActivate: [permissionGuard('onboarding.candidatures.lire')],
+      },
+      {
+        path: 'onboarding/taches',
+        loadComponent: () =>
+          import('./pages/onboarding/onboarding-taches.page').then(
+            (m) => m.OnboardingTachesPageComponent
+          ),
+        canActivate: [permissionGuard('onboarding.taches.lire')],
+      },
+      {
+        path: 'onboarding/admin',
+        loadComponent: () =>
+          import('./pages/onboarding/onboarding-admin.page').then(
+            (m) => m.OnboardingAdminPageComponent
+          ),
+        canActivate: [permissionAnyGuard('onboarding.admin', 'workflow.admin')],
       },
       {
         path: 'parametrages',

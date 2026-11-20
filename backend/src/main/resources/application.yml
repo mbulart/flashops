@@ -6,8 +6,8 @@ spring:
     name: flash-ops-api
   servlet:
     multipart:
-      max-file-size: 2MB
-      max-request-size: 2MB
+      max-file-size: 10MB
+      max-request-size: 12MB
       resolve-lazily: true
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/flash_ops}
@@ -37,5 +37,6 @@ flashops:
     full-name: Administrateur Flash OPS
   storage:
     avatars-dir: ${FLASHOPS_AVATARS_DIR:./data/avatars}
+    documents-dir: ${FLASHOPS_DOCUMENTS_DIR:./data/documents}
   geonames:
     username: ${GEONAMES_USERNAME:}

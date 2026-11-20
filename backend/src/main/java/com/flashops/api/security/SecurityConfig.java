@@ -59,6 +59,18 @@ public class SecurityConfig {
                         "/api/v1/health",
                         "/api/v1/health/")
                     .permitAll()
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/public/onboarding/**")
+                    .permitAll()
+                    .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/v1/public/onboarding/**")
+                    .permitAll()
+                    .requestMatchers(
+                        HttpMethod.PUT,
+                        "/api/v1/public/onboarding/**")
+                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

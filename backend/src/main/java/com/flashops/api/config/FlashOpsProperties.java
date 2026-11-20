@@ -16,7 +16,7 @@ public record FlashOpsProperties(
 
   public record Admin(String email, String password, String fullName) {}
 
-  public record Storage(String avatarsDir) {}
+  public record Storage(String avatarsDir, String documentsDir) {}
 
   public record Geonames(String username) {}
 }

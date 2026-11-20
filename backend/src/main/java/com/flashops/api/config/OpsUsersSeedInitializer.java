@@ -32,6 +32,15 @@ public class OpsUsersSeedInitializer implements ApplicationRunner {
 
   private static final String BENIE_EMAIL = "bnzeko@flash.one";
   private static final String FLASH_TRANSFER_PERM = "pilotage.produit.flash_transfer";
+  private static final String AMINA_EMAIL = "a.mbelu@flash.one";
+  private static final String[] AMINA_ONBOARDING_PERMS = {
+    "onboarding.candidatures.lire",
+    "onboarding.candidatures.ecrire",
+    "onboarding.taches.lire",
+    "onboarding.taches.agir",
+    "onboarding.admin",
+    "workflow.lire"
+  };
 
   private final UtilisateurRepository utilisateurs;
   private final RoleRepository roles;
@@ -106,6 +115,7 @@ public class OpsUsersSeedInitializer implements ApplicationRunner {
       log.info("Seed ops terminé — créés={}, synchronisés={}", created, updated);
     }
     grantBenieFlashTransfer();
+    grantAminaOnboarding();
   }
 
   private void grantBenieFlashTransfer() {
@@ -124,6 +134,28 @@ public class OpsUsersSeedInitializer implements ApplicationRunner {
             FLASH_TRANSFER_PERM);
     if (n > 0) {
       log.info("Permission {} accordée à {}", FLASH_TRANSFER_PERM, BENIE_EMAIL);
+    }
+  }
+
+  private void grantAminaOnboarding() {
+    int total = 0;
+    for (String code : AMINA_ONBOARDING_PERMS) {
+      total +=
+          jdbc.update(
+              """
+              INSERT INTO utilisateurs_permissions (utilisateur_id, permission_id)
+              SELECT u.id, p.id
+              FROM utilisateurs u
+              CROSS JOIN permissions p
+              WHERE lower(u.courriel) = ?
+                AND p.code = ?
+              ON CONFLICT DO NOTHING
+              """,
+              AMINA_EMAIL,
+              code);
+    }
+    if (total > 0) {
+      log.info("Permissions Onboarding accordées à {} ({})", AMINA_EMAIL, total);
     }
   }
 
