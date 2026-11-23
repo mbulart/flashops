@@ -84,6 +84,7 @@ const ECRANS_SERVICE: PilotageEcranOption[] = [
   { id: 'recharges', label: 'Recharges', rawEcrans: ['RechargesUnites', 'RechargesMega'] },
   { id: 'canal', label: 'Canal+', rawEcrans: ['ReportingCanal'] },
   { id: 'easytv', label: 'EasyTV', rawEcrans: ['ReportingEasyTV'] },
+  { id: 'bluesat', label: 'Bleusat', rawEcrans: ['ReportingBluesat'] },
   { id: 'startimes', label: 'StarTimes', rawEcrans: ['Transactions'] },
 ];
 
@@ -112,6 +113,10 @@ const MODULE_LABELS: Record<string, string> = {
   TELCO: 'TELCO',
   CANAL_PLUS: 'Canal+',
   STARTIMES: 'StarTimes',
+  BLUESAT: 'Bleusat',
+  BLEUSAT: 'Bleusat',
+  EASY_TV: 'EasyTV',
+  EASYTV: 'EasyTV',
 };
 
 const ECRAN_LABELS: Record<string, string> = {
@@ -125,17 +130,43 @@ const ECRAN_LABELS: Record<string, string> = {
   RechargesMega: 'Recharges mega',
   ReportingCanal: 'Canal+',
   ReportingEasyTV: 'EasyTV',
+  ReportingBluesat: 'Bleusat',
+  ReportingBleusat: 'Bleusat',
   Transactions: 'Transactions',
 };
 
+/** Libellé lisible pour un module/produit inconnu (ex. BLUESAT → Bleusat). */
+function pilotageHumanizeToken(raw: string): string {
+  const key = (raw || '').trim();
+  if (!key) return '';
+  return key
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => {
+      const upper = part.toUpperCase();
+      if (upper === 'TV') return 'TV';
+      if (upper === 'PLUS') return '+';
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    })
+    .join(' ')
+    .replace(/\s\+/g, '+');
+}
+
 export function pilotageModuleLabel(module: string): string {
   const key = (module || '').trim();
-  return MODULE_LABELS[key] ?? key;
+  if (!key) return '';
+  return MODULE_LABELS[key] ?? MODULE_LABELS[key.toUpperCase()] ?? pilotageHumanizeToken(key);
 }
 
 export function pilotageEcranLabel(ecran: string): string {
   const key = (ecran || '').trim();
-  return ECRAN_LABELS[key] ?? key;
+  if (!key) return '';
+  if (ECRAN_LABELS[key]) return ECRAN_LABELS[key];
+  // ReportingBluesat / ReportingCanal → Bleusat / Canal
+  if (/^Reporting/i.test(key)) {
+    return pilotageHumanizeToken(key.replace(/^Reporting/i, ''));
+  }
+  return pilotageHumanizeToken(key);
 }
 
 const DISPLAY_NAMES: Record<string, string> = {
