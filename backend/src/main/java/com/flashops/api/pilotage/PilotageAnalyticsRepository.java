@@ -827,13 +827,12 @@ public class PilotageAnalyticsRepository {
   private List<ZoneActiviteRow> loadGrainZoneActivite(PilotageBundleQuery q) {
     Grain grain = resolveAgenceRankGrain(q);
     var scoped = PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
-    String province = cleaned("d", "province");
-    String ville = cleaned("d", "ville");
+    // Province/ville vides → « Non renseigné » (ex. Bleusat / POS sans fiche geo).
+    String province = "coalesce(nullif(" + cleaned("d", "province") + ", ''), 'Non renseigné')";
+    String ville = "coalesce(nullif(" + cleaned("d", "ville") + ", ''), 'Non renseigné')";
     String body =
         scoped.fromAndWhere()
-            + " AND g.agence_id <> 0 AND "
-            + province
-            + " <> '' GROUP BY "
+            + " AND g.agence_id <> 0 GROUP BY "
             + province
             + ", "
             + ville;
@@ -859,8 +858,8 @@ public class PilotageAnalyticsRepository {
               " INNER JOIN pilotage.dim_agence AS ag ON ag.agence_id = f.agence_id WHERE ");
     }
     String ag = scoped.agenceAlias() != null ? scoped.agenceAlias() : "ag";
-    String province = cleaned(ag, "province");
-    String ville = cleaned(ag, "ville");
+    String province = "coalesce(nullif(" + cleaned(ag, "province") + ", ''), 'Non renseigné')";
+    String ville = "coalesce(nullif(" + cleaned(ag, "ville") + ", ''), 'Non renseigné')";
     String sql =
         "SELECT "
             + province
@@ -870,9 +869,7 @@ public class PilotageAnalyticsRepository {
             + PilotageMoneySql.sum("f", "montant", q)
             + " AS montant "
             + from
-            + " AND f.agence_id <> 0 AND "
-            + province
-            + " <> '' GROUP BY "
+            + " AND f.agence_id <> 0 GROUP BY "
             + province
             + ", "
             + ville;
