@@ -64,6 +64,31 @@ final class PilotageMoneySql {
     return "coalesce(" + sumRaw(alias, column, q) + ", 0)";
   }
 
+  /**
+   * Somme monétaire des seules lignes « Succès » (conversion CDF/FCN→USD si active).
+   * Utilisé quand aucun filtre statut n’est posé : le volume reste tous statuts, le montant non.
+   */
+  static String sumSucces(String alias, String column, PilotageBundleQuery q) {
+    String ref = alias + "." + column;
+    String expr = q.convertsToUsd() ? converted(ref, q.tauxUsdCdf(), q.tauxUsdFcn()) : ref;
+    return "coalesce(sum("
+        + expr
+        + ") FILTER (WHERE "
+        + alias
+        + ".statut_uniforme = 'Succès'), 0)";
+  }
+
+  /** Moyenne monétaire des seules lignes « Succès ». */
+  static String avgSucces(String alias, String column, PilotageBundleQuery q) {
+    String ref = alias + "." + column;
+    String expr = q.convertsToUsd() ? converted(ref, q.tauxUsdCdf(), q.tauxUsdFcn()) : ref;
+    return "coalesce(avg("
+        + expr
+        + ") FILTER (WHERE "
+        + alias
+        + ".statut_uniforme = 'Succès'), 0)";
+  }
+
   /** Expression {@code sum(...)} seule (ORDER BY). */
   static String sumRaw(String alias, String column, PilotageBundleQuery q) {
     String ref = alias + "." + column;

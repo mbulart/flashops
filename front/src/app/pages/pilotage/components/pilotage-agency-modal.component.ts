@@ -90,9 +90,9 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
               <span class="agency-sheet__dot" aria-hidden="true"></span>
               {{ domainesSummary() }}
               <span class="agency-sheet__dot" aria-hidden="true"></span>
-              {{ formatNumberFr(agency.volume) }} vol.
+              {{ formatNumberFr(headerVolume()) }} vol.
               <span class="agency-sheet__dot" aria-hidden="true"></span>
-              {{ formatValeurFr(agency.montant, appliedDevise) }}
+              {{ formatValeurFr(headerMontant(), appliedDevise) }}
             </p>
           </div>
           <button #closeBtn type="button" class="agency-sheet__close" (click)="closed.emit()" aria-label="Fermer">
@@ -1075,9 +1075,25 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
   }
 
   partyToLabel(): string {
+    if (this.isServiceScope()) return 'Client';
     if (this.appliedEcran === 'envois') return 'Destinataire';
     if (this.appliedEcran === 'retraits') return 'Récepteur';
     return 'Bénéficiaire';
+  }
+
+  /** Volume / montant d’en-tête : KPI filtrés si chargés, sinon ligne top-agences. */
+  headerVolume(): number {
+    const page = this.txPage();
+    return page ? page.total : this.agency.volume;
+  }
+
+  headerMontant(): number {
+    const page = this.txPage();
+    return page ? page.montantTotal : this.agency.montant;
+  }
+
+  private isServiceScope(): boolean {
+    return this.resolveDomaineCodes(this.appliedDomaineIds).includes('service');
   }
 
   flashPaymentPartners(): { value: string; label: string }[] {
@@ -1346,6 +1362,10 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
     this.draftSousProduit = (this.criteria.sousProduit || '').trim();
     this.appliedSousProduit = this.draftSousProduit;
     const wantedStatuts = new Set(this.criteria.statutUniformes || []);
+    // Sans statut au dashboard : Succès par défaut (montants / volume métier, pas En attente/Echouée).
+    if (!wantedStatuts.size) {
+      wantedStatuts.add('Succès');
+    }
     this.draftStatutIds = PILOTAGE_STATUT_OPTIONS.filter(
       (o) => o.value && wantedStatuts.has(o.value)
     ).map((o) => pilotageStatutOptionId(o.value));
@@ -1500,6 +1520,21 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
     return [];
   }
 
+  /** Multi-devises du dashboard (conversion USD) si la devise affichée n’a pas changé. */
+  private resolveTxDevises(): string[] {
+    const applied = (this.appliedDevise || '').trim().toUpperCase();
+    const parentDisplay = (this.criteria.devise || '').trim().toUpperCase();
+    const parentList = (this.criteria.devises || [])
+      .map((d) => (d || '').trim().toUpperCase())
+      .filter(Boolean);
+    if (this.inheritParentProduits && applied && applied === parentDisplay && parentList.length) {
+      return [...parentList];
+    }
+    if (applied) return [applied];
+    if (parentList.length) return [...parentList];
+    return [(parentDisplay || 'USD')].filter(Boolean);
+  }
+
   /** Critères parent + filtres appliqués de la modal (domaine / dates / devise inclus). */
   private txCriteria(): PilotageCriteria {
     const domaines = this.resolveDomaineCodes(this.appliedDomaineIds);
@@ -1521,7 +1556,8 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
       domaine: domaines[0] ?? this.criteria.domaine,
       domaines: domaines.length ? domaines : this.criteria.domaines,
       devise: this.appliedDevise || this.criteria.devise,
-      devises: [(this.appliedDevise || this.criteria.devise || 'USD').trim().toUpperCase()].filter(Boolean),
+      // Conserve le multi-devises parent (ex. USD+CDF → conversion) tant qu’on n’a pas forcé une devise seule.
+      devises: this.resolveTxDevises(),
       from: this.appliedFrom || this.criteria.from,
       to: this.appliedTo || this.criteria.to,
       produitIds: this.resolveTxProduitIds(),
@@ -1533,11 +1569,7 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
           ? pilotageCompactKey(this.appliedSousProduit || this.criteria.sousProduit || '')
           : '',
       ecran: ecranOk ? this.appliedEcran : this.inheritParentProduits ? this.criteria.ecran || '' : '',
-      statutUniformes: this.resolveAppliedStatuts().length
-        ? this.resolveAppliedStatuts()
-        : this.inheritParentProduits
-          ? [...(this.criteria.statutUniformes || [])]
-          : [],
+      statutUniformes: this.resolveAppliedStatuts(),
       categories: [],
       agenceIds: [],
       agentIds: [],

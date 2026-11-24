@@ -228,6 +228,22 @@ final class PilotageSqlScope {
     return new ScopedSql(sql.toString(), args, false, null);
   }
 
+  /** True si le client a choisi au moins un statut (pas le défaut implicite Succès argent). */
+  static boolean hasExplicitStatutFilter(PilotageBundleQuery q) {
+    return q.statutUniformes() != null && !q.statutUniformes().isEmpty();
+  }
+
+  /**
+   * Classements / montants : sans filtre statut explicite, on ne garde que « Succès »
+   * (évite En attente / Echouée dans le top agences et les KPI monétaires).
+   */
+  static String restrictToSuccesIfNoStatut(PilotageBundleQuery q, String alias, String fromAndWhere) {
+    if (hasExplicitStatutFilter(q)) {
+      return fromAndWhere;
+    }
+    return fromAndWhere + " AND " + alias + ".statut_uniforme = 'Succès'";
+  }
+
   private static void appendCommonProductStatutFilters(
       PilotageBundleQuery q, String alias, StringBuilder sql, List<Object> args, boolean agentGrain) {
     if (q.statutUniformes() != null && !q.statutUniformes().isEmpty()) {

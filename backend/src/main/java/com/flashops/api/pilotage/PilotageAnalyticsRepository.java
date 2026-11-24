@@ -28,16 +28,25 @@ public class PilotageAnalyticsRepository {
       }
       Grain grain = resolveGrain(q);
       var scoped = PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), grain.joinAgence(), grain.agent());
+      boolean statutScoped = PilotageSqlScope.hasExplicitStatutFilter(q);
       var nbMontantExpr =
           grain.hasNbMontant()
-              ? "coalesce(sum(g.nb_montant), 0)::bigint"
-              : "coalesce(sum(g.nb), 0)::bigint";
+              ? (statutScoped
+                  ? "coalesce(sum(g.nb_montant), 0)::bigint"
+                  : "coalesce(sum(g.nb_montant) FILTER (WHERE g.statut_uniforme = 'Succès'), 0)::bigint")
+              : (statutScoped
+                  ? "coalesce(sum(g.nb), 0)::bigint"
+                  : "coalesce(sum(g.nb) FILTER (WHERE g.statut_uniforme = 'Succès'), 0)::bigint");
+      var montantExpr =
+          statutScoped
+              ? PilotageMoneySql.sum("g", "montant", q)
+              : PilotageMoneySql.sumSucces("g", "montant", q);
       var sql =
           new StringBuilder(
               "SELECT coalesce(sum(g.nb), 0)::bigint AS nb, "
                   + nbMontantExpr
                   + " AS nb_montant, "
-                  + PilotageMoneySql.sum("g", "montant", q)
+                  + montantExpr
                   + " AS montant, "
                   + commissionSelect(grain.table(), "g", q)
                   + ", coalesce(sum(g.nb) FILTER (WHERE g.statut_uniforme = 'Succès'), 0)::bigint AS nb_succes");
@@ -293,12 +302,16 @@ public class PilotageAnalyticsRepository {
             .map(t -> new MonthCompareRow(t.nb(), t.montant()));
       }
       var scoped = PilotageSqlScope.buildSingleMonth(q, moisIso);
+      String montantExpr =
+          PilotageSqlScope.hasExplicitStatutFilter(q)
+              ? PilotageMoneySql.sum("g", "montant", q)
+              : PilotageMoneySql.sumSucces("g", "montant", q);
       var sql =
           new StringBuilder(
               """
               SELECT coalesce(sum(g.nb), 0)::bigint AS nb,
                      """
-                  + PilotageMoneySql.sum("g", "montant", q)
+                  + montantExpr
                   + " AS montant ");
       sql.append(scoped.fromAndWhere());
       var args = new ArrayList<>(scoped.args());
@@ -319,12 +332,26 @@ public class PilotageAnalyticsRepository {
 
   private Optional<TotalsRow> loadFaitTotals(PilotageBundleQuery q) {
     var scoped = PilotageSqlScope.buildFait(jdbc, q);
+    boolean statutScoped = PilotageSqlScope.hasExplicitStatutFilter(q);
+    String nbMontant =
+        statutScoped
+            ? "count(*) FILTER (WHERE f.montant IS NOT NULL)::bigint"
+            : "count(*) FILTER (WHERE f.montant IS NOT NULL AND s.statut_uniforme = 'Succès')::bigint";
+    String montant =
+        statutScoped
+            ? PilotageMoneySql.sum("f", "montant", q)
+            : "coalesce(sum(CASE WHEN s.statut_uniforme = 'Succès' THEN "
+                + (q.convertsToUsd()
+                    ? PilotageMoneySql.value("f", "montant", q)
+                    : "f.montant")
+                + " ELSE 0 END), 0)";
     var sql =
         """
         SELECT count(*)::bigint AS nb,
-               count(*) FILTER (WHERE f.montant IS NOT NULL)::bigint AS nb_montant,
                """
-            + PilotageMoneySql.sum("f", "montant", q)
+            + nbMontant
+            + " AS nb_montant, "
+            + montant
             + " AS montant, "
             + commissionSelect("pilotage.fait_operation", "f", q)
             + """
@@ -550,21 +577,31 @@ public class PilotageAnalyticsRepository {
       offset = (long) (safePage - 1) * safeSize;
     }
     var scoped = PilotageSqlScope.buildLignes(jdbc, q);
+    // Le front envoie Succès par défaut ; si l’utilisateur vide le filtre statut, on montre tout.
     String scope = scoped.fromAndWhere() + " AND f.agence_id = ?";
     var args = new ArrayList<>(scoped.args());
     args.add(agenceId);
     String party = partyQuery == null ? "" : partyQuery.trim();
     if (!party.isEmpty()) {
-      scope += " AND (f.expediteur ILIKE ? OR f.beneficiaire ILIKE ?)";
+      scope +=
+          " AND (f.expediteur ILIKE ? OR f.beneficiaire ILIKE ? OR f.telephone ILIKE ?"
+              + " OR f.telephone_expediteur ILIKE ?)";
       String like = "%" + party.replace("%", "").replace("_", "") + "%";
       args.add(like);
       args.add(like);
+      args.add(like);
+      args.add(like);
     }
+    String montantExpr = PilotageMoneySql.value("f", "montant", q);
     var stats =
         jdbc.queryForObject(
             "SELECT count(*)::bigint AS total,"
-                + " coalesce(avg(f.montant), 0) AS moyenne,"
-                + " coalesce(sum(f.montant), 0) AS montant_total "
+                + " coalesce(avg("
+                + montantExpr
+                + "), 0) AS moyenne,"
+                + " coalesce(sum("
+                + montantExpr
+                + "), 0) AS montant_total "
                 + scope,
             (rs, rowNum) ->
                 new AgenceTxStats(
@@ -584,11 +621,20 @@ public class PilotageAnalyticsRepository {
                coalesce(nullif(btrim(p.produit), ''), '') AS produit,
                coalesce(nullif(btrim(p.ecran), ''), '') AS ecran,
                coalesce(nullif(btrim(agent.nom), ''), '') AS operateur,
-               coalesce(nullif(btrim(f.expediteur), ''), '') AS expediteur,
-               coalesce(nullif(btrim(f.beneficiaire), ''), '') AS beneficiaire,
+               coalesce(
+                 nullif(btrim(f.expediteur), ''),
+                 nullif(btrim(f.telephone_expediteur), ''),
+                 ''
+               ) AS expediteur,
+               coalesce(
+                 nullif(btrim(f.beneficiaire), ''),
+                 nullif(btrim(f.telephone), ''),
+                 ''
+               ) AS beneficiaire,
                coalesce(s.statut_uniforme, '') AS statut,
-               f.montant
-        """
+               """
+            + montantExpr
+            + " AS montant "
             + scope.replace(
                 " FROM pilotage.fait_operation AS f",
                 " FROM pilotage.fait_operation AS f"
@@ -1241,8 +1287,10 @@ public class PilotageAnalyticsRepository {
     Grain grain = resolveAgenceRankGrain(q);
     var scoped =
         PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
+    String baseFrom =
+        PilotageSqlScope.restrictToSuccesIfNoStatut(q, "g", scoped.fromAndWhere());
     String grouped =
-        withAgenceGeo(scoped.fromAndWhere(), "d")
+        withAgenceGeo(baseFrom, "d")
             + """
              AND g.agence_id <> 0
              GROUP BY g.agence_id, d.code_agence, d.nom, d.categorie, d.pos_id, rg.libelle, zn.libelle
@@ -1291,7 +1339,7 @@ public class PilotageAnalyticsRepository {
       boolean byVolume) {
     String order = orderByMontantVolume("sum(f.montant)", "count(*)", worst, byVolume);
     var scoped = PilotageSqlScope.buildFait(jdbc, q);
-    String from = scoped.fromAndWhere();
+    String from = PilotageSqlScope.restrictToSuccesIfNoStatut(q, "s", scoped.fromAndWhere());
     if (scoped.agenceAlias() == null) {
       from =
           from.replaceFirst(
