@@ -66,12 +66,13 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
   standalone: true,
   imports: [FormsModule, GeoMapComponent, MultiSelectComponent, SkeletonComponent, StatusBadgeComponent],
   template: `
-    <div class="agency-modal">
+    <div class="agency-modal" (click)="closed.emit()">
       <section
         class="agency-sheet"
         role="dialog"
         aria-modal="true"
         aria-labelledby="agency-sheet-title"
+        (click)="$event.stopPropagation()"
       >
         <header class="agency-sheet__head">
           <div class="agency-sheet__identity">
@@ -414,10 +415,14 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
     </div>
   `,
   styles: `
+    :host {
+      display: block;
+    }
+
     .agency-modal {
       position: fixed;
       inset: 0;
-      z-index: 1200;
+      z-index: 10000;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -874,8 +879,11 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
   private readonly pilotage = inject(PilotageService);
   private readonly toast = inject(ToastService);
   private readonly appSettings = inject(AppSettingsService);
+  private readonly hostRef = inject(ElementRef<HTMLElement>);
   private previousOverflow = '';
   private txToken = 0;
+  /** Emplacement d’origine — la modal est portée sur document.body (hors stacking Leaflet). */
+  private portalHome: { parent: Node; next: ChildNode | null } | null = null;
 
   @Input({ required: true }) agency!: PilotageAgenceRank;
   @Input({ required: true }) criteria!: PilotageCriteria;
@@ -1039,8 +1047,12 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
   }
 
   ngOnInit(): void {
+    this.mountToBody();
     this.previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    document.body.classList.add('agency-modal-open');
+    // Ferme tout plein écran carte et neutralise les events carte du dashboard.
+    document.dispatchEvent(new CustomEvent('flashopsExitMapFs'));
   }
 
   ngAfterViewInit(): void {
@@ -1048,13 +1060,22 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
   }
 
   ngOnDestroy(): void {
+    document.body.classList.remove('agency-modal-open');
     document.body.style.overflow = this.previousOverflow;
+    this.portalHome = null;
     this.txToken += 1;
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.closed.emit();
+  }
+
+  private mountToBody(): void {
+    const host = this.hostRef.nativeElement;
+    if (!host.parentNode || this.portalHome) return;
+    this.portalHome = { parent: host.parentNode, next: host.nextSibling };
+    document.body.appendChild(host);
   }
 
   title(): string {

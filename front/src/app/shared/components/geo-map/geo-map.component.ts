@@ -173,7 +173,8 @@ type MapEngine = 'google' | 'leaflet';
         position: absolute;
         top: 0.65rem;
         right: 0.65rem;
-        z-index: 5000;
+        /* Sous les panes Leaflet élevés, au-dessus des tuiles — jamais au-dessus des modales. */
+        z-index: 600;
         display: inline-flex;
         align-items: center;
         gap: 0.35rem;
@@ -207,7 +208,7 @@ type MapEngine = 'google' | 'leaflet';
         top: max(3.25rem, calc(env(safe-area-inset-top, 0px) + 2.75rem));
         left: 50%;
         transform: translateX(-50%);
-        z-index: 5000;
+        z-index: 600;
         max-width: calc(100% - 2rem);
         padding: 0.3rem 0.75rem;
         border-radius: 999px;
@@ -626,6 +627,14 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (document.body.classList.contains('agency-modal-open')) return;
+    if (this.fullscreen()) {
+      this.setFullscreen(false);
+    }
+  }
+
+  @HostListener('document:flashopsExitMapFs')
+  onGlobalExitFullscreen(): void {
     if (this.fullscreen()) {
       this.setFullscreen(false);
     }
@@ -634,6 +643,7 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   toggleFullscreen(ev?: Event): void {
     ev?.preventDefault();
     ev?.stopPropagation();
+    if (document.body.classList.contains('agency-modal-open')) return;
     this.setFullscreen(!this.fullscreen());
   }
 
@@ -971,6 +981,7 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   private setFullscreen(on: boolean): void {
     if (on === this.fullscreen()) return;
+    if (on && document.body.classList.contains('agency-modal-open')) return;
     if (on) {
       this.fsPrevBodyOverflow = document.body.style.overflow;
       document.body.classList.add('geo-map-fs-open');

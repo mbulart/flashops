@@ -1034,7 +1034,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                           class="pilotage-agency-row"
                           [ngClass]="agencyRankClass(item.rank)"
                           tabindex="0"
-                          (click)="openAgency(item.row)"
+                          (click)="openAgency(item.row); $event.stopPropagation()"
                           (keydown.enter)="openAgency(item.row)"
                         >
                           <td>
@@ -2091,7 +2091,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   }
 
   openAgency(row: PilotageAgenceRank): void {
-    // Si un plein écran carte a laissé body.geo-map-fs-open, la fiche serait masquée.
+    document.dispatchEvent(new CustomEvent('flashopsExitMapFs'));
     document.body.classList.remove('geo-map-fs-open');
     this.openedAgency.set(row);
   }

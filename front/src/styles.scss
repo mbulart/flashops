@@ -107,7 +107,7 @@ app-geo-map {
 }
 
 /* Plein écran carte : retire le transform iOS pour que position:fixed
-   vise le viewport — z-index carte (1040) reste sous les modales (≥1200). */
+   vise le viewport — z-index carte (1040) reste sous les modales. */
 body.geo-map-fs-open {
   overflow: hidden !important;
 }
@@ -123,6 +123,27 @@ body.geo-map-fs-open app-geo-map .geo-map-shell--fullscreen .geo-map-host {
   height: 100% !important;
   min-height: 0 !important;
   max-height: none !important;
+}
+
+/*
+ * Modal agence ouverte : Leaflet (transform 3d) peut peindre la carte
+ * AU-DESSUS d’un dialog fixed sibling — d’où fond gris + seul « Plein écran ».
+ * La modal est portée sur body ; on neutralise les cartes du shell app.
+ */
+body.agency-modal-open app-root app-geo-map {
+  pointer-events: none !important;
+}
+
+body.agency-modal-open app-root .geo-map-fs-btn,
+body.agency-modal-open app-root .geo-map-shell--fullscreen {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.agency-modal-open app-root .geo-map-shell--fullscreen {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 0 !important;
 }
 
 .app-splash {
