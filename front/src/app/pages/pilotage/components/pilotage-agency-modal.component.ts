@@ -842,6 +842,8 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
   readonly produitsLoading = signal(false);
   private filtresToken = 0;
   private appliedProduits: PilotageProduitVue[] = [];
+  /** Tant que true, la modal conserve le filtre produit du dashboard parent. */
+  private inheritParentProduits = true;
 
   draftDomaineIds: number[] = [];
   draftFrom = '';
@@ -946,24 +948,27 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
       return;
     }
     if (changes['criteria']) {
+      this.inheritParentProduits = true;
       this.syncScopeFromCriteria();
-      this.draftEcran = '';
-      this.draftProduitIds = [];
-      this.draftPartenaire = '';
-      this.draftModePaiement = '';
-      this.draftSousProduit = '';
+      this.seedDraftFromCriteria();
       this.reloadModalProduits({ seedApplied: true });
       this.page.set(1);
       this.txPage.set(null);
       this.loadTransactions();
       return;
     }
+    if (changes['produits'] && this.inheritParentProduits) {
+      this.seedProductsFromParentInput();
+      this.seedProduitSelectionFromCriteria();
+      this.draftProduitIds = [...this.appliedProduitIds];
+      this.sensListe.update((n) => n + 1);
+    }
     if (changes['domaines'] || changes['devises']) {
       this.draftScopeTick.update((n) => n + 1);
       const validDomains = new Set(this.domaineSelectOptions().map((o) => o.id));
       this.draftDomaineIds = this.draftDomaineIds.filter((id) => validDomains.has(id));
       if (!this.draftDomaineIds.length) this.draftDomaineIds = this.domaineIdsFromCriteria();
-      if (changes['domaines']) this.reloadModalProduits();
+      if (changes['domaines']) this.reloadModalProduits({ seedApplied: this.inheritParentProduits });
       else this.onSensChange();
     }
   }
@@ -1198,6 +1203,7 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
       this.toast.warning('Devise requise.');
       return;
     }
+    this.inheritParentProduits = false;
     this.appliedDomaineIds = [...this.draftDomaineIds];
     this.appliedFrom = from;
     this.appliedTo = to;
@@ -1300,21 +1306,13 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
   }
 
   private resetLocalFilters(): void {
+    this.inheritParentProduits = true;
     this.syncScopeFromCriteria();
-    this.draftEcran = '';
-    this.draftProduitIds = [];
-    this.draftPartenaire = '';
-    this.draftModePaiement = '';
-    this.draftSousProduit = '';
-    this.draftStatutIds = [];
+    this.seedDraftFromCriteria();
+    this.seedProductsFromParentInput();
+    this.seedProduitSelectionFromCriteria();
+    this.draftProduitIds = [...this.appliedProduitIds];
     this.draftPartyQuery = '';
-    this.appliedEcran = '';
-    this.appliedProduitIds = [];
-    this.appliedProduits = [];
-    this.appliedPartenaire = '';
-    this.appliedModePaiement = '';
-    this.appliedSousProduit = '';
-    this.appliedStatutIds = [];
     this.appliedPartyQuery = '';
     this.sensListe.update((n) => n + 1);
     this.reloadModalProduits({ seedApplied: true });
@@ -1332,6 +1330,53 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
     this.draftScopeTick.update((n) => n + 1);
   }
 
+  /** Reprend sens / partenaire / statuts / produits depuis le dashboard. */
+  private seedDraftFromCriteria(): void {
+    const domaines = this.resolveDomaineCodes(this.draftDomaineIds);
+    const ecran = (this.criteria.ecran || '').trim();
+    this.draftEcran =
+      domaines.length === 1 && pilotageEcransForDomain(domaines[0]).some((e) => e.id === ecran)
+        ? ecran
+        : '';
+    this.appliedEcran = this.draftEcran;
+    this.draftPartenaire = (this.criteria.partenaire || '').trim();
+    this.appliedPartenaire = this.draftPartenaire;
+    this.draftModePaiement = this.criteria.modePaiement || '';
+    this.appliedModePaiement = this.draftModePaiement;
+    this.draftSousProduit = (this.criteria.sousProduit || '').trim();
+    this.appliedSousProduit = this.draftSousProduit;
+    const wantedStatuts = new Set(this.criteria.statutUniformes || []);
+    this.draftStatutIds = PILOTAGE_STATUT_OPTIONS.filter(
+      (o) => o.value && wantedStatuts.has(o.value)
+    ).map((o) => pilotageStatutOptionId(o.value));
+    this.appliedStatutIds = [...this.draftStatutIds];
+  }
+
+  private seedProductsFromParentInput(): void {
+    const rows = [...(this.produits || [])];
+    this.modalProduits.set(rows);
+    this.appliedProduits = rows;
+  }
+
+  /** Mappe les produit_id du dashboard vers les ids multi-select de la modal. */
+  private seedProduitSelectionFromCriteria(): void {
+    const wanted = new Set(
+      (this.criteria.produitIds || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+    );
+    if (!wanted.size) {
+      this.appliedProduitIds = [];
+      this.draftProduitIds = [];
+      return;
+    }
+    const rows = this.appliedProduits.length ? this.appliedProduits : this.modalProduits();
+    const choices = buildPilotageProduitChoices(rows, this.appliedEcran || this.draftEcran || '');
+    const ids = choices
+      .filter((choice) => choice.rows.some((row) => wanted.has(Number(row.produitId))))
+      .map((choice) => choice.id);
+    this.appliedProduitIds = ids;
+    this.draftProduitIds = [...ids];
+  }
+
   /** Charge les produits du/des domaine(s) sélectionné(s) dans le modal. */
   private reloadModalProduits(options?: { seedApplied?: boolean }): void {
     const domaines = this.resolveDomaineCodes(this.draftDomaineIds);
@@ -1339,7 +1384,10 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
     if (!domaines.length) {
       this.modalProduits.set([]);
       this.produitsLoading.set(false);
-      if (options?.seedApplied) this.appliedProduits = [];
+      if (options?.seedApplied) {
+        this.appliedProduits = [];
+        this.seedProduitSelectionFromCriteria();
+      }
       this.onSensChange();
       return;
     }
@@ -1363,14 +1411,26 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
         }
         this.modalProduits.set(produits);
         this.produitsLoading.set(false);
-        if (options?.seedApplied) this.appliedProduits = [...produits];
+        if (options?.seedApplied) {
+          this.appliedProduits = [...produits];
+          if (this.inheritParentProduits) {
+            this.seedProduitSelectionFromCriteria();
+            this.draftProduitIds = [...this.appliedProduitIds];
+          }
+        }
         this.onSensChange();
+        if (options?.seedApplied && this.inheritParentProduits) {
+          this.loadTransactions();
+        }
       },
       error: () => {
         if (token !== this.filtresToken) return;
         this.modalProduits.set([]);
         this.produitsLoading.set(false);
-        if (options?.seedApplied) this.appliedProduits = [];
+        if (options?.seedApplied) {
+          this.appliedProduits = [];
+          if (this.inheritParentProduits) this.seedProduitSelectionFromCriteria();
+        }
         this.onSensChange();
       },
     });
@@ -1426,15 +1486,36 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
     return resolvePilotageProduitIds(choices, picked, partner, mode, sous);
   }
 
+  /**
+   * Produits pour les transactions : sélection modal, sinon héritage dashboard
+   * (évite d'afficher Canal+/tous services quand Bleusat est filtré au-dessus).
+   */
+  private resolveTxProduitIds(): number[] {
+    const resolved = this.resolvedAppliedProduitIds();
+    if (resolved.length) return resolved;
+    if (this.appliedProduitIds.length > 0) return [];
+    if (this.inheritParentProduits && this.criteria.produitIds?.length) {
+      return [...this.criteria.produitIds];
+    }
+    return [];
+  }
+
   /** Critères parent + filtres appliqués de la modal (domaine / dates / devise inclus). */
   private txCriteria(): PilotageCriteria {
     const domaines = this.resolveDomaineCodes(this.appliedDomaineIds);
     const choices = buildPilotageProduitChoices(this.appliedProductRows(), this.appliedEcran);
     const flashChoice = choices.find((item) => item.module.trim().toUpperCase() === 'FLASHPAYMENT');
     const flashSelected = !!flashChoice && this.appliedProduitIds.includes(flashChoice.id);
-    const partner = flashSelected ? pilotageCompactKey(this.appliedPartenaire) : '';
+    const partner = flashSelected
+      ? pilotageCompactKey(this.appliedPartenaire)
+      : this.inheritParentProduits
+        ? pilotageCompactKey(this.criteria.partenaire || '')
+        : '';
     const ecranOk =
       domaines.length === 1 && pilotageEcransForDomain(domaines[0]).some((e) => e.id === this.appliedEcran);
+    const modePaiement = partner
+      ? this.appliedModePaiement || (this.inheritParentProduits ? this.criteria.modePaiement : '')
+      : '';
     return {
       ...this.criteria,
       domaine: domaines[0] ?? this.criteria.domaine,
@@ -1443,13 +1524,20 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
       devises: [(this.appliedDevise || this.criteria.devise || 'USD').trim().toUpperCase()].filter(Boolean),
       from: this.appliedFrom || this.criteria.from,
       to: this.appliedTo || this.criteria.to,
-      produitIds: this.resolvedAppliedProduitIds(),
-      produitLabels: [],
+      produitIds: this.resolveTxProduitIds(),
+      produitLabels: this.criteria.produitLabels?.length ? [...this.criteria.produitLabels] : [],
       partenaire: partner,
-      modePaiement: partner ? this.appliedModePaiement : '',
-      sousProduit: this.appliedModePaiement === 'momo' ? pilotageCompactKey(this.appliedSousProduit) : '',
-      ecran: ecranOk ? this.appliedEcran : '',
-      statutUniformes: this.resolveAppliedStatuts(),
+      modePaiement,
+      sousProduit:
+        modePaiement === 'momo'
+          ? pilotageCompactKey(this.appliedSousProduit || this.criteria.sousProduit || '')
+          : '',
+      ecran: ecranOk ? this.appliedEcran : this.inheritParentProduits ? this.criteria.ecran || '' : '',
+      statutUniformes: this.resolveAppliedStatuts().length
+        ? this.resolveAppliedStatuts()
+        : this.inheritParentProduits
+          ? [...(this.criteria.statutUniformes || [])]
+          : [],
       categories: [],
       agenceIds: [],
       agentIds: [],
@@ -1479,12 +1567,13 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
   private loadTransactions(): void {
     const agenceId = this.agency.agenceId;
     const token = ++this.txToken;
-    const produitIds = this.resolvedAppliedProduitIds();
+    const produitIds = this.resolveTxProduitIds();
     const productCascade =
       this.appliedProduitIds.length > 0 ||
       !!this.appliedPartenaire ||
       !!this.appliedModePaiement ||
-      !!this.appliedSousProduit;
+      !!this.appliedSousProduit ||
+      (this.inheritParentProduits && !!this.criteria.produitIds?.length);
     if (productCascade && !produitIds.length) {
       this.txPage.set({ total: 0, page: 1, size: this.pageSize(), moyenne: 0, montantTotal: 0, lignes: [] });
       this.txLoading.set(false);
