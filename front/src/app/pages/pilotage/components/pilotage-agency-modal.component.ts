@@ -430,6 +430,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
       flex-direction: column;
       width: min(72rem, 100%);
       max-height: calc(100vh - 2rem);
+      max-height: calc(100dvh - 2rem);
       overflow: hidden;
       border-radius: 1rem;
       background: var(--card-bg, #fff);

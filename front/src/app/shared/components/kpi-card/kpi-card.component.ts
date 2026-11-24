@@ -7,7 +7,7 @@ import { SkeletonComponent } from '../skeleton/skeleton.component';
   standalone: true,
   imports: [CommonModule, SkeletonComponent],
   template: `
-    <div class="kpi-card h-100">
+    <div class="kpi-card">
       <div class="kpi-card-icon" [ngClass]="'text-' + variant">
         <i [class]="icon"></i>
       </div>
