@@ -106,6 +106,37 @@ app-geo-map {
   width: 100%;
 }
 
+/* Plein écran carte : hors stacking transform iOS + hauteur mobile auto */
+body.geo-map-fs-open {
+  overflow: hidden !important;
+}
+
+body.geo-map-fs-open .app-content {
+  transform: none !important;
+}
+
+app-geo-map.geo-map-fs-host {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2400 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+app-geo-map.geo-map-fs-host .geo-map-shell,
+app-geo-map.geo-map-fs-host .geo-map-host {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
 .app-splash {
   position: fixed;
   inset: 0;

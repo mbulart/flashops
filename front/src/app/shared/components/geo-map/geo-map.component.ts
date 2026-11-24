@@ -31,13 +31,14 @@ type MapEngine = 'google' | 'leaflet';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="geo-map-shell" [class.geo-map-shell--fullscreen]="fullscreen()" [class.geo-map-shell--ready]="tilesReady()">
-      @if (!compactChrome) {
+      @if (!compactChrome || fullscreen()) {
         <button
           type="button"
           class="geo-map-fs-btn"
+          [class.geo-map-fs-btn--exit]="fullscreen()"
           (click)="toggleFullscreen($event)"
           [attr.aria-label]="fullscreen() ? 'Quitter le plein écran' : 'Agrandir la carte'"
-          [title]="fullscreen() ? 'Quitter (Échap)' : 'Plein écran'"
+          [title]="fullscreen() ? 'Réduire' : 'Plein écran'"
         >
           <i class="bi" [class.bi-fullscreen]="!fullscreen()" [class.bi-fullscreen-exit]="fullscreen()"></i>
           @if (fullscreen()) {
@@ -48,9 +49,9 @@ type MapEngine = 'google' | 'leaflet';
         </button>
       }
       @if (fullscreen()) {
-        <div class="geo-map-fs-hint">Échap ou Réduire pour quitter</div>
+        <div class="geo-map-fs-hint">Touchez Réduire pour quitter</div>
       }
-      @if (engine() === 'google' && !compactChrome) {
+      @if (engine() === 'google' && !compactChrome && !fullscreen()) {
         <div class="geo-map-provider geo-map-provider--google">Google Maps</div>
       }
       @if (!staticPin && !ringColor && points.length && presenceMode) {
@@ -118,6 +119,7 @@ type MapEngine = 'google' | 'leaflet';
         padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
         display: flex;
         flex-direction: column;
+        overflow: visible;
       }
       .geo-map-host--pick {
         cursor: crosshair;
@@ -170,7 +172,7 @@ type MapEngine = 'google' | 'leaflet';
         position: absolute;
         top: 0.65rem;
         right: 0.65rem;
-        z-index: 1000;
+        z-index: 5000;
         display: inline-flex;
         align-items: center;
         gap: 0.35rem;
@@ -183,22 +185,56 @@ type MapEngine = 'google' | 'leaflet';
         font-weight: 600;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
         cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
       }
       .geo-map-fs-btn:hover {
         filter: brightness(1.05);
       }
+      .geo-map-fs-btn--exit {
+        top: max(0.65rem, env(safe-area-inset-top, 0px));
+        right: max(0.65rem, env(safe-area-inset-right, 0px));
+        padding: 0.55rem 0.9rem;
+        font-size: 0.95rem;
+        border: 1px solid color-mix(in srgb, #111 25%, transparent);
+        background: #fff;
+        color: #111;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+      }
       .geo-map-fs-hint {
         position: absolute;
-        top: 0.75rem;
+        top: max(3.25rem, calc(env(safe-area-inset-top, 0px) + 2.75rem));
         left: 50%;
         transform: translateX(-50%);
-        z-index: 1000;
-        padding: 0.25rem 0.65rem;
+        z-index: 5000;
+        max-width: calc(100% - 2rem);
+        padding: 0.3rem 0.75rem;
         border-radius: 999px;
-        background: color-mix(in srgb, var(--card-bg, #fff) 88%, transparent);
+        background: color-mix(in srgb, var(--card-bg, #fff) 92%, transparent);
         font-size: 0.75rem;
         color: var(--bs-secondary-color, #6c757d);
         pointer-events: none;
+        text-align: center;
+      }
+      @media (max-width: 767.98px) {
+        .geo-map-fs-btn--exit {
+          top: auto;
+          bottom: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 0.75rem));
+          left: 50%;
+          right: auto;
+          transform: translateX(-50%);
+          min-height: 2.75rem;
+          min-width: 9.5rem;
+          justify-content: center;
+          border-radius: 999px;
+          font-size: 1rem;
+          background: #ffd500;
+          border-color: color-mix(in srgb, #111 20%, transparent);
+          box-shadow: 0 6px 22px rgba(0, 0, 0, 0.32);
+        }
+        .geo-map-fs-hint {
+          top: max(0.85rem, env(safe-area-inset-top, 0px));
+        }
       }
       .geo-map-provider {
         position: absolute;
@@ -403,12 +439,15 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   private readonly gmapsLoader = inject(GoogleMapsLoaderService);
   private readonly zone = inject(NgZone);
+  private readonly hostRef = inject(ElementRef<HTMLElement>);
 
   readonly fullscreen = signal(false);
   readonly engine = signal<MapEngine>('leaflet');
   readonly tilesReady = signal(false);
   readonly heatColor = mapHeatColor;
 
+  /** Marqueur DOM pour reposer la carte après plein écran (évite le piège transform iOS). */
+  private fsAnchor: Comment | null = null;
   private leafletMap?: L.Map;
   private leafletTiles?: L.TileLayer;
   private leafletTilesLite?: L.TileLayer;
@@ -547,7 +586,9 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.destroyed = true;
     this.hostObserver?.disconnect();
     this.hostObserver = undefined;
+    this.detachFullscreenHost(false);
     this.setBodyScrollLocked(false);
+    document.body.classList.remove('geo-map-fs-open');
     if (this.sizeTimer != null) {
       clearTimeout(this.sizeTimer);
       this.sizeTimer = undefined;
@@ -919,11 +960,38 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   private setFullscreen(on: boolean): void {
     this.fullscreen.set(on);
+    document.body.classList.toggle('geo-map-fs-open', on);
     this.setBodyScrollLocked(on);
+    this.detachFullscreenHost(on);
     this.leafletMap?.scrollWheelZoom.enable();
     this.googleMap?.setOptions({ scrollwheel: true });
-    this.scheduleInvalidateSize(100);
-    this.scheduleInvalidateSize(250);
+    this.kickInvalidateSize([0, 80, 200, 400]);
+  }
+
+  /**
+   * Monte la carte sur document.body en plein écran.
+   * Sinon `position:fixed` est piégé par `.app-content { transform }` (WebKit)
+   * et les `height: auto !important` du thème mobile.
+   */
+  private detachFullscreenHost(on: boolean): void {
+    const host = this.hostRef.nativeElement;
+    if (on) {
+      if (this.fsAnchor) return;
+      this.fsAnchor = document.createComment('geo-map-fs-anchor');
+      host.parentNode?.insertBefore(this.fsAnchor, host);
+      document.body.appendChild(host);
+      host.classList.add('geo-map-fs-host');
+      return;
+    }
+    if (!this.fsAnchor?.parentNode) {
+      host.classList.remove('geo-map-fs-host');
+      this.fsAnchor = null;
+      return;
+    }
+    this.fsAnchor.parentNode.insertBefore(host, this.fsAnchor);
+    this.fsAnchor.remove();
+    this.fsAnchor = null;
+    host.classList.remove('geo-map-fs-host');
   }
 
   private setBodyScrollLocked(locked: boolean): void {
