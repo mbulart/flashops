@@ -106,7 +106,8 @@ app-geo-map {
   width: 100%;
 }
 
-/* Plein écran carte : hors stacking transform iOS + hauteur mobile auto */
+/* Plein écran carte : styles UNIQUEMENT tant que body.geo-map-fs-open
+   (évite un calque fixed transparent qui bloque l’UI après Réduire). */
 body.geo-map-fs-open {
   overflow: hidden !important;
 }
@@ -115,7 +116,7 @@ body.geo-map-fs-open .app-content {
   transform: none !important;
 }
 
-app-geo-map.geo-map-fs-host {
+body.geo-map-fs-open app-geo-map.geo-map-fs-host {
   position: fixed !important;
   inset: 0 !important;
   z-index: 2400 !important;
@@ -126,10 +127,11 @@ app-geo-map.geo-map-fs-host {
   margin: 0 !important;
   display: flex !important;
   flex-direction: column !important;
+  background: var(--card-bg, #0f1115);
 }
 
-app-geo-map.geo-map-fs-host .geo-map-shell,
-app-geo-map.geo-map-fs-host .geo-map-host {
+body.geo-map-fs-open app-geo-map.geo-map-fs-host .geo-map-shell,
+body.geo-map-fs-open app-geo-map.geo-map-fs-host .geo-map-host {
   flex: 1 1 auto !important;
   width: 100% !important;
   height: 100% !important;

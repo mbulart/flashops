@@ -4,6 +4,7 @@ import {
   Component,
   ElementRef,
   EventEmitter,
+  HostBinding,
   HostListener,
   Input,
   NgZone,
@@ -446,8 +447,15 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   readonly tilesReady = signal(false);
   readonly heatColor = mapHeatColor;
 
-  /** Marqueur DOM pour reposer la carte après plein écran (évite le piège transform iOS). */
-  private fsAnchor: Comment | null = null;
+  /** Classe host pilotée par le signal — évite un calque fixed fantôme après Réduire. */
+  @HostBinding('class.geo-map-fs-host')
+  get fsHostClass(): boolean {
+    return this.fullscreen();
+  }
+
+  /** Emplacement d’origine pour reposer la carte après plein écran. */
+  private fsHome: { parent: Node; next: ChildNode | null } | null = null;
+  private fsPrevBodyOverflow = '';
   private leafletMap?: L.Map;
   private leafletTiles?: L.TileLayer;
   private leafletTilesLite?: L.TileLayer;
@@ -586,9 +594,9 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.destroyed = true;
     this.hostObserver?.disconnect();
     this.hostObserver = undefined;
-    this.detachFullscreenHost(false);
-    this.setBodyScrollLocked(false);
-    document.body.classList.remove('geo-map-fs-open');
+    if (this.fullscreen()) {
+      this.exitFullscreenChrome();
+    }
     if (this.sizeTimer != null) {
       clearTimeout(this.sizeTimer);
       this.sizeTimer = undefined;
@@ -959,13 +967,31 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private setFullscreen(on: boolean): void {
-    this.fullscreen.set(on);
-    document.body.classList.toggle('geo-map-fs-open', on);
-    this.setBodyScrollLocked(on);
-    this.detachFullscreenHost(on);
+    if (on === this.fullscreen()) return;
+    if (on) {
+      this.enterFullscreenChrome();
+      this.fullscreen.set(true);
+    } else {
+      this.fullscreen.set(false);
+      this.exitFullscreenChrome();
+    }
     this.leafletMap?.scrollWheelZoom.enable();
     this.googleMap?.setOptions({ scrollwheel: true });
     this.kickInvalidateSize([0, 80, 200, 400]);
+  }
+
+  private enterFullscreenChrome(): void {
+    this.fsPrevBodyOverflow = document.body.style.overflow;
+    document.body.classList.add('geo-map-fs-open');
+    document.body.style.overflow = 'hidden';
+    this.mountFullscreenHost();
+  }
+
+  private exitFullscreenChrome(): void {
+    this.unmountFullscreenHost();
+    document.body.classList.remove('geo-map-fs-open');
+    document.body.style.overflow = this.fsPrevBodyOverflow;
+    this.fsPrevBodyOverflow = '';
   }
 
   /**
@@ -973,29 +999,24 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
    * Sinon `position:fixed` est piégé par `.app-content { transform }` (WebKit)
    * et les `height: auto !important` du thème mobile.
    */
-  private detachFullscreenHost(on: boolean): void {
+  private mountFullscreenHost(): void {
     const host = this.hostRef.nativeElement;
-    if (on) {
-      if (this.fsAnchor) return;
-      this.fsAnchor = document.createComment('geo-map-fs-anchor');
-      host.parentNode?.insertBefore(this.fsAnchor, host);
-      document.body.appendChild(host);
-      host.classList.add('geo-map-fs-host');
-      return;
-    }
-    if (!this.fsAnchor?.parentNode) {
-      host.classList.remove('geo-map-fs-host');
-      this.fsAnchor = null;
-      return;
-    }
-    this.fsAnchor.parentNode.insertBefore(host, this.fsAnchor);
-    this.fsAnchor.remove();
-    this.fsAnchor = null;
-    host.classList.remove('geo-map-fs-host');
+    if (this.fsHome || !host.parentNode) return;
+    this.fsHome = { parent: host.parentNode, next: host.nextSibling };
+    document.body.appendChild(host);
   }
 
-  private setBodyScrollLocked(locked: boolean): void {
-    document.body.style.overflow = locked ? 'hidden' : '';
+  private unmountFullscreenHost(): void {
+    const host = this.hostRef.nativeElement;
+    const home = this.fsHome;
+    this.fsHome = null;
+    host.classList.remove('geo-map-fs-host');
+    if (!home?.parent || !document.contains(home.parent)) return;
+    if (home.next && home.next.parentNode === home.parent) {
+      home.parent.insertBefore(host, home.next);
+    } else {
+      home.parent.appendChild(host);
+    }
   }
 
   private renderPoints(force: boolean): void {
