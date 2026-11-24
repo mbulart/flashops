@@ -130,17 +130,21 @@ body.geo-map-fs-open app-geo-map .geo-map-shell--fullscreen .geo-map-host {
  * AU-DESSUS d’un dialog fixed sibling — d’où fond gris + seul « Plein écran ».
  * La modal est portée sur body ; on neutralise les cartes du shell app.
  */
-body.agency-modal-open app-root app-geo-map {
+body.agency-modal-open app-root app-geo-map,
+body.agency-modal-open app-root app-rdc-province-map {
   pointer-events: none !important;
 }
 
 body.agency-modal-open app-root .geo-map-fs-btn,
-body.agency-modal-open app-root .geo-map-shell--fullscreen {
+body.agency-modal-open app-root .geo-map-shell--fullscreen,
+body.agency-modal-open app-root .rdc-btn,
+body.agency-modal-open app-root .rdc-shell--fullscreen {
   visibility: hidden !important;
   pointer-events: none !important;
 }
 
-body.agency-modal-open app-root .geo-map-shell--fullscreen {
+body.agency-modal-open app-root .geo-map-shell--fullscreen,
+body.agency-modal-open app-root .rdc-shell--fullscreen {
   position: relative !important;
   inset: auto !important;
   z-index: 0 !important;
@@ -988,8 +992,17 @@ fieldset:disabled .btn-primary {
 }
 
 .nav-tabs-ranking {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-bottom-color: var(--card-border);
   gap: 0.15rem;
+  scrollbar-width: thin;
+
+  .nav-item {
+    flex: 0 0 auto;
+  }
 
   .nav-link {
     border: 0;

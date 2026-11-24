@@ -168,6 +168,17 @@ public final class PilotageDtos {
   public record CouloirClassementPage(
       long total, int page, int size, java.util.List<CouloirRank> items) {}
 
+  /**
+   * Classement léger réseau commercial (quelques dizaines de zones). Le front en déduit aussi le
+   * Top régions sans requête supplémentaire.
+   */
+  public record ReseauZoneRank(
+      int zoneId,
+      String zone,
+      String region,
+      long volume,
+      java.math.BigDecimal montant) {}
+
   /** {@code code} = nom GeoJSON de la province (après rapprochement de {@code dim_agence.province}). */
   public record ZoneActivite(
       String code, long volume, java.math.BigDecimal montant) {}

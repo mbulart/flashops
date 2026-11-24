@@ -30,6 +30,7 @@ import {
   PilotageProductSlice,
   PilotageProductTimeseriesPoint,
   PilotageReseauRef,
+  PilotageReseauZoneRank,
   PilotageTransactionDetail,
   PilotageTransactionListItem,
   PilotageTransactionsPage,
@@ -335,6 +336,18 @@ export class PilotageService {
     return this.http
       .get<{ data: PilotageCouloirClassementPage }>(`${this.baseUrl}/couloirs/classement`, { params })
       .pipe(map((r) => normalizeCouloirClassement(r.data)));
+  }
+
+  /** Zones réseau (≤200) — une seule requête ; le front agrège les régions. */
+  loadClassementZonesReseau(criteria: PilotageCriteria) {
+    return this.http
+      .get<{ data: PilotageReseauZoneRank[] }>(`${this.baseUrl}/zones/classement`, {
+        params: this.criteriaParams(criteria),
+      })
+      .pipe(
+        timeout(5000),
+        map((r) => (r.data ?? []).map((row) => normalizeReseauZoneRank(row)))
+      );
   }
 
   loadBundle(criteria: PilotageCriteria) {
@@ -790,6 +803,17 @@ function normalizeCouloirClassement(
     page: Number(raw?.page ?? 1),
     size: Number(raw?.size ?? 10),
     items: (raw?.items ?? []).map((row) => normalizeCouloirRank(row)),
+  };
+}
+
+function normalizeReseauZoneRank(row: PilotageReseauZoneRank): PilotageReseauZoneRank {
+  const raw = row as PilotageReseauZoneRank & { zone_id?: number };
+  return {
+    zoneId: Number(raw.zoneId ?? raw.zone_id ?? 0),
+    zone: (raw.zone ?? '').trim() || 'Non renseigné',
+    region: (raw.region ?? '').trim() || 'Non renseigné',
+    volume: Number(raw.volume ?? 0),
+    montant: Number(raw.montant ?? 0),
   };
 }
 

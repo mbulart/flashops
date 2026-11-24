@@ -38,11 +38,15 @@ import {
   PilotageCriteria,
   PilotageDomaine,
   PilotageDomaineOption,
+  PilotageGeoRankRow,
   PilotageJourFiltre,
   PilotageLocationLabels,
   PilotageReseauRef,
+  PilotageReseauZoneRank,
   PilotageZoneActivite,
 } from '../../core/models/pilotage.models';
+
+type RankingPane = 'agences' | 'couloirs' | 'provinces' | 'regions' | 'zones';
 import { AppSettingsService } from '../../core/services/app-settings.service';
 import { PilotageService } from '../../core/services/pilotage.service';
 import { ThemeService } from '../../core/services/theme.service';
@@ -875,7 +879,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                   Dernières
                 </button>
               </div>
-              @if (rankingPane() === 'agences') {
+              @if (rankingPane() !== 'couloirs') {
                 <div class="btn-group btn-group-sm pilotage-chart-toggle" role="group" aria-label="Critère de classement">
                   <button
                     type="button"
@@ -899,7 +903,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
               }
               <select
                 class="form-select form-select-sm pilotage-agency-page-size"
-                [attr.aria-label]="rankingPane() === 'agences' ? 'Agences par page' : 'Corridors par page'"
+                [attr.aria-label]="rankingPageSizeLabel()"
                 [ngModel]="agencyPageSize()"
                 (ngModelChange)="setAgencyPageSize($event)"
               >
@@ -1010,6 +1014,42 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                   Corridors
                 </button>
               </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  type="button"
+                  class="nav-link"
+                  role="tab"
+                  [class.active]="rankingPane() === 'provinces'"
+                  [attr.aria-selected]="rankingPane() === 'provinces'"
+                  (click)="setRankingPane('provinces')"
+                >
+                  Provinces
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  type="button"
+                  class="nav-link"
+                  role="tab"
+                  [class.active]="rankingPane() === 'regions'"
+                  [attr.aria-selected]="rankingPane() === 'regions'"
+                  (click)="setRankingPane('regions')"
+                >
+                  Régions
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button
+                  type="button"
+                  class="nav-link"
+                  role="tab"
+                  [class.active]="rankingPane() === 'zones'"
+                  [attr.aria-selected]="rankingPane() === 'zones'"
+                  (click)="setRankingPane('zones')"
+                >
+                  Zones
+                </button>
+              </li>
             </ul>
             @if (rankingPane() === 'agences') {
               @if (agencyLoading() || bundleLoading()) {
@@ -1082,7 +1122,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
               } @else {
                 <app-empty-state title="Aucune agence" message="Pas de volume agence sur ce périmètre." />
               }
-            } @else {
+            } @else if (rankingPane() === 'couloirs') {
               @if (corridorLoading() || bundleLoading()) {
                 <app-skeleton type="table" [rows]="6" [cols]="4" />
               } @else if (corridorPageRows().length) {
@@ -1138,6 +1178,63 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 </div>
               } @else {
                 <app-empty-state title="Aucun corridor" message="Pas de requêtes corridor sur ce périmètre." />
+              }
+            } @else {
+              @if ((rankingPane() === 'regions' || rankingPane() === 'zones') && (reseauZoneLoading() || bundleLoading())) {
+                <app-skeleton type="table" [rows]="6" [cols]="4" />
+              } @else if (geoRankPageRows().length) {
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0 pilotage-top-agences">
+                    <thead>
+                      <tr>
+                        <th style="width: 3rem">#</th>
+                        <th>{{ geoRankColumnLabel() }}</th>
+                        <th class="text-end">Volume</th>
+                        <th class="text-end">Montant</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (item of geoRankPageRows(); track item.row.code) {
+                        <tr class="pilotage-agency-row" [ngClass]="agencyRankClass(item.rank)">
+                          <td>
+                            <span class="agency-rank-badge" [ngClass]="agencyBadgeClass(item.rank)">{{ item.rank + 1 }}</span>
+                          </td>
+                          <td>
+                            <span class="d-block fw-semibold">{{ item.row.label }}</span>
+                            @if (item.row.detail) {
+                              <small class="text-muted">{{ item.row.detail }}</small>
+                            }
+                          </td>
+                          <td class="text-end text-nowrap">{{ formatPilotageNumber(item.row.volume) }}</td>
+                          <td class="text-end text-nowrap" [title]="formatValeurFr(item.row.montant, bundle()?.devise ?? 'USD')">
+                            {{ formatPilotageMontant(item.row.montant, bundle()?.devise ?? 'USD') }}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <div class="pilotage-agency-pager">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    [disabled]="currentGeoRankPage() <= 1"
+                    (click)="setGeoRankPage(currentGeoRankPage() - 1)"
+                  >
+                    Précédent
+                  </button>
+                  <span>{{ geoRankRangeLabel() }}</span>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    [disabled]="currentGeoRankPage() >= geoRankPageCount()"
+                    (click)="setGeoRankPage(currentGeoRankPage() + 1)"
+                  >
+                    Suivant
+                  </button>
+                </div>
+              } @else {
+                <app-empty-state [title]="geoRankEmptyTitle()" [message]="geoRankEmptyMessage()" />
               }
             }
           </app-section-card>
@@ -1379,7 +1476,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   readonly exportingExcel = signal(false);
   readonly exportMenuOpen = signal(false);
   readonly agencyPageSizes = [5, 10, 20, 50];
-  readonly rankingPane = signal<'agences' | 'couloirs'>('agences');
+  readonly rankingPane = signal<RankingPane>('agences');
   readonly agencyOrder = signal<'top' | 'pire'>('top');
   readonly agencyTri = signal<'montant' | 'volume'>('montant');
   readonly agencyPageSize = signal(10);
@@ -1392,6 +1489,11 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   readonly corridorTotal = signal(0);
   readonly corridorRows = signal<PilotageCouloirRank[]>([]);
   readonly corridorLoading = signal(false);
+  /** Zones réseau (lazy) — sert aussi au Top régions sans 2ᵉ requête. */
+  readonly reseauZoneRows = signal<PilotageReseauZoneRank[]>([]);
+  readonly reseauZoneLoading = signal(false);
+  readonly reseauZoneLoaded = signal(false);
+  readonly geoRankPage = signal(1);
   readonly agencyPageCount = computed(() =>
     Math.max(1, Math.ceil(this.agencyTotal() / this.agencyPageSize()))
   );
@@ -1416,6 +1518,63 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
       rank: start + index,
     }));
   });
+
+  /** Provinces géo : déjà chargées via zones-activite (carte) — 0 requête en plus. */
+  readonly provinceRankAll = computed((): PilotageGeoRankRow[] => {
+    const rows = this.zoneActivite().map((z) => ({
+      code: z.code,
+      label: provinceDisplayLabel(z.code),
+      volume: z.volume,
+      montant: z.montant,
+    }));
+    return sortGeoRanks(rows, this.agencyTri(), this.agencyOrder());
+  });
+
+  /** Régions réseau : agrégat client des zones (même payload). */
+  readonly regionRankAll = computed((): PilotageGeoRankRow[] => {
+    const acc = new Map<string, PilotageGeoRankRow>();
+    for (const z of this.reseauZoneRows()) {
+      const key = z.region || 'Non renseigné';
+      const cur = acc.get(key) ?? { code: key, label: key, volume: 0, montant: 0 };
+      cur.volume += z.volume;
+      cur.montant += z.montant;
+      acc.set(key, cur);
+    }
+    return sortGeoRanks([...acc.values()], this.agencyTri(), this.agencyOrder());
+  });
+
+  readonly zoneRankAll = computed((): PilotageGeoRankRow[] => {
+    const rows = this.reseauZoneRows().map((z) => ({
+      code: String(z.zoneId || z.zone),
+      label: z.zone,
+      detail: z.region && z.region !== z.zone ? z.region : undefined,
+      volume: z.volume,
+      montant: z.montant,
+    }));
+    return sortGeoRanks(rows, this.agencyTri(), this.agencyOrder());
+  });
+
+  readonly geoRankSource = computed((): PilotageGeoRankRow[] => {
+    const pane = this.rankingPane();
+    if (pane === 'provinces') return this.provinceRankAll();
+    if (pane === 'regions') return this.regionRankAll();
+    if (pane === 'zones') return this.zoneRankAll();
+    return [];
+  });
+
+  readonly geoRankTotal = computed(() => this.geoRankSource().length);
+  readonly geoRankPageCount = computed(() =>
+    Math.max(1, Math.ceil(this.geoRankTotal() / this.agencyPageSize()))
+  );
+  readonly geoRankPageRows = computed(() => {
+    const size = this.agencyPageSize();
+    const page = Math.min(this.geoRankPage(), this.geoRankPageCount());
+    const start = (page - 1) * size;
+    return this.geoRankSource()
+      .slice(start, start + size)
+      .map((row, index) => ({ row, rank: start + index }));
+  });
+
   readonly exportProgress = signal(0);
   private exportCreep: ReturnType<typeof setInterval> | null = null;
 
@@ -2430,17 +2589,112 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
 
   rankingTitle(): string {
     const top = this.agencyOrder() === 'top';
-    if (this.rankingPane() === 'couloirs') {
-      return top ? 'Top corridors' : 'Derniers corridors';
+    switch (this.rankingPane()) {
+      case 'couloirs':
+        return top ? 'Top corridors' : 'Derniers corridors';
+      case 'provinces':
+        return top ? 'Top provinces' : 'Dernières provinces';
+      case 'regions':
+        return top ? 'Top régions' : 'Dernières régions';
+      case 'zones':
+        return top ? 'Top zones' : 'Dernières zones';
+      default:
+        return top ? 'Top agences' : 'Dernières agences';
     }
-    return top ? 'Top agences' : 'Dernières agences';
   }
 
   rankingSubtitle(): string {
-    if (this.rankingPane() === 'couloirs') {
-      return this.corridorSubtitle();
+    switch (this.rankingPane()) {
+      case 'couloirs':
+        return this.corridorSubtitle();
+      case 'provinces':
+      case 'regions':
+      case 'zones':
+        return this.geoRankSubtitle();
+      default:
+        return this.agencySubtitle();
     }
-    return this.agencySubtitle();
+  }
+
+  rankingPageSizeLabel(): string {
+    switch (this.rankingPane()) {
+      case 'couloirs':
+        return 'Corridors par page';
+      case 'provinces':
+        return 'Provinces par page';
+      case 'regions':
+        return 'Régions par page';
+      case 'zones':
+        return 'Zones par page';
+      default:
+        return 'Agences par page';
+    }
+  }
+
+  geoRankColumnLabel(): string {
+    switch (this.rankingPane()) {
+      case 'regions':
+        return 'Région';
+      case 'zones':
+        return 'Zone';
+      default:
+        return 'Province';
+    }
+  }
+
+  geoRankSubtitle(): string {
+    const triLabel = this.agencyTri() === 'volume' ? 'Volume' : 'Montant';
+    const total = this.geoRankTotal();
+    const unit =
+      this.rankingPane() === 'regions'
+        ? 'région(s)'
+        : this.rankingPane() === 'zones'
+          ? 'zone(s)'
+          : 'province(s)';
+    if (!total) return triLabel;
+    const sens = this.agencyOrder() === 'top' ? 'meilleures en tête' : 'plus faibles en tête';
+    return `${triLabel} — ${total.toLocaleString('fr-FR')} ${unit}, ${sens}`;
+  }
+
+  geoRankRangeLabel(): string {
+    const total = this.geoRankTotal();
+    if (!total) return '0';
+    const size = this.agencyPageSize();
+    const page = this.currentGeoRankPage();
+    const from = (page - 1) * size + 1;
+    const to = Math.min(page * size, total);
+    return `${from}–${to} sur ${total.toLocaleString('fr-FR')}`;
+  }
+
+  geoRankEmptyTitle(): string {
+    switch (this.rankingPane()) {
+      case 'regions':
+        return 'Aucune région';
+      case 'zones':
+        return 'Aucune zone';
+      default:
+        return 'Aucune province';
+    }
+  }
+
+  geoRankEmptyMessage(): string {
+    switch (this.rankingPane()) {
+      case 'regions':
+        return 'Pas d’activité agrégée par région réseau sur ce périmètre.';
+      case 'zones':
+        return 'Pas d’activité agrégée par zone réseau sur ce périmètre.';
+      default:
+        return 'Pas d’activité province sur ce périmètre.';
+    }
+  }
+
+  currentGeoRankPage(): number {
+    return Math.min(this.geoRankPage(), this.geoRankPageCount());
+  }
+
+  setGeoRankPage(page: number): void {
+    const next = Math.min(Math.max(1, page), this.geoRankPageCount());
+    if (next !== this.geoRankPage()) this.geoRankPage.set(next);
   }
 
   agencySubtitle(): string {
@@ -2486,12 +2740,16 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     return Math.min(this.corridorPage(), this.corridorPageCount());
   }
 
-  setRankingPane(pane: 'agences' | 'couloirs'): void {
+  setRankingPane(pane: RankingPane): void {
     if (this.rankingPane() === pane) return;
     this.exportMenuOpen.set(false);
     this.rankingPane.set(pane);
+    this.geoRankPage.set(1);
     if (pane === 'couloirs' && !this.corridorRows().length && !this.corridorLoading()) {
       this.reloadCorridorClassement({ resetPage: false });
+    }
+    if ((pane === 'regions' || pane === 'zones') && !this.reseauZoneLoaded() && !this.reseauZoneLoading()) {
+      this.reloadReseauZones();
     }
   }
 
@@ -2515,6 +2773,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.agencyPageSize.set(next);
     this.agencyPage.set(1);
     this.corridorPage.set(1);
+    this.geoRankPage.set(1);
     this.reloadClassement({ resetPage: false });
     this.reloadCorridorClassement({ resetPage: false });
   }
@@ -2524,15 +2783,21 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.openedAgency.set(null);
     this.agencyOrder.set(order);
     this.patchAgencyOrderInUrl(order);
+    this.geoRankPage.set(1);
     this.reloadClassement({ resetPage: true });
     this.reloadCorridorClassement({ resetPage: true });
+    // provinces / régions / zones : tri client, pas de requête.
   }
 
   setAgencyTri(tri: 'montant' | 'volume'): void {
     if (this.agencyTri() === tri) return;
     this.openedAgency.set(null);
     this.agencyTri.set(tri);
-    this.reloadClassement({ resetPage: true });
+    this.geoRankPage.set(1);
+    if (this.rankingPane() === 'agences') {
+      this.reloadClassement({ resetPage: true });
+    }
+    // Autres onglets : tri client uniquement.
   }
 
   private patchAgencyOrderInUrl(order: 'top' | 'pire'): void {
@@ -2727,6 +2992,30 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Lazy : une seule requête légère, partagée Régions + Zones. */
+  private reloadReseauZones(): void {
+    const c = this.criteria();
+    if (!c || !this.metaReady()) {
+      this.reseauZoneRows.set([]);
+      this.reseauZoneLoading.set(false);
+      this.reseauZoneLoaded.set(false);
+      return;
+    }
+    this.reseauZoneLoading.set(true);
+    this.pilotage.loadClassementZonesReseau(c).subscribe({
+      next: (rows) => {
+        this.reseauZoneRows.set(rows);
+        this.reseauZoneLoaded.set(true);
+        this.reseauZoneLoading.set(false);
+      },
+      error: () => {
+        this.reseauZoneRows.set([]);
+        this.reseauZoneLoaded.set(true);
+        this.reseauZoneLoading.set(false);
+      },
+    });
+  }
+
   private refreshBundle(): void {
     const c = this.criteria();
     if (!c || !this.metaReady()) {
@@ -2735,6 +3024,8 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
       this.agencyTotal.set(0);
       this.corridorRows.set([]);
       this.corridorTotal.set(0);
+      this.reseauZoneRows.set([]);
+      this.reseauZoneLoaded.set(false);
       return;
     }
     this.bundleLoading.set(true);
@@ -2742,6 +3033,11 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.refreshZoneActivite(c);
     this.reloadClassement({ resetPage: true });
     this.reloadCorridorClassement({ resetPage: true });
+    // Zones/régions : uniquement si l’onglet a déjà été ouvert (évite une requête inutile).
+    if (this.reseauZoneLoaded() || this.rankingPane() === 'regions' || this.rankingPane() === 'zones') {
+      this.reloadReseauZones();
+    }
+    this.geoRankPage.set(1);
     this.pilotage.loadBundle(c).subscribe({
       next: (data) => {
         this.bundle.set(data);
@@ -2781,6 +3077,9 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.rankingPane.set('agences');
     this.agencyPage.set(1);
     this.corridorPage.set(1);
+    this.geoRankPage.set(1);
+    this.reseauZoneRows.set([]);
+    this.reseauZoneLoaded.set(false);
     this.detailFiltresOpen.set(false);
     this.onDomaineIdsChange(this.draftDomaineIds);
     this.applySearch(false);
@@ -3280,6 +3579,34 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     if (code === 'service') return 'Services';
     return label;
   }
+}
+
+function sortGeoRanks(
+  rows: PilotageGeoRankRow[],
+  tri: 'montant' | 'volume',
+  ordre: 'top' | 'pire'
+): PilotageGeoRankRow[] {
+  const dir = ordre === 'top' ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const av = tri === 'volume' ? a.volume : a.montant;
+    const bv = tri === 'volume' ? b.volume : b.montant;
+    if (av !== bv) return av < bv ? dir : -dir;
+    return a.label.localeCompare(b.label, 'fr');
+  });
+}
+
+function provinceDisplayLabel(code: string): string {
+  const labels: Record<string, string> = {
+    'North Kivu': 'Nord-Kivu',
+    'South Kivu': 'Sud-Kivu',
+    'Kongo-Central': 'Kongo Central',
+    'Upper Uele': 'Haut-Uélé',
+    'Lower Uele': 'Bas-Uélé',
+    'Central Kasai': 'Kasaï-Central',
+    'Kasai-Oriental': 'Kasaï-Oriental',
+    'Mai-Ndombe': 'Maï-Ndombe',
+  };
+  return labels[code] ?? code;
 }
 
 function queryInts(values: string[]): number[] {

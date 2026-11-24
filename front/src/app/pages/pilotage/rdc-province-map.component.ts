@@ -43,30 +43,33 @@ let africaCache: Promise<GeoJson> | null = null;
   standalone: true,
   template: `
     <div class="rdc-shell" [class.rdc-shell--expanded]="expanded()" [class.rdc-shell--fullscreen]="fullscreen()">
-      <div class="rdc-toolbar">
+      <div class="rdc-toolbar" [class.rdc-toolbar--fs]="fullscreen()">
+        @if (!fullscreen()) {
+          <button
+            type="button"
+            class="rdc-btn"
+            (click)="toggleExpanded($event)"
+            [attr.aria-label]="expanded() ? 'Compresser la carte' : 'Étendre la carte'"
+            [title]="expanded() ? 'Compresser' : 'Étendre'"
+          >
+            <i class="bi" [class.bi-arrows-angle-contract]="expanded()" [class.bi-arrows-angle-expand]="!expanded()"></i>
+            <span>{{ expanded() ? 'Compresser' : 'Étendre' }}</span>
+          </button>
+        }
         <button
           type="button"
           class="rdc-btn"
-          (click)="toggleExpanded($event)"
-          [attr.aria-label]="expanded() ? 'Compresser la carte' : 'Étendre la carte'"
-          [title]="expanded() ? 'Compresser' : 'Étendre'"
-        >
-          <i class="bi" [class.bi-arrows-angle-contract]="expanded()" [class.bi-arrows-angle-expand]="!expanded()"></i>
-          <span>{{ expanded() ? 'Compresser' : 'Étendre' }}</span>
-        </button>
-        <button
-          type="button"
-          class="rdc-btn"
+          [class.rdc-btn--exit]="fullscreen()"
           (click)="toggleFullscreen($event)"
           [attr.aria-label]="fullscreen() ? 'Quitter le plein écran' : 'Plein écran'"
-          [title]="fullscreen() ? 'Quitter (Échap)' : 'Plein écran'"
+          [title]="fullscreen() ? 'Réduire' : 'Plein écran'"
         >
           <i class="bi" [class.bi-fullscreen-exit]="fullscreen()" [class.bi-fullscreen]="!fullscreen()"></i>
           <span>{{ fullscreen() ? 'Réduire' : 'Plein écran' }}</span>
         </button>
       </div>
       @if (fullscreen()) {
-        <div class="rdc-fs-hint">Échap ou Réduire pour quitter</div>
+        <div class="rdc-fs-hint">Touchez Réduire pour quitter</div>
       }
       <div #host class="rdc-map"></div>
     </div>
@@ -89,21 +92,29 @@ let africaCache: Promise<GeoJson> | null = null;
         height: 100%;
         width: 100%;
       }
+      /* Sous les modales (agence ~10000) */
       .rdc-shell--fullscreen {
         position: fixed;
         inset: 0;
-        z-index: 2100;
+        z-index: 1040;
         height: 100% !important;
         background: var(--card-bg, #0f1115);
         padding: 0.75rem;
+        padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+        padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+        padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+        padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
       }
       .rdc-toolbar {
         position: absolute;
         top: 0.65rem;
         right: 0.65rem;
-        z-index: 1000;
+        z-index: 1100;
         display: flex;
         gap: 0.35rem;
+      }
+      .rdc-toolbar--fs {
+        z-index: 1200;
       }
       .rdc-btn {
         display: inline-flex;
@@ -118,22 +129,56 @@ let africaCache: Promise<GeoJson> | null = null;
         font-weight: 600;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
         cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
       }
       .rdc-btn:hover {
         filter: brightness(1.05);
       }
+      .rdc-btn--exit {
+        padding: 0.55rem 0.9rem;
+        font-size: 0.95rem;
+        background: #fff;
+        color: #111;
+        border-color: color-mix(in srgb, #111 25%, transparent);
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
+      }
       .rdc-fs-hint {
         position: absolute;
-        top: 0.75rem;
+        top: max(3.25rem, calc(env(safe-area-inset-top, 0px) + 2.75rem));
         left: 50%;
         transform: translateX(-50%);
-        z-index: 1000;
-        padding: 0.25rem 0.65rem;
+        z-index: 1200;
+        max-width: calc(100% - 2rem);
+        padding: 0.3rem 0.75rem;
         border-radius: 999px;
-        background: color-mix(in srgb, var(--card-bg, #fff) 88%, transparent);
+        background: color-mix(in srgb, var(--card-bg, #fff) 92%, transparent);
         font-size: 0.75rem;
         color: var(--bs-secondary-color, #6c757d);
         pointer-events: none;
+        text-align: center;
+      }
+      @media (max-width: 767.98px) {
+        .rdc-toolbar--fs {
+          top: auto;
+          bottom: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 0.75rem));
+          left: 50%;
+          right: auto;
+          transform: translateX(-50%);
+        }
+        .rdc-btn--exit {
+          min-height: 2.75rem;
+          min-width: 9.5rem;
+          justify-content: center;
+          border-radius: 999px;
+          font-size: 1rem;
+          background: #ffd500;
+          border-color: color-mix(in srgb, #111 20%, transparent);
+          box-shadow: 0 6px 22px rgba(0, 0, 0, 0.32);
+        }
+        .rdc-fs-hint {
+          top: max(0.85rem, env(safe-area-inset-top, 0px));
+        }
       }
       .rdc-map {
         height: 100%;
@@ -144,6 +189,7 @@ let africaCache: Promise<GeoJson> | null = null;
       }
       .rdc-shell--fullscreen .rdc-map {
         border-radius: 0.4rem;
+        height: 100%;
       }
       :host-context([data-bs-theme='dark']) .rdc-map {
         background: #0b1220;
@@ -276,25 +322,44 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
   }
 
   toggleExpanded(ev?: Event): void {
+    ev?.preventDefault();
     ev?.stopPropagation();
     if (this.fullscreen()) {
-      this.fullscreen.set(false);
+      this.setFullscreen(false);
     }
     this.expanded.update((v) => !v);
     this.scheduleResize();
   }
 
   toggleFullscreen(ev?: Event): void {
+    ev?.preventDefault();
     ev?.stopPropagation();
-    this.fullscreen.update((v) => !v);
-    if (this.fullscreen()) this.expanded.set(true);
-    this.scheduleResize();
+    if (document.body.classList.contains('agency-modal-open')) return;
+    this.setFullscreen(!this.fullscreen());
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (document.body.classList.contains('agency-modal-open')) return;
     if (!this.fullscreen()) return;
-    this.fullscreen.set(false);
+    this.setFullscreen(false);
+  }
+
+  @HostListener('document:flashopsExitMapFs')
+  onGlobalExitFullscreen(): void {
+    if (this.fullscreen()) this.setFullscreen(false);
+  }
+
+  private setFullscreen(on: boolean): void {
+    if (on === this.fullscreen()) return;
+    if (on && document.body.classList.contains('agency-modal-open')) return;
+    this.fullscreen.set(on);
+    if (on) {
+      this.expanded.set(true);
+      document.body.classList.add('geo-map-fs-open');
+    } else if (!document.querySelector('app-geo-map .geo-map-shell--fullscreen')) {
+      document.body.classList.remove('geo-map-fs-open');
+    }
     this.scheduleResize();
   }
 
@@ -315,6 +380,12 @@ export class RdcProvinceMapComponent implements AfterViewInit, OnChanges, OnDest
   }
 
   ngOnDestroy(): void {
+    if (this.fullscreen()) {
+      this.fullscreen.set(false);
+      if (!document.querySelector('app-geo-map .geo-map-shell--fullscreen')) {
+        document.body.classList.remove('geo-map-fs-open');
+      }
+    }
     if (this.sizeTimer != null) clearTimeout(this.sizeTimer);
     this.map?.remove();
     this.map = undefined;

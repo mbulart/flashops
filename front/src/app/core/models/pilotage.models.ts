@@ -274,6 +274,24 @@ export interface PilotageCouloirClassementPage {
   items: PilotageCouloirRank[];
 }
 
+/** Zone réseau commerciale (réponse légère `/zones/classement`). */
+export interface PilotageReseauZoneRank {
+  zoneId: number;
+  zone: string;
+  region: string;
+  volume: number;
+  montant: number;
+}
+
+/** Ligne affichée pour Top provinces / régions / zones (pagination front). */
+export interface PilotageGeoRankRow {
+  code: string;
+  label: string;
+  detail?: string;
+  volume: number;
+  montant: number;
+}
+
 export interface PilotageAgenceFiche {
   agenceId: number;
   codeAgence: string;

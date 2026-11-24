@@ -211,6 +211,58 @@ public class PilotageController {
             query, "pire".equalsIgnoreCase(ordre), page, size, byVolume));
   }
 
+  /**
+   * Classement zones réseau (léger, ≤200 lignes). Pas de pagination serveur : le front pagine et en
+   * dérive le Top régions sans requête supplémentaire.
+   */
+  @GetMapping("/zones/classement")
+  public Map<String, List<PilotageDtos.ReseauZoneRank>> classementZones(
+      @RequestParam("domaine") java.util.List<String> domaine,
+      @RequestParam("devise") List<String> devise,
+      @RequestParam("from") String from,
+      @RequestParam("to") String to,
+      @RequestParam(value = "produit_id", required = false) List<Integer> produitIds,
+      @RequestParam(value = "ecran", required = false) String ecran,
+      @RequestParam(value = "statut_uniforme", required = false) List<String> statutUniformes,
+      @RequestParam(value = "categorie", required = false) List<String> categories,
+      @RequestParam(value = "agence_id", required = false) List<Integer> agenceIds,
+      @RequestParam(value = "agent_id", required = false) List<Integer> agentIds,
+      @RequestParam(value = "type_operation_id", required = false) List<Integer> typeOperationIds,
+      @RequestParam(value = "jour_filtre", required = false) String jourFiltre,
+      @RequestParam(value = "couloir", required = false) List<String> couloirCodes,
+      @RequestParam(value = "reseau_region", required = false) List<String> reseauRegion,
+      @RequestParam(value = "zone_id", required = false) List<Integer> zoneId,
+      @RequestParam(value = "pays_id", required = false) Integer paysId,
+      @RequestParam(value = "province_id", required = false) Integer provinceId,
+      @RequestParam(value = "ville_id", required = false) List<Integer> villeId,
+      @RequestParam(value = "territoire_id", required = false) Integer territoireId,
+      @RequestParam(value = "commune_id", required = false) List<Integer> communeId) {
+    permissions.require(AuthSupport.currentUserId(), "dashboard.voir");
+    var query =
+        scopedQuery(
+            domaine,
+            devise,
+            from,
+            to,
+            produitIds,
+            ecran,
+            statutUniformes,
+            categories,
+            agenceIds,
+            agentIds,
+            typeOperationIds,
+            jourFiltre,
+            couloirCodes,
+            reseauRegion,
+            zoneId,
+            paysId,
+            provinceId,
+            villeId,
+            territoireId,
+            communeId);
+    return Map.of("data", analyticsService.classementZonesReseau(query));
+  }
+
   @GetMapping("/couloirs/classement")
   public Map<String, PilotageDtos.CouloirClassementPage> classementCouloirs(
       @RequestParam("domaine") java.util.List<String> domaine,

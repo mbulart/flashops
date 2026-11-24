@@ -1388,6 +1388,93 @@ public class PilotageAnalyticsRepository {
     return new AgenceClassement(total, 1, limit, rows);
   }
 
+  /**
+   * Classement zones réseau (et régions via join). Liste complète plafonnée — assez petite pour
+   * pagination / agrégation côté front sans round-trips.
+   */
+  public List<ReseauZoneRankRow> loadReseauZoneRanks(PilotageBundleQuery q) {
+    try {
+      if (q.couloirOnFact()) {
+        return loadFaitReseauZoneRanks(q);
+      }
+      return loadGrainReseauZoneRanks(q);
+    } catch (DataAccessException ex) {
+      log.error("Classement zones réseau pilotage indisponible", ex);
+      return List.of();
+    }
+  }
+
+  private List<ReseauZoneRankRow> loadGrainReseauZoneRanks(PilotageBundleQuery q) {
+    Grain grain = resolveAgenceRankGrain(q);
+    var scoped = PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
+    String baseFrom =
+        PilotageSqlScope.restrictToSuccesIfNoStatut(q, "g", scoped.fromAndWhere());
+    String grouped =
+        withAgenceGeo(baseFrom, "d")
+            + """
+             AND g.agence_id <> 0
+             GROUP BY coalesce(zn.zone_id, 0), zn.libelle, rg.libelle
+            """;
+    String sql =
+        """
+        SELECT coalesce(zn.zone_id, 0) AS zone_id,
+               coalesce(nullif(nullif(btrim(zn.libelle), ''), 'Non renseigné'), 'Non renseigné') AS zone,
+               coalesce(nullif(nullif(btrim(rg.libelle), ''), 'Non renseigné'), 'Non renseigné') AS region,
+               coalesce(sum(g.nb), 0)::bigint AS nb,
+        """
+            + PilotageMoneySql.sum("g", "montant", q)
+            + " AS montant "
+            + grouped
+            + """
+             ORDER BY montant DESC, nb DESC
+             LIMIT 200
+            """;
+    return jdbc.query(sql, this::mapReseauZoneRank, scoped.args().toArray());
+  }
+
+  private List<ReseauZoneRankRow> loadFaitReseauZoneRanks(PilotageBundleQuery q) {
+    var scoped = PilotageSqlScope.buildFait(jdbc, q);
+    String from = scoped.fromAndWhere();
+    if (scoped.agenceAlias() == null) {
+      from =
+          from.replaceFirst(
+              " WHERE ",
+              " INNER JOIN pilotage.dim_agence AS ag ON ag.agence_id = f.agence_id WHERE ");
+    }
+    String ag = scoped.agenceAlias() != null ? scoped.agenceAlias() : "ag";
+    String grouped =
+        withAgenceGeo(from, ag)
+            + """
+             AND f.agence_id <> 0
+             GROUP BY coalesce(zn.zone_id, 0), zn.libelle, rg.libelle
+            """;
+    String sql =
+        """
+        SELECT coalesce(zn.zone_id, 0) AS zone_id,
+               coalesce(nullif(nullif(btrim(zn.libelle), ''), 'Non renseigné'), 'Non renseigné') AS zone,
+               coalesce(nullif(nullif(btrim(rg.libelle), ''), 'Non renseigné'), 'Non renseigné') AS region,
+               count(*)::bigint AS nb,
+        """
+            + PilotageMoneySql.sum("f", "montant", q)
+            + " AS montant "
+            + grouped
+            + """
+             ORDER BY montant DESC, nb DESC
+             LIMIT 200
+            """;
+    return jdbc.query(sql, this::mapReseauZoneRank, scoped.args().toArray());
+  }
+
+  private ReseauZoneRankRow mapReseauZoneRank(java.sql.ResultSet rs, int rowNum)
+      throws java.sql.SQLException {
+    return new ReseauZoneRankRow(
+        rs.getInt("zone_id"),
+        rs.getString("zone"),
+        rs.getString("region"),
+        rs.getLong("nb"),
+        money(rs, "montant"));
+  }
+
   /** Classement corridors (par volume = requêtes). */
   public CouloirClassement loadTopCorridorsPage(
       PilotageBundleQuery q, int page, int size, boolean worst) {
@@ -2087,6 +2174,10 @@ public class PilotageAnalyticsRepository {
       return new CouloirClassement(total, page, size, rows);
     }
   }
+
+  /** Agrégat réseau commercial : une ligne par zone (région jointe), plafond bas. */
+  public record ReseauZoneRankRow(
+      int zoneId, String zone, String region, long nb, BigDecimal montant) {}
 
   public record AgenceClassement(long total, int page, int size, List<AgenceRankRow> rows) {
     AgenceClassement withPage(int page, int size) {

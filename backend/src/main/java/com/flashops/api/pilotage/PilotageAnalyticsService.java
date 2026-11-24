@@ -402,6 +402,22 @@ public class PilotageAnalyticsService {
     return new PilotageDtos.CouloirClassementPage(raw.total(), raw.page(), raw.size(), items);
   }
 
+  /** Zones réseau (liste courte) — le front agrège aussi les régions sans 2ᵉ requête. */
+  public List<PilotageDtos.ReseauZoneRank> classementZonesReseau(PilotageBundleQuery q) {
+    q = withMoneyContext(q);
+    validate(q);
+    return repository.loadReseauZoneRanks(q).stream()
+        .map(
+            r ->
+                new PilotageDtos.ReseauZoneRank(
+                    r.zoneId(),
+                    r.zone() == null ? "Non renseigné" : r.zone(),
+                    r.region() == null ? "Non renseigné" : r.region(),
+                    r.nb(),
+                    r.montant() == null ? BigDecimal.ZERO : r.montant()))
+        .toList();
+  }
+
   public PilotageDtos.ExportResponse export(PilotageBundleQuery q) {
     q = withMoneyContext(q);
     validate(q);
