@@ -112,6 +112,10 @@ type MapEngine = 'google' | 'leaflet';
         border-radius: 0;
         background: var(--card-bg, #0f1115);
         padding: 0.75rem;
+        padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+        padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+        padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+        padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
         display: flex;
         flex-direction: column;
       }

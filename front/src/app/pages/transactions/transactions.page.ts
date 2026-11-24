@@ -411,6 +411,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
     .tx-table-actions {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 0.45rem;
     }
     .tx-page-size {
@@ -443,11 +444,20 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
       display: flex;
       align-items: center;
       justify-content: flex-end;
+      flex-wrap: wrap;
       gap: 0.4rem;
       padding: 0.65rem 0.9rem;
       border-top: 1px solid var(--card-border, #e5e7eb);
       font-size: 0.82rem;
       color: var(--text-muted, #6b7280);
+    }
+    @media (max-width: 575.98px) {
+      .tx-pager {
+        justify-content: space-between;
+      }
+      .clip {
+        max-width: 8rem;
+      }
     }
   `,
 })

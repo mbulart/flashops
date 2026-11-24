@@ -203,6 +203,19 @@ export type AgenceFormModel = AgenceAdminInput & {
       height: 100% !important;
       min-height: 36rem;
     }
+    @media (max-width: 991.98px) {
+      .agence-form-modal {
+        width: 100%;
+        max-height: min(96dvh, 100%);
+      }
+      .agence-form-map-col,
+      .agency-map,
+      .agency-map ::ng-deep app-geo-map,
+      .agency-map ::ng-deep .geo-map-shell,
+      .agency-map ::ng-deep .geo-map-host {
+        min-height: 18rem;
+      }
+    }
   `,
 })
 export class AgenceFormModalComponent implements OnChanges {

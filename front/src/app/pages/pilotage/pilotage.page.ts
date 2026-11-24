@@ -1306,6 +1306,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
       display: flex;
       align-items: center;
       justify-content: flex-end;
+      flex-wrap: wrap;
       gap: 0.75rem;
       margin-top: 0.75rem;
       color: var(--text-muted, #6b7280);
@@ -1324,6 +1325,27 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
     .pilotage-agency-row:focus-visible {
       outline: 2px solid #ffd500;
       outline-offset: -2px;
+    }
+
+    @media (max-width: 575.98px) {
+      .pilotage-export-collapse__panel {
+        position: fixed;
+        top: auto;
+        right: 0.75rem;
+        left: 0.75rem;
+        bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+        width: auto;
+      }
+
+      .pilotage-export-loader__card {
+        min-width: 0;
+        width: calc(100vw - 2rem);
+        padding: 1.25rem 1.15rem 1.1rem;
+      }
+
+      .pilotage-agency-pager {
+        justify-content: space-between;
+      }
     }
   `,
 })

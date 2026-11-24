@@ -344,6 +344,18 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
         grid-column: 1 / -1;
       }
     }
+    @media (max-width: 575.98px) {
+      .agences-filter-row {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .agences-pager {
+        flex-wrap: wrap;
+        justify-content: space-between;
+      }
+      .agences-table-actions {
+        flex-wrap: wrap;
+      }
+    }
     .agences-filters .filter-field {
       min-width: 0;
     }

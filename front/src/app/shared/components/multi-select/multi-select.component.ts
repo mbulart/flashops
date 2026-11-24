@@ -192,6 +192,23 @@ export interface MultiSelectOption {
     .option-item.selected {
       background: rgba(255, 213, 0, 0.16);
     }
+    .option-item span:first-child {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 575.98px) {
+      .multi-select-panel {
+        left: 0;
+        right: 0;
+        width: auto;
+        max-width: calc(100vw - 1.25rem);
+      }
+      .selected-chip {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
   `,
 })
 export class MultiSelectComponent implements OnInit, OnDestroy {

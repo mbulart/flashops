@@ -760,6 +760,14 @@ interface SoldeSeuilRow {
       white-space: nowrap;
       vertical-align: middle;
     }
+    @media (max-width: 767.98px) {
+      .appro-table {
+        font-size: 0.78rem;
+      }
+      .solde-cell {
+        min-width: 7rem;
+      }
+    }
     .mono {
       font-variant-numeric: tabular-nums;
     }

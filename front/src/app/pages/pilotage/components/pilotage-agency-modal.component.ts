@@ -785,22 +785,86 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
       font-variant-numeric: tabular-nums;
     }
 
-    @media (max-width: 720px) {
+    @media (max-width: 991.98px) {
+      .agency-sheet {
+        width: min(72rem, 100%);
+        max-height: calc(100dvh - 1.25rem);
+        border-radius: 0.85rem;
+      }
+
       .identity-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
+      .tx-filters {
+        grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+      }
+
+      .tx-filters .filter-field--party,
+      .tx-filters .filter-field--action {
+        min-width: 0;
+      }
+
+      .tx-head {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .tx-head__actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .identity-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
       .tx-totals {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
       }
 
       .agency-modal {
-        padding: 0.5rem;
+        padding: 0.35rem;
+        padding-top: max(0.35rem, env(safe-area-inset-top, 0px));
+        padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
         align-items: stretch;
       }
 
       .agency-sheet {
-        max-height: calc(100vh - 1rem);
+        width: 100%;
+        max-height: calc(100dvh - 0.7rem);
+        border-radius: 0.75rem;
+      }
+
+      .agency-sheet__head,
+      .agency-sheet__body,
+      .tx-pager {
+        padding-left: 0.85rem;
+        padding-right: 0.85rem;
+      }
+
+      .agency-sheet__identity h2 {
+        font-size: 1.05rem;
+      }
+
+      .tx-filters {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 0.55rem;
+      }
+
+      .tx-table {
+        min-width: 42rem;
+      }
+
+      .tx-pager {
+        gap: 0.5rem;
+      }
+
+      .tx-pager__nav {
+        width: 100%;
+        justify-content: space-between;
       }
     }
   `,

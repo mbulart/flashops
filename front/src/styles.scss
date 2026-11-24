@@ -67,6 +67,13 @@
 html,
 body {
   height: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+body {
+  padding-left: env(safe-area-inset-left, 0);
+  padding-right: env(safe-area-inset-right, 0);
 }
 
 .app-splash {
@@ -1974,9 +1981,15 @@ fieldset:disabled .btn-primary {
 
 .filters-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem 1rem;
   align-items: end;
+}
+
+@media (min-width: 576px) {
+  .filters-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .filters-grid .filter-field {
@@ -2391,4 +2404,194 @@ fieldset:disabled .btn-primary {
   gap: 1rem;
   background: var(--card-bg);
   border-bottom: 1px solid var(--card-border);
+}
+
+/* ─── Responsive thème (shell, pages, tables, modales) ─── */
+.page-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.table-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.section-card-body,
+.filter-panel .card-body,
+.app-content {
+  min-width: 0;
+}
+
+@media (max-width: 991.98px) {
+  :root {
+    --header-height: 56px;
+    --flash-section-padding-x: 0.85rem;
+    --flash-section-padding-y: 0.65rem;
+  }
+
+  .app-header {
+    padding: 0 0.75rem;
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  .app-content {
+    padding: 0.75rem 0.75rem 1.5rem;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-sidebar {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    width: min(var(--sidebar-width), 88vw);
+  }
+
+  .page-title {
+    font-size: 1.15rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+
+  .page-header-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .section-card-header:not(.section-card-header--stacked) {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .section-card-header:not(.section-card-header--stacked) .section-card-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .user-menu {
+    max-width: none;
+    padding-right: 0.45rem;
+  }
+
+  .user-dropdown-menu {
+    min-width: min(16rem, calc(100vw - 1.5rem));
+    right: 0;
+  }
+
+  .period-presets {
+    gap: 0.3rem;
+  }
+
+  .period-presets .btn {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .pilotage-filters-actions {
+    justify-content: stretch;
+  }
+
+  .pilotage-filters-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .pilotage-chart-toolbar {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .pilotage-charts-sens {
+    justify-content: flex-start;
+  }
+
+  .pilotage-agency-pager {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .pilotage-kpi-grid .kpi-card-value {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    font-size: 0.84rem;
+  }
+
+  .login-page {
+    padding: 1rem;
+    padding-top: max(1rem, env(safe-area-inset-top, 0px));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    align-items: flex-start;
+  }
+
+  .login-card {
+    padding: 1.35rem 1.15rem;
+  }
+
+  .parametrages-modal-backdrop {
+    padding: 0.5rem;
+    align-items: flex-end;
+  }
+
+  .parametrages-modal {
+    width: 100%;
+    max-height: min(94vh, calc(100dvh - 0.75rem));
+    border-radius: var(--flash-radius) var(--flash-radius) 0 0;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .app-content {
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+  }
+
+  .table > :not(caption) > * > * {
+    padding: 0.45rem 0.55rem;
+  }
+
+  .btn-sm {
+    --bs-btn-padding-y: 0.28rem;
+    --bs-btn-padding-x: 0.55rem;
+  }
+
+  .pilotage-filter-row--loc-compact,
+  .pilotage-filter-row--detail-main,
+  .pilotage-filter-row--products,
+  .pilotage-filter-row--products-transfert,
+  .pilotage-filter-row--triple,
+  .pilotage-filter-row--pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pilotage-filter-row--detail-main .pilotage-couloirs-field {
+    grid-column: 1;
+  }
+
+  .pilotage-kpi-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .export-busy-card {
+    min-width: 0;
+    width: calc(100vw - 1.5rem);
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  .pilotage-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }

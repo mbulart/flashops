@@ -160,8 +160,23 @@ import { formatValeurFr } from '../../shared/utils/format.utils';
       margin: 0;
     }
     @media (max-width: 700px) {
+      .tx-modal {
+        padding: 0.5rem;
+        padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+        padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+        align-items: stretch;
+      }
+      .tx-sheet {
+        max-height: calc(100dvh - 1rem);
+        border-radius: 0.75rem;
+      }
+      .tx-sheet__head,
+      .tx-sheet__body {
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
+      }
       .tx-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
       }
     }
     .tx-kv {

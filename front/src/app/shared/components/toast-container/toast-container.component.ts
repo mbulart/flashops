@@ -48,14 +48,24 @@ import { ToastService, ToastType } from '../../../core/services/toast.service';
   styles: `
     .fi-toast-stack {
       position: fixed;
-      top: 1rem;
-      right: 1rem;
+      top: max(1rem, env(safe-area-inset-top, 0px));
+      right: max(1rem, env(safe-area-inset-right, 0px));
       z-index: 1200;
       display: flex;
       flex-direction: column;
       gap: 0.65rem;
       width: min(24rem, calc(100vw - 2rem));
       pointer-events: none;
+    }
+    @media (max-width: 575.98px) {
+      .fi-toast-stack {
+        left: max(0.75rem, env(safe-area-inset-left, 0px));
+        right: max(0.75rem, env(safe-area-inset-right, 0px));
+        width: auto;
+      }
+      .fi-toast {
+        transform-origin: top center;
+      }
     }
 
     .fi-toast {

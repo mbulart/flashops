@@ -129,6 +129,12 @@ type LoginMode = 'password' | 'token';
     .login-map-link:hover {
       color: var(--text-primary, #111);
     }
+    @media (max-width: 420px) {
+      .login-mode .nav-link {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.35rem;
+      }
+    }
   `,
 })
 export class LoginPageComponent implements OnInit {
