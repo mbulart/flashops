@@ -417,7 +417,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
     .agency-modal {
       position: fixed;
       inset: 0;
-      z-index: 1100;
+      z-index: 1200;
       display: flex;
       align-items: center;
       justify-content: center;

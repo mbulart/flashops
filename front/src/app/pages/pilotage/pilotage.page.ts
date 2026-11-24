@@ -2091,6 +2091,8 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   }
 
   openAgency(row: PilotageAgenceRank): void {
+    // Si un plein écran carte a laissé body.geo-map-fs-open, la fiche serait masquée.
+    document.body.classList.remove('geo-map-fs-open');
     this.openedAgency.set(row);
   }
 

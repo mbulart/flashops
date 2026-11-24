@@ -4,7 +4,6 @@ import {
   Component,
   ElementRef,
   EventEmitter,
-  HostBinding,
   HostListener,
   Input,
   NgZone,
@@ -107,10 +106,11 @@ type MapEngine = 'google' | 'leaflet';
         display: flex;
         flex-direction: column;
       }
+      /* Sous les modales (agence ~1200) pour ne jamais masquer la fiche. */
       .geo-map-shell--fullscreen {
         position: fixed;
         inset: 0;
-        z-index: 2100;
+        z-index: 1040;
         border-radius: 0;
         background: var(--card-bg, #0f1115);
         padding: 0.75rem;
@@ -120,7 +120,7 @@ type MapEngine = 'google' | 'leaflet';
         padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
         display: flex;
         flex-direction: column;
-        overflow: visible;
+        overflow: hidden;
       }
       .geo-map-host--pick {
         cursor: crosshair;
@@ -440,21 +440,12 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   private readonly gmapsLoader = inject(GoogleMapsLoaderService);
   private readonly zone = inject(NgZone);
-  private readonly hostRef = inject(ElementRef<HTMLElement>);
 
   readonly fullscreen = signal(false);
   readonly engine = signal<MapEngine>('leaflet');
   readonly tilesReady = signal(false);
   readonly heatColor = mapHeatColor;
 
-  /** Classe host pilotée par le signal — évite un calque fixed fantôme après Réduire. */
-  @HostBinding('class.geo-map-fs-host')
-  get fsHostClass(): boolean {
-    return this.fullscreen();
-  }
-
-  /** Emplacement d’origine pour reposer la carte après plein écran. */
-  private fsHome: { parent: Node; next: ChildNode | null } | null = null;
   private fsPrevBodyOverflow = '';
   private leafletMap?: L.Map;
   private leafletTiles?: L.TileLayer;
@@ -595,7 +586,8 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.hostObserver?.disconnect();
     this.hostObserver = undefined;
     if (this.fullscreen()) {
-      this.exitFullscreenChrome();
+      this.fullscreen.set(false);
+      this.clearFullscreenChrome();
     }
     if (this.sizeTimer != null) {
       clearTimeout(this.sizeTimer);
@@ -647,11 +639,21 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   onHostDblClick(ev: MouseEvent): void {
     if (this.pickMode) return;
+    // Mobile : le double-tap synthétique ouvre la fiche agence + plein écran → UI bloquée.
+    if (this.isCoarsePointer()) return;
     const t = ev.target as HTMLElement | null;
     if (t?.closest?.('.geo-hex-icon, .leaflet-marker-icon, .leaflet-popup, .gm-style-iw, .leaflet-control')) {
       return;
     }
     this.toggleFullscreen(ev);
+  }
+
+  private isCoarsePointer(): boolean {
+    try {
+      return window.matchMedia('(hover: none), (pointer: coarse)').matches;
+    } catch {
+      return false;
+    }
   }
 
   private initGoogle(): void {
@@ -669,7 +671,8 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
     });
     this.googleInfo = new google.maps.InfoWindow();
     this.googleDblClickListener = this.googleMap.addListener('dblclick', () => {
-      if (!this.pickMode) this.zone.run(() => this.toggleFullscreen());
+      if (this.pickMode || this.isCoarsePointer()) return;
+      this.zone.run(() => this.toggleFullscreen());
     });
     google.maps.event.addListenerOnce(this.googleMap, 'idle', () => {
       this.zone.run(() => this.tilesReady.set(true));
@@ -969,54 +972,32 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
   private setFullscreen(on: boolean): void {
     if (on === this.fullscreen()) return;
     if (on) {
-      this.enterFullscreenChrome();
+      this.fsPrevBodyOverflow = document.body.style.overflow;
+      document.body.classList.add('geo-map-fs-open');
+      document.body.style.overflow = 'hidden';
       this.fullscreen.set(true);
     } else {
       this.fullscreen.set(false);
-      this.exitFullscreenChrome();
+      this.clearFullscreenChrome();
     }
     this.leafletMap?.scrollWheelZoom.enable();
     this.googleMap?.setOptions({ scrollwheel: true });
     this.kickInvalidateSize([0, 80, 200, 400]);
   }
 
-  private enterFullscreenChrome(): void {
-    this.fsPrevBodyOverflow = document.body.style.overflow;
-    document.body.classList.add('geo-map-fs-open');
-    document.body.style.overflow = 'hidden';
-    this.mountFullscreenHost();
-  }
-
-  private exitFullscreenChrome(): void {
-    this.unmountFullscreenHost();
+  /** Pas de reparenting DOM : il masquait la modal agence sous la carte. */
+  private clearFullscreenChrome(): void {
     document.body.classList.remove('geo-map-fs-open');
     document.body.style.overflow = this.fsPrevBodyOverflow;
     this.fsPrevBodyOverflow = '';
   }
 
-  /**
-   * Monte la carte sur document.body en plein écran.
-   * Sinon `position:fixed` est piégé par `.app-content { transform }` (WebKit)
-   * et les `height: auto !important` du thème mobile.
-   */
-  private mountFullscreenHost(): void {
-    const host = this.hostRef.nativeElement;
-    if (this.fsHome || !host.parentNode) return;
-    this.fsHome = { parent: host.parentNode, next: host.nextSibling };
-    document.body.appendChild(host);
-  }
-
-  private unmountFullscreenHost(): void {
-    const host = this.hostRef.nativeElement;
-    const home = this.fsHome;
-    this.fsHome = null;
-    host.classList.remove('geo-map-fs-host');
-    if (!home?.parent || !document.contains(home.parent)) return;
-    if (home.next && home.next.parentNode === home.parent) {
-      home.parent.insertBefore(host, home.next);
-    } else {
-      home.parent.appendChild(host);
+  /** Quitte le plein écran avant d’ouvrir une fiche (évite fond gris + bouton seul). */
+  private emitAgencyClick(agencyId: number): void {
+    if (this.fullscreen()) {
+      this.setFullscreen(false);
     }
+    this.agencyClick.emit(agencyId);
   }
 
   private renderPoints(force: boolean): void {
@@ -1108,7 +1089,7 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
               `</div>`
           );
           this.googleInfo?.open({ map: this.googleMap, anchor: marker });
-          this.zone.run(() => this.agencyClick.emit(p.agency_id));
+          this.zone.run(() => this.emitAgencyClick(p.agency_id));
         });
       }
       this.googleMarkers.push(marker);
@@ -1169,7 +1150,7 @@ export class GeoMapComponent implements AfterViewInit, OnChanges, OnDestroy {
             `<small>${escapeHtml(p.code)}</small><br/>` +
             this.popupBody(p)
         );
-        marker.on('click', () => this.zone.run(() => this.agencyClick.emit(p.agency_id)));
+        marker.on('click', () => this.zone.run(() => this.emitAgencyClick(p.agency_id)));
       }
       marker.addTo(this.leafletLayer);
       bounds.extend([p.lat, p.lng]);
