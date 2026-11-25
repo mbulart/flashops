@@ -52,14 +52,16 @@ public class ProduitPermissionsSyncInitializer implements ApplicationRunner {
             SELECT r.id, p.id
             FROM roles r
             CROSS JOIN permissions p
-            WHERE r.code = 'SUPER_ADMIN'
+            WHERE r.code IN ('SUPER_ADMIN', 'ADMIN')
               AND p.code LIKE 'pilotage.produit.%'
             ON CONFLICT DO NOTHING
             """);
 
     if (created > 0 || granted > 0) {
       log.info(
-          "Sync permissions produits — créées={}, SUPER_ADMIN accordées={}", created, granted);
+          "Sync permissions produits — créées={}, SUPER_ADMIN/ADMIN accordées={}",
+          created,
+          granted);
     }
   }
 }

@@ -24,6 +24,10 @@ public class PermissionGuard {
   }
 
   public void require(int userId, String permissionCode) {
+    requireAny(userId, permissionCode);
+  }
+
+  public void requireAny(int userId, String... permissionCodes) {
     Utilisateur u =
         utilisateurs
             .findWithRoleById(userId)
@@ -31,10 +35,15 @@ public class PermissionGuard {
     if ("SUPER_ADMIN".equals(u.getRole().getCode())) {
       return;
     }
-    boolean ok =
-        permissions.findCodesForUser(userId).stream().anyMatch(permissionCode::equals);
-    if (!ok) {
+    if (permissionCodes == null || permissionCodes.length == 0) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "insufficient permissions");
     }
+    var codes = permissions.findCodesForUser(userId);
+    for (String needed : permissionCodes) {
+      if (needed != null && codes.stream().anyMatch(needed::equals)) {
+        return;
+      }
+    }
+    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "insufficient permissions");
   }
 }

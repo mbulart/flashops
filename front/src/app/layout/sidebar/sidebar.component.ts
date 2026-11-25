@@ -158,7 +158,7 @@ export class SidebarComponent implements OnInit {
           label: 'Transactions',
           path: '/transactions',
           icon: 'bi bi-receipt',
-          permission: 'dashboard.voir',
+          permission: ['transactions.lire', 'dashboard.voir'],
         },
         {
           label: 'Appro. MOMO',

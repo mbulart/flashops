@@ -513,7 +513,7 @@ public class PilotageController {
       @RequestParam(value = "page", defaultValue = "1") int page,
       @RequestParam(value = "size", defaultValue = "25") int size) {
     int userId = AuthSupport.currentUserId();
-    permissions.require(userId, "dashboard.voir");
+    permissions.requireAny(userId, "transactions.lire", "dashboard.voir");
     var query =
         scopedQuery(
             domaine,
@@ -543,7 +543,7 @@ public class PilotageController {
   public Map<String, PilotageDtos.TransactionDetail> transactionDetail(
       @PathVariable("operationId") long operationId) {
     int userId = AuthSupport.currentUserId();
-    permissions.require(userId, "dashboard.voir");
+    permissions.requireAny(userId, "transactions.lire", "dashboard.voir");
     UserDataScope scope = dataScope.resolve(userId);
     List<Integer> restrict = scope.unrestricted() ? null : scope.allowedAgenceIds();
     return Map.of("data", analyticsService.transactionDetail(operationId, restrict));
@@ -577,7 +577,7 @@ public class PilotageController {
       @RequestParam(value = "size", defaultValue = "10") int size,
       @RequestParam(value = "export", defaultValue = "false") boolean export) {
     int userId = AuthSupport.currentUserId();
-    permissions.require(userId, "dashboard.voir");
+    permissions.requireAny(userId, "transactions.lire", "dashboard.voir");
     dataScope.requireAgenceAccess(userId, agenceId);
     var query =
         scopedQuery(

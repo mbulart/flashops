@@ -47,7 +47,7 @@ export const routes: Routes = [
         path: 'transactions',
         loadComponent: () =>
           import('./pages/transactions/transactions.page').then((m) => m.TransactionsPageComponent),
-        canActivate: [permissionGuard('dashboard.voir')],
+        canActivate: [permissionAnyGuard('transactions.lire', 'dashboard.voir')],
       },
       {
         path: 'approvisionnement-vas',

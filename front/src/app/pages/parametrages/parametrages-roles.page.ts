@@ -47,7 +47,10 @@ import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.com
           } @else if (selectedRole()!.code === 'SUPER_ADMIN') {
             <p class="text-muted mb-0">Le rôle super administrateur possède toutes les permissions.</p>
           } @else if (selectedRole()!.code === 'ADMIN') {
-            <p class="text-muted mb-0">Accès opérationnel (pilotage, agences), sans gestion des paramétrages.</p>
+            <p class="text-muted mb-0">
+              Accès opérationnel : pilotage, agences (lecture/écriture) et transactions (lecture), sans suppression ni
+              paramétrages.
+            </p>
           } @else {
             @for (group of permissionGroups(); track group.module) {
               <div class="mb-3">
