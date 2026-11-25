@@ -141,6 +141,45 @@ public final class PilotageDtos {
       String devise,
       java.util.List<AgencePeriodeBucket> periods) {}
 
+  /** Ligne agence × produit pour export périodique. */
+  public record AgenceProduitRank(
+      int agenceId,
+      @JsonProperty("code_agence") String codeAgence,
+      String nom,
+      String categorie,
+      @JsonProperty("pos_id") String posId,
+      String region,
+      String zone,
+      @JsonProperty("produit_id") int produitId,
+      String produit,
+      long volume,
+      java.math.BigDecimal montant,
+      java.math.BigDecimal commission,
+      @JsonProperty("commission_fcn") java.math.BigDecimal commissionFcn,
+      @JsonProperty("commission_agent") java.math.BigDecimal commissionAgent,
+      @JsonProperty("commission_fcn_agent") java.math.BigDecimal commissionFcnAgent) {}
+
+  public record AgenceProduitPeriodeBucket(
+      String periode,
+      String label,
+      @JsonProperty("periode_debut") String periodeDebut,
+      @JsonProperty("periode_fin") String periodeFin,
+      long volume,
+      java.math.BigDecimal montant,
+      java.math.BigDecimal commission,
+      @JsonProperty("commission_fcn") java.math.BigDecimal commissionFcn,
+      @JsonProperty("commission_agent") java.math.BigDecimal commissionAgent,
+      @JsonProperty("commission_fcn_agent") java.math.BigDecimal commissionFcnAgent,
+      java.util.List<AgenceProduitRank> rows) {}
+
+  public record AgencesProduitsPeriodiqueExport(
+      String grain,
+      String from,
+      String to,
+      String domaine,
+      String devise,
+      java.util.List<AgenceProduitPeriodeBucket> periods) {}
+
   public record AgenceRank(
       int agenceId,
       @JsonProperty("code_agence") String codeAgence,

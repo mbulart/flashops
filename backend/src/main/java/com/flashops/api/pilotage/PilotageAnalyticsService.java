@@ -535,6 +535,80 @@ public class PilotageAnalyticsService {
         periods);
   }
 
+  public PilotageDtos.AgencesProduitsPeriodiqueExport exportAgencesProduitsPeriodique(
+      PilotageBundleQuery q, String grain) {
+    q = withMoneyContext(q);
+    validate(q);
+    String resolved = "week".equalsIgnoreCase(grain) ? "week" : "month";
+    var flat = repository.loadAgencesProduitsPeriodiques(q, resolved);
+    var byPeriod =
+        new java.util.LinkedHashMap<
+            String, java.util.List<PilotageAnalyticsRepository.AgenceProduitPeriodiqueRow>>();
+    for (var row : flat) {
+      byPeriod.computeIfAbsent(row.periode(), k -> new java.util.ArrayList<>()).add(row);
+    }
+    var periods = new java.util.ArrayList<PilotageDtos.AgenceProduitPeriodeBucket>();
+    for (var entry : byPeriod.entrySet()) {
+      var rows = entry.getValue();
+      if (rows.isEmpty()) {
+        continue;
+      }
+      var first = rows.get(0);
+      long volume = 0L;
+      java.math.BigDecimal montant = java.math.BigDecimal.ZERO;
+      java.math.BigDecimal commission = java.math.BigDecimal.ZERO;
+      java.math.BigDecimal commissionFcn = java.math.BigDecimal.ZERO;
+      java.math.BigDecimal commissionAgent = java.math.BigDecimal.ZERO;
+      java.math.BigDecimal commissionFcnAgent = java.math.BigDecimal.ZERO;
+      var items = new java.util.ArrayList<PilotageDtos.AgenceProduitRank>();
+      for (var r : rows) {
+        volume += r.nb();
+        montant = montant.add(nullToZero(r.montant()));
+        commission = commission.add(nullToZero(r.commission()));
+        commissionFcn = commissionFcn.add(nullToZero(r.commissionFcn()));
+        commissionAgent = commissionAgent.add(nullToZero(r.commissionAgent()));
+        commissionFcnAgent = commissionFcnAgent.add(nullToZero(r.commissionFcnAgent()));
+        items.add(
+            new PilotageDtos.AgenceProduitRank(
+                r.agenceId(),
+                r.codeAgence(),
+                r.nom(),
+                r.categorie(),
+                r.posId(),
+                r.region(),
+                r.zone(),
+                r.produitId(),
+                r.produit(),
+                r.nb(),
+                r.montant(),
+                r.commission(),
+                r.commissionFcn(),
+                r.commissionAgent(),
+                r.commissionFcnAgent()));
+      }
+      periods.add(
+          new PilotageDtos.AgenceProduitPeriodeBucket(
+              first.periode(),
+              periodLabel(resolved, first.periode(), first.periodeDebut(), first.periodeFin()),
+              first.periodeDebut(),
+              first.periodeFin(),
+              volume,
+              montant,
+              commission,
+              commissionFcn,
+              commissionAgent,
+              commissionFcnAgent,
+              items));
+    }
+    return new PilotageDtos.AgencesProduitsPeriodiqueExport(
+        resolved,
+        q.from(),
+        q.to(),
+        String.join(",", q.resolvedDomaines()),
+        q.devise(),
+        periods);
+  }
+
   private static java.math.BigDecimal nullToZero(java.math.BigDecimal value) {
     return value == null ? java.math.BigDecimal.ZERO : value;
   }

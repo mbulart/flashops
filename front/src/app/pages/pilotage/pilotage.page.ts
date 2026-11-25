@@ -85,6 +85,7 @@ import {
 } from './pilotage-charts.util';
 import { downloadPilotageExcel } from './pilotage-excel.export';
 import { downloadPilotageAgencesPeriodiqueExcel } from './pilotage-agences-periodique.export';
+import { downloadPilotageAgencesProduitsPeriodiqueExcel } from './pilotage-agences-produits-periodique.export';
 import { downloadPilotageProduitsMensuelExcel } from './pilotage-produits-mensuel.export';
 import { buildPilotageReportIdentity } from './pilotage-report-identity';
 
@@ -981,6 +982,21 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                           </span>
                           <span class="pilotage-export-collapse__item-desc">
                             Une feuille Excel par mois, classement et totaux.
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          class="pilotage-export-collapse__item"
+                          role="menuitem"
+                          [disabled]="exportingExcel()"
+                          (click)="exportAgencesProduitsPeriodique()"
+                        >
+                          <span class="pilotage-export-collapse__item-title">
+                            <i class="bi bi-grid-3x3-gap me-2" aria-hidden="true"></i>
+                            Agences × produits par mois
+                          </span>
+                          <span class="pilotage-export-collapse__item-desc">
+                            Une feuille par mois : agence, produit, volume et montant.
                           </span>
                         </button>
                       }
@@ -2547,8 +2563,51 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
       });
   }
 
+  exportAgencesProduitsPeriodique(): void {
+    const criteria = this.criteria();
+    if (!criteria || this.exportingExcel() || !this.periodAtLeastOneMonth()) return;
+    this.exportMenuOpen.set(false);
+    this.exportingExcel.set(true);
+    this.exportProgress.set(3);
+    this.startExportCreep();
+    this.pilotage
+      .loadAgencesProduitsPeriodique(criteria, 'month', (ratio) =>
+        this.bumpExportProgress(ratio * 100)
+      )
+      .subscribe({
+        next: (data) => {
+          const identity = this.buildExportIdentity('agences-produits-mois', criteria);
+          const settings = this.appSettings.settings();
+          downloadPilotageAgencesProduitsPeriodiqueExcel(
+            {
+              identity,
+              from: data.from || criteria.from,
+              to: data.to || criteria.to,
+              devise: data.devise || criteria.devise,
+              periods: data.periods,
+              logoUrl: settings.logo_light || '/branding/logo-light1.png',
+              appName: settings.app_name || 'Flash OPS',
+              faviconUrl: settings.favicon || '/branding/logo-light1.png',
+            },
+            (percent) => this.bumpExportProgress(percent)
+          )
+            .then(() => {
+              if (!data.periods?.length) {
+                this.toast.warning('Aucune donnée agence × produit par mois pour ce périmètre.');
+              }
+            })
+            .catch(() => this.toast.error('Export agences × produits par mois impossible.'))
+            .finally(() => this.finishExport());
+        },
+        error: () => {
+          this.finishExport();
+          this.toast.error('Export agences × produits par mois impossible.');
+        },
+      });
+  }
+
   private buildExportIdentity(
-    kind: 'agences' | 'produits-mensuel' | 'agences-mois',
+    kind: 'agences' | 'produits-mensuel' | 'agences-mois' | 'agences-produits-mois',
     criteria: PilotageCriteria
   ) {
     const domaines = criteria.domaines?.length ? criteria.domaines : [criteria.domaine];

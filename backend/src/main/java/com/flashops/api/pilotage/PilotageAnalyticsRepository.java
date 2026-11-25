@@ -1276,6 +1276,181 @@ public class PilotageAnalyticsRepository {
         money(rs, "commission_fcn_agent"));
   }
 
+  /**
+   * Export agence × produit découpé par mois (ou semaine ISO). Tri : période DESC, agence, produit.
+   */
+  public List<AgenceProduitPeriodiqueRow> loadAgencesProduitsPeriodiques(
+      PilotageBundleQuery q, String grain) {
+    String trunc = "week".equalsIgnoreCase(grain) ? "week" : "month";
+    try {
+      if (q.couloirOnFact()) {
+        return loadFaitAgencesProduitsPeriodiques(q, trunc);
+      }
+      return loadGrainAgencesProduitsPeriodiques(q, trunc);
+    } catch (DataAccessException ex) {
+      log.error("Agences×produits périodiques pilotage indisponibles", ex);
+      return List.of();
+    }
+  }
+
+  private List<AgenceProduitPeriodiqueRow> loadGrainAgencesProduitsPeriodiques(
+      PilotageBundleQuery q, String trunc) {
+    Grain grain = resolveAgenceRankGrain(q);
+    var scoped =
+        PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
+    String periodSelect = periodSelectSql("g.jour", trunc);
+    String periodGroup = periodGroupSql("g.jour", trunc);
+    String from =
+        ensureProduitJoin(withAgenceGeo(scoped.fromAndWhere(), "d"), "g");
+    String grouped =
+        from
+            + """
+             AND g.agence_id <> 0
+             AND g.produit_id <> 0
+             GROUP BY
+            """
+            + periodGroup
+            + """, g.agence_id, d.code_agence, d.nom, d.categorie, d.pos_id, rg.libelle, zn.libelle,
+               g.produit_id, p.module, p.produit
+             ORDER BY periode DESC, lower(coalesce(nullif(btrim(d.nom), ''), d.code_agence)),
+                      lower(coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), '')),
+                      sum(g.montant) DESC""";
+    var sql =
+        """
+        SELECT
+        """
+            + periodSelect
+            + """
+               g.agence_id,
+               coalesce(nullif(btrim(d.code_agence), ''), '') AS code_agence,
+               coalesce(nullif(btrim(d.nom), ''), '') AS nom,
+               coalesce(nullif(btrim(d.categorie), ''), '') AS categorie,
+               coalesce(nullif(btrim(d.pos_id), ''), '') AS pos_id,
+        """
+            + AGENCE_GEO_SELECT
+            + """
+               g.produit_id,
+               coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), 'Non renseigné') AS produit,
+               coalesce(sum(g.nb), 0)::bigint AS nb,
+               coalesce(sum(g.montant), 0) AS montant,
+        """
+            + commissionSelect(grain.table(), "g", q)
+            + grouped;
+    return jdbc.query(sql, this::mapAgenceProduitPeriodique, scoped.args().toArray());
+  }
+
+  private List<AgenceProduitPeriodiqueRow> loadFaitAgencesProduitsPeriodiques(
+      PilotageBundleQuery q, String trunc) {
+    var scoped = PilotageSqlScope.buildFait(jdbc, q);
+    String from = scoped.fromAndWhere();
+    if (scoped.agenceAlias() == null) {
+      from =
+          from.replaceFirst(
+              " WHERE ",
+              " INNER JOIN pilotage.dim_agence AS ag ON ag.agence_id = f.agence_id WHERE ");
+    }
+    String ag = scoped.agenceAlias() != null ? scoped.agenceAlias() : "ag";
+    from = ensureProduitJoin(withAgenceGeo(from, ag), "f");
+    String periodSelect = periodSelectSql("d.jour", trunc);
+    String periodGroup = periodGroupSql("d.jour", trunc);
+    String grouped =
+        from
+            + """
+             AND f.agence_id <> 0
+             AND f.produit_id <> 0
+             GROUP BY
+            """
+            + periodGroup
+            + ", f.agence_id, "
+            + ag
+            + ".code_agence, "
+            + ag
+            + ".nom, "
+            + ag
+            + ".categorie, "
+            + ag
+            + ".pos_id, rg.libelle, zn.libelle, f.produit_id, p.module, p.produit"
+            + """
+             ORDER BY periode DESC, lower(coalesce(nullif(btrim("""
+            + ag
+            + """.nom), ''), """
+            + ag
+            + """.code_agence)),
+                      lower(coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), '')),
+                      sum(f.montant) DESC""";
+    var sql =
+        """
+        SELECT
+        """
+            + periodSelect
+            + """
+               f.agence_id,
+               coalesce(nullif(btrim("""
+            + ag
+            + """.code_agence), ''), '') AS code_agence,
+               coalesce(nullif(btrim("""
+            + ag
+            + """.nom), ''), '') AS nom,
+               coalesce(nullif(btrim("""
+            + ag
+            + """.categorie), ''), '') AS categorie,
+               coalesce(nullif(btrim("""
+            + ag
+            + """.pos_id), ''), '') AS pos_id,
+        """
+            + AGENCE_GEO_SELECT
+            + """
+               f.produit_id,
+               coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), 'Non renseigné') AS produit,
+               count(*)::bigint AS nb,
+               coalesce(sum(f.montant), 0) AS montant,
+        """
+            + commissionSelect("pilotage.fait_operation", "f", q)
+            + grouped;
+    return jdbc.query(sql, this::mapAgenceProduitPeriodique, scoped.args().toArray());
+  }
+
+  private AgenceProduitPeriodiqueRow mapAgenceProduitPeriodique(java.sql.ResultSet rs, int rowNum)
+      throws java.sql.SQLException {
+    java.sql.Date debut = rs.getDate("periode_debut");
+    java.sql.Date fin = rs.getDate("periode_fin");
+    return new AgenceProduitPeriodiqueRow(
+        rs.getString("periode"),
+        debut == null ? "" : debut.toLocalDate().toString(),
+        fin == null ? "" : fin.toLocalDate().toString(),
+        rs.getInt("agence_id"),
+        rs.getString("code_agence"),
+        rs.getString("nom"),
+        rs.getString("categorie"),
+        rs.getString("pos_id"),
+        rs.getString("region"),
+        rs.getString("zone"),
+        rs.getInt("produit_id"),
+        rs.getString("produit"),
+        rs.getLong("nb"),
+        money(rs, "montant"),
+        money(rs, "commission"),
+        money(rs, "commission_fcn"),
+        money(rs, "commission_agent"),
+        money(rs, "commission_fcn_agent"));
+  }
+
+  private static String ensureProduitJoin(String fromWhere, String factAlias) {
+    if (fromWhere.contains("pilotage.dim_produit AS p")
+        || fromWhere.contains("pilotage.dim_produit as p")) {
+      return fromWhere;
+    }
+    String joinProduit =
+        " INNER JOIN pilotage.dim_produit AS p ON p.produit_id = " + factAlias + ".produit_id";
+    if (fromWhere.contains(" WHERE 1=1")) {
+      return fromWhere.replace(" WHERE 1=1", joinProduit + " WHERE 1=1");
+    }
+    if (fromWhere.contains(" WHERE p.produit_id <> 0")) {
+      return fromWhere.replace(" WHERE p.produit_id <> 0", joinProduit + " WHERE p.produit_id <> 0");
+    }
+    return fromWhere.replaceFirst(" WHERE ", joinProduit + " WHERE ");
+  }
+
   private AgenceClassement loadGrainTopAgences(
       PilotageBundleQuery q,
       int limit,
@@ -2149,6 +2324,26 @@ public class PilotageAnalyticsRepository {
       String posId,
       String region,
       String zone,
+      long nb,
+      BigDecimal montant,
+      BigDecimal commission,
+      BigDecimal commissionFcn,
+      BigDecimal commissionAgent,
+      BigDecimal commissionFcnAgent) {}
+
+  public record AgenceProduitPeriodiqueRow(
+      String periode,
+      String periodeDebut,
+      String periodeFin,
+      int agenceId,
+      String codeAgence,
+      String nom,
+      String categorie,
+      String posId,
+      String region,
+      String zone,
+      int produitId,
+      String produit,
       long nb,
       BigDecimal montant,
       BigDecimal commission,

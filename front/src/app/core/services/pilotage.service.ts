@@ -23,6 +23,9 @@ import {
   PilotageLigneExport,
   PilotageAgencesPeriodiqueExport,
   PilotageAgencePeriodeBucket,
+  PilotageAgencesProduitsPeriodiqueExport,
+  PilotageAgenceProduitPeriodeBucket,
+  PilotageAgenceProduitRank,
   PilotageProduitsMensuelExport,
   PilotageProductMonthlyRow,
   PilotageFiltres,
@@ -253,6 +256,39 @@ export class PilotageService {
             event.type === HttpEventType.Response
         ),
         map((event) => normalizeAgencesPeriodique(event.body!.data))
+      );
+  }
+
+  loadAgencesProduitsPeriodique(
+    criteria: PilotageCriteria,
+    grain: 'month' | 'week' = 'month',
+    onProgress?: (ratio: number) => void
+  ) {
+    const params = this.criteriaParams(criteria).set('grain', grain);
+    return this.http
+      .get<{ data: PilotageAgencesProduitsPeriodiqueExport }>(
+        `${this.baseUrl}/export/agences-produits-periodique`,
+        {
+          params,
+          reportProgress: true,
+          observe: 'events',
+        }
+      )
+      .pipe(
+        tap((event) => {
+          if (!onProgress || event.type !== HttpEventType.DownloadProgress) return;
+          const total = event.total ?? 0;
+          if (total > 0) {
+            onProgress(Math.min(0.82, (event.loaded / total) * 0.82));
+            return;
+          }
+          onProgress(Math.min(0.55, event.loaded / (event.loaded + 250_000)));
+        }),
+        filter(
+          (event): event is HttpResponse<{ data: PilotageAgencesProduitsPeriodiqueExport }> =>
+            event.type === HttpEventType.Response
+        ),
+        map((event) => normalizeAgencesProduitsPeriodique(event.body!.data))
       );
   }
 
@@ -872,6 +908,70 @@ function normalizeAgencesPeriodique(
     domaine: raw.domaine,
     devise: raw.devise,
     periods,
+  };
+}
+
+function normalizeAgencesProduitsPeriodique(
+  raw: PilotageAgencesProduitsPeriodiqueExport
+): PilotageAgencesProduitsPeriodiqueExport {
+  const periods = (raw.periods ?? []).map((bucket) => {
+    const row = bucket as PilotageAgenceProduitPeriodeBucket & {
+      periode_debut?: string;
+      periode_fin?: string;
+      commission_fcn?: number;
+      commission_agent?: number;
+      commission_fcn_agent?: number;
+    };
+    return {
+      periode: row.periode ?? '',
+      label: row.label ?? row.periode ?? '',
+      periodeDebut: row.periodeDebut ?? row.periode_debut ?? '',
+      periodeFin: row.periodeFin ?? row.periode_fin ?? '',
+      volume: Number(row.volume ?? 0),
+      montant: Number(row.montant ?? 0),
+      commission: Number(row.commission ?? 0),
+      commissionFcn: Number(row.commissionFcn ?? row.commission_fcn ?? 0),
+      commissionAgent: Number(row.commissionAgent ?? row.commission_agent ?? 0),
+      commissionFcnAgent: Number(row.commissionFcnAgent ?? row.commission_fcn_agent ?? 0),
+      rows: (row.rows ?? []).map((item) => normalizeAgenceProduitRank(item)),
+    };
+  });
+  return {
+    grain: raw.grain === 'week' ? 'week' : 'month',
+    from: raw.from,
+    to: raw.to,
+    domaine: raw.domaine,
+    devise: raw.devise,
+    periods,
+  };
+}
+
+function normalizeAgenceProduitRank(raw: PilotageAgenceProduitRank): PilotageAgenceProduitRank {
+  const row = raw as PilotageAgenceProduitRank & {
+    agence_id?: number;
+    code_agence?: string;
+    pos_id?: string;
+    produit_id?: number;
+    commission_fcn?: number;
+    commission_agent?: number;
+    commission_fcn_agent?: number;
+  };
+  return {
+    agenceId: Number(row.agenceId ?? row.agence_id ?? 0),
+    codeAgence: row.codeAgence ?? row.code_agence ?? '',
+    nom: row.nom ?? '',
+    categorie: row.categorie ?? '',
+    posId: row.posId ?? row.pos_id ?? '',
+    region: row.region ?? '',
+    zone: row.zone ?? '',
+    produitId: Number(row.produitId ?? row.produit_id ?? 0),
+    produit: row.produit ?? '',
+    volume: Number(row.volume ?? 0),
+    montant: Number(row.montant ?? 0),
+    commission: Number(row.commission ?? 0),
+    commissionFcn: Number(row.commissionFcn ?? row.commission_fcn ?? 0),
+    commissionAgent: Number(row.commissionAgent ?? row.commission_agent ?? 0),
+    commissionFcnAgent: Number(row.commissionFcnAgent ?? row.commission_fcn_agent ?? 0),
   };
 }
 

@@ -237,6 +237,47 @@ export interface PilotageAgencesPeriodiqueExport {
   periods: PilotageAgencePeriodeBucket[];
 }
 
+export interface PilotageAgenceProduitRank {
+  agenceId: number;
+  codeAgence: string;
+  nom: string;
+  categorie: string;
+  posId: string;
+  region: string;
+  zone: string;
+  produitId: number;
+  produit: string;
+  volume: number;
+  montant: number;
+  commission: number;
+  commissionFcn: number;
+  commissionAgent: number;
+  commissionFcnAgent: number;
+}
+
+export interface PilotageAgenceProduitPeriodeBucket {
+  periode: string;
+  label: string;
+  periodeDebut: string;
+  periodeFin: string;
+  volume: number;
+  montant: number;
+  commission: number;
+  commissionFcn: number;
+  commissionAgent: number;
+  commissionFcnAgent: number;
+  rows: PilotageAgenceProduitRank[];
+}
+
+export interface PilotageAgencesProduitsPeriodiqueExport {
+  grain: 'month' | 'week' | string;
+  from: string;
+  to: string;
+  domaine: string;
+  devise: string;
+  periods: PilotageAgenceProduitPeriodeBucket[];
+}
+
 export interface PilotageAgenceRank {
   agenceId: number;
   codeAgence: string;
