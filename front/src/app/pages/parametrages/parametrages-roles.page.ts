@@ -48,8 +48,8 @@ import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.com
             <p class="text-muted mb-0">Le rôle super administrateur possède toutes les permissions.</p>
           } @else if (selectedRole()!.code === 'ADMIN') {
             <p class="text-muted mb-0">
-              Accès opérationnel : pilotage, agences (lecture/écriture) et transactions (lecture), sans suppression ni
-              paramétrages.
+              Accès à tout le périmètre opérationnel (pilotage, agences, transactions, approvisionnement, onboarding…),
+              sans paramétrages ni suppression.
             </p>
           } @else {
             @for (group of permissionGroups(); track group.module) {
