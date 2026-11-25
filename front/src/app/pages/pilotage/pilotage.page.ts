@@ -3586,7 +3586,8 @@ function sortGeoRanks(
   tri: 'montant' | 'volume',
   ordre: 'top' | 'pire'
 ): PilotageGeoRankRow[] {
-  const dir = ordre === 'top' ? -1 : 1;
+  // Top = meilleurs en tête (DESC) ; Dernières = plus faibles en tête (ASC).
+  const dir = ordre === 'top' ? 1 : -1;
   return [...rows].sort((a, b) => {
     const av = tri === 'volume' ? a.volume : a.montant;
     const bv = tri === 'volume' ? b.volume : b.montant;
