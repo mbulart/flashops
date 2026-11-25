@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { AgenceAdmin, AgenceAdminFilters, AgenceAdminInput } from '../../core/models/agences.models';
@@ -11,6 +11,7 @@ import {
   PilotageReseauRef,
 } from '../../core/models/pilotage.models';
 import { AgencesService } from '../../core/services/agences.service';
+import { AppSettingsService } from '../../core/services/app-settings.service';
 import { AuthService } from '../../core/services/auth.service';
 import { PilotageService } from '../../core/services/pilotage.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -21,6 +22,9 @@ import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.com
 import { exportExcel, periodPresetRange } from '../../shared/utils/format.utils';
 import { TableActionsMenuComponent } from '../parametrages/components/table-actions-menu.component';
 import { PilotageAgencyModalComponent } from '../pilotage/components/pilotage-agency-modal.component';
+import { downloadPilotageAgencesPeriodiqueExcel } from '../pilotage/pilotage-agences-periodique.export';
+import { downloadPilotageAgencesProduitsPeriodiqueExcel } from '../pilotage/pilotage-agences-produits-periodique.export';
+import { buildPilotageReportIdentity } from '../pilotage/pilotage-report-identity';
 import { AgenceFormModalComponent } from './components/agence-form-modal.component';
 
 const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
@@ -184,9 +188,78 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
             <i class="bi bi-plus-lg me-1"></i>Ajouter
           </button>
         }
-        <button type="button" class="btn btn-outline-dark btn-sm" [disabled]="exporting() || loading()" (click)="exportRows()">
-          <i class="bi bi-download me-1"></i>{{ exporting() ? 'Export…' : 'Exporter' }}
-        </button>
+        <div class="agences-export-collapse" [class.is-open]="exportMenuOpen()">
+          <button
+            type="button"
+            class="btn btn-outline-dark btn-sm"
+            [disabled]="exporting() || loading()"
+            [attr.aria-expanded]="exportMenuOpen()"
+            aria-controls="agences-export-panel"
+            (click)="toggleExportMenu($event)"
+          >
+            <i class="bi bi-download me-1"></i>{{ exporting() ? 'Export…' : 'Exporter' }}
+            <i
+              class="bi ms-1"
+              [class.bi-chevron-up]="exportMenuOpen()"
+              [class.bi-chevron-down]="!exportMenuOpen()"
+              aria-hidden="true"
+            ></i>
+          </button>
+          @if (exportMenuOpen()) {
+            <div
+              id="agences-export-panel"
+              class="agences-export-collapse__panel shadow-sm"
+              role="menu"
+              (click)="$event.stopPropagation()"
+            >
+              <button
+                type="button"
+                class="agences-export-collapse__item"
+                role="menuitem"
+                [disabled]="exporting()"
+                (click)="exportRows()"
+              >
+                <span class="agences-export-collapse__item-title">
+                  <i class="bi bi-table me-2" aria-hidden="true"></i>
+                  Registre des agences
+                </span>
+                <span class="agences-export-collapse__item-desc">
+                  Liste filtrée du registre (identifiants, réseau, localisation…).
+                </span>
+              </button>
+              <button
+                type="button"
+                class="agences-export-collapse__item"
+                role="menuitem"
+                [disabled]="exporting()"
+                (click)="exportAgencesPeriodique()"
+              >
+                <span class="agences-export-collapse__item-title">
+                  <i class="bi bi-building me-2" aria-hidden="true"></i>
+                  Agences par mois
+                </span>
+                <span class="agences-export-collapse__item-desc">
+                  Une feuille Excel par mois, totaux volume / montant (année en cours).
+                </span>
+              </button>
+              <button
+                type="button"
+                class="agences-export-collapse__item"
+                role="menuitem"
+                [disabled]="exporting()"
+                (click)="exportAgencesProduitsPeriodique()"
+              >
+                <span class="agences-export-collapse__item-title">
+                  <i class="bi bi-grid-3x3-gap me-2" aria-hidden="true"></i>
+                  Agences × produits par mois
+                </span>
+                <span class="agences-export-collapse__item-desc">
+                  Une feuille par mois : agence, produit (Envoi/Retrait), volume et montant.
+                </span>
+              </button>
+            </div>
+          }
+        </div>
         <select class="form-select form-select-sm agences-page-size" [ngModel]="pageSize()" (ngModelChange)="setPageSize($event)">
           @for (s of pageSizes; track s) {
             <option [ngValue]="s">{{ s }} / page</option>
@@ -377,6 +450,60 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
       align-items: center;
       gap: 0.45rem;
     }
+    .agences-export-collapse {
+      position: relative;
+    }
+    .agences-export-collapse__panel {
+      position: absolute;
+      top: calc(100% + 0.35rem);
+      right: 0;
+      z-index: 30;
+      width: min(22rem, 80vw);
+      padding: 0.35rem;
+      border: 1px solid var(--card-border);
+      border-radius: 0.65rem;
+      background: var(--card-bg);
+    }
+    .agences-export-collapse__item {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.2rem;
+      width: 100%;
+      margin: 0;
+      padding: 0.7rem 0.8rem;
+      border: 0;
+      border-radius: 0.5rem;
+      background: transparent;
+      color: var(--text-primary);
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .agences-export-collapse__item:hover:not(:disabled),
+    .agences-export-collapse__item:focus-visible {
+      background: var(--flash-gray-100, rgba(0, 0, 0, 0.04));
+      outline: none;
+    }
+    .agences-export-collapse__item:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .agences-export-collapse__item-title {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .agences-export-collapse__item-desc {
+      font-size: 0.75rem;
+      line-height: 1.35;
+      color: var(--text-muted);
+    }
+    :host-context([data-bs-theme='dark']) .agences-export-collapse__item:hover:not(:disabled),
+    :host-context([data-bs-theme='dark']) .agences-export-collapse__item:focus-visible {
+      background: #2a2a2a;
+    }
     .agences-page-size {
       width: auto;
       min-width: 7rem;
@@ -464,9 +591,11 @@ export class AgencesPageComponent implements OnInit {
   readonly auth = inject(AuthService);
   private readonly agencesApi = inject(AgencesService);
   private readonly pilotage = inject(PilotageService);
+  private readonly appSettings = inject(AppSettingsService);
   private readonly toast = inject(ToastService);
 
   readonly pageSizes = [25, 50, 100];
+  readonly exportMenuOpen = signal(false);
 
   draftActivityDays: number | null = null;
   draftInactiveSinceDays: number | null = null;
@@ -723,7 +852,19 @@ export class AgencesPageComponent implements OnInit {
     }
   }
 
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.exportMenuOpen()) this.exportMenuOpen.set(false);
+  }
+
+  toggleExportMenu(event: Event): void {
+    event.stopPropagation();
+    if (this.exporting() || this.loading()) return;
+    this.exportMenuOpen.update((open) => !open);
+  }
+
   async exportRows(): Promise<void> {
+    this.exportMenuOpen.set(false);
     this.exporting.set(true);
     try {
       const rows = await firstValueFrom(this.agencesApi.export({ ...this.applied, page: 1, size: 50_000 }));
@@ -773,6 +914,131 @@ export class AgencesPageComponent implements OnInit {
     } finally {
       this.exporting.set(false);
     }
+  }
+
+  exportAgencesPeriodique(): void {
+    if (this.exporting()) return;
+    this.exportMenuOpen.set(false);
+    this.exporting.set(true);
+    const criteria = this.buildActivityExportCriteria();
+    this.pilotage.loadAgencesPeriodique(criteria, 'month', 'top', 'montant').subscribe({
+      next: (data) => {
+        const settings = this.appSettings.settings();
+        const identity = buildPilotageReportIdentity({
+          kind: 'agences-mois',
+          criteria,
+          domainesLabel: this.domainesLabel(criteria.domaines),
+          period: `${this.formatDateFr(criteria.from)} — ${this.formatDateFr(criteria.to)}`,
+          chips: this.exportScopeChips(),
+        });
+        downloadPilotageAgencesPeriodiqueExcel({
+          identity,
+          from: data.from || criteria.from,
+          to: data.to || criteria.to,
+          devise: data.devise || criteria.devise,
+          periods: data.periods,
+          logoUrl: settings.logo_light || '/branding/logo-light1.png',
+          appName: settings.app_name || 'Flash OPS',
+          faviconUrl: settings.favicon || '/branding/logo-light1.png',
+        })
+          .then(() => {
+            if (!data.periods?.length) {
+              this.toast.warning('Aucune donnée agence par mois pour ce périmètre.');
+            }
+          })
+          .catch(() => this.toast.error('Export agences par mois impossible.'))
+          .finally(() => this.exporting.set(false));
+      },
+      error: () => {
+        this.exporting.set(false);
+        this.toast.error('Export agences par mois impossible.');
+      },
+    });
+  }
+
+  exportAgencesProduitsPeriodique(): void {
+    if (this.exporting()) return;
+    this.exportMenuOpen.set(false);
+    this.exporting.set(true);
+    const criteria = this.buildActivityExportCriteria();
+    this.pilotage.loadAgencesProduitsPeriodique(criteria, 'month').subscribe({
+      next: (data) => {
+        const settings = this.appSettings.settings();
+        const identity = buildPilotageReportIdentity({
+          kind: 'agences-produits-mois',
+          criteria,
+          domainesLabel: this.domainesLabel(criteria.domaines),
+          period: `${this.formatDateFr(criteria.from)} — ${this.formatDateFr(criteria.to)}`,
+          chips: this.exportScopeChips(),
+        });
+        downloadPilotageAgencesProduitsPeriodiqueExcel({
+          identity,
+          from: data.from || criteria.from,
+          to: data.to || criteria.to,
+          devise: data.devise || criteria.devise,
+          periods: data.periods,
+          logoUrl: settings.logo_light || '/branding/logo-light1.png',
+          appName: settings.app_name || 'Flash OPS',
+          faviconUrl: settings.favicon || '/branding/logo-light1.png',
+        })
+          .then(() => {
+            if (!data.periods?.length) {
+              this.toast.warning('Aucune donnée agence × produit par mois pour ce périmètre.');
+            }
+          })
+          .catch(() => this.toast.error('Export agences × produits par mois impossible.'))
+          .finally(() => this.exporting.set(false));
+      },
+      error: () => {
+        this.exporting.set(false);
+        this.toast.error('Export agences × produits par mois impossible.');
+      },
+    });
+  }
+
+  /** Critères activité pour exports mensuels : année en cours + filtres registre. */
+  private buildActivityExportCriteria(): PilotageCriteria {
+    const base = this.buildAgencyCriteria();
+    const range = periodPresetRange('year');
+    const regionLabel =
+      this.applied.region_id != null
+        ? this.regions().find((r) => r.id === this.applied.region_id)?.libelle?.trim() || ''
+        : '';
+    return {
+      ...base,
+      from: range.from,
+      to: range.to,
+      categories: this.applied.categorie ? [this.applied.categorie] : [],
+      zoneIds: this.applied.zone_id != null ? [this.applied.zone_id] : [],
+      reseauRegions: regionLabel ? [regionLabel] : [],
+    };
+  }
+
+  private domainesLabel(domaines: PilotageDomaine[]): string {
+    const labels = this.domaines()
+      .filter((d) => domaines.includes(d.code as PilotageDomaine))
+      .map((d) => d.label);
+    return labels.length ? labels.join(', ') : 'Tous domaines';
+  }
+
+  private exportScopeChips(): string[] {
+    const chips: string[] = [];
+    if (this.applied.region_id != null) {
+      const label = this.regions().find((r) => r.id === this.applied.region_id)?.libelle;
+      if (label) chips.push(`Région : ${label}`);
+    }
+    if (this.applied.zone_id != null) {
+      const label = this.zones().find((z) => z.id === this.applied.zone_id)?.libelle;
+      if (label) chips.push(`Zone : ${label}`);
+    }
+    if (this.applied.categorie) chips.push(`Catégorie : ${this.applied.categorie}`);
+    return chips;
+  }
+
+  private formatDateFr(iso: string): string {
+    const [y, m, d] = (iso || '').split('-');
+    if (!y || !m || !d) return iso || '—';
+    return `${d}/${m}/${y}`;
   }
 
   private buildFilters(page: number): AgenceAdminFilters {
