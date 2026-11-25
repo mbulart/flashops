@@ -1312,10 +1312,11 @@ public class PilotageAnalyticsRepository {
         coalesce(nullif(btrim(d.pos_id), ''), '') AS pos_id,
         """);
     sql.append(AGENCE_GEO_SELECT);
+    sql.append(" g.produit_id, ");
+    sql.append(produitLabelWithEcranSql("p"));
     sql.append(
         """
-        g.produit_id,
-        coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), 'Non renseigné') AS produit,
+         AS produit,
         coalesce(sum(g.nb), 0)::bigint AS nb,
         coalesce(sum(g.montant), 0) AS montant,
         """);
@@ -1331,11 +1332,11 @@ public class PilotageAnalyticsRepository {
     sql.append(
         """
         , g.agence_id, d.code_agence, d.nom, d.categorie, d.pos_id, rg.libelle, zn.libelle,
-          g.produit_id, p.module, p.produit
+          g.produit_id, p.module, p.produit, p.ecran
          ORDER BY periode DESC, lower(coalesce(nullif(btrim(d.nom), ''), d.code_agence)),
-                  lower(coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), '')),
-                  sum(g.montant) DESC
-        """);
+                  lower(""");
+    sql.append(produitLabelWithEcranSql("p"));
+    sql.append("), sum(g.montant) DESC");
     return jdbc.query(sql.toString(), this::mapAgenceProduitPeriodique, scoped.args().toArray());
   }
 
@@ -1361,10 +1362,11 @@ public class PilotageAnalyticsRepository {
     sql.append("coalesce(nullif(btrim(").append(ag).append(".categorie), ''), '') AS categorie, ");
     sql.append("coalesce(nullif(btrim(").append(ag).append(".pos_id), ''), '') AS pos_id, ");
     sql.append(AGENCE_GEO_SELECT);
+    sql.append(" f.produit_id, ");
+    sql.append(produitLabelWithEcranSql("p"));
     sql.append(
         """
-        f.produit_id,
-        coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), 'Non renseigné') AS produit,
+         AS produit,
         count(*)::bigint AS nb,
         coalesce(sum(f.montant), 0) AS montant,
         """);
@@ -1385,14 +1387,14 @@ public class PilotageAnalyticsRepository {
         .append(ag)
         .append(".categorie, ")
         .append(ag)
-        .append(".pos_id, rg.libelle, zn.libelle, f.produit_id, p.module, p.produit ");
+        .append(".pos_id, rg.libelle, zn.libelle, f.produit_id, p.module, p.produit, p.ecran ");
     sql.append(" ORDER BY periode DESC, lower(coalesce(nullif(btrim(")
         .append(ag)
         .append(".nom), ''), ")
         .append(ag)
-        .append(".code_agence)), ")
-        .append(
-            "lower(coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), '')), sum(f.montant) DESC");
+        .append(".code_agence)), lower(")
+        .append(produitLabelWithEcranSql("p"))
+        .append("), sum(f.montant) DESC");
     return jdbc.query(sql.toString(), this::mapAgenceProduitPeriodique, scoped.args().toArray());
   }
 
@@ -1435,6 +1437,50 @@ public class PilotageAnalyticsRepository {
       return fromWhere.replace(" WHERE p.produit_id <> 0", joinProduit + " WHERE p.produit_id <> 0");
     }
     return fromWhere.replaceFirst(" WHERE ", joinProduit + " WHERE ");
+  }
+
+  /**
+   * Libellé produit avec sens d’écran : {@code WESTERN UNION — Envoi} / {@code — Retrait}, etc.
+   * Aligné sur l’export « Produits par mois ».
+   */
+  private static String produitLabelWithEcranSql(String pAlias) {
+    String name =
+        "coalesce(nullif(btrim("
+            + pAlias
+            + ".produit), ''), nullif(btrim("
+            + pAlias
+            + ".module), ''), 'Non renseigné')";
+    String ecran = "nullif(btrim(" + pAlias + ".ecran), '')";
+    return "CASE"
+        + " WHEN "
+        + ecran
+        + " IS NULL THEN "
+        + name
+        + " WHEN lower("
+        + ecran
+        + ") IN ('envois', 'envoi') THEN "
+        + name
+        + " || ' — Envoi'"
+        + " WHEN lower("
+        + ecran
+        + ") IN ('retraits', 'retrait') THEN "
+        + name
+        + " || ' — Retrait'"
+        + " WHEN lower("
+        + ecran
+        + ") = 'transfertfond' THEN "
+        + name
+        + " || ' — Transfert de fonds'"
+        + " WHEN lower("
+        + ecran
+        + ") = 'mobilemoney' THEN "
+        + name
+        + " || ' — Mobile Money'"
+        + " ELSE "
+        + name
+        + " || ' — ' || "
+        + ecran
+        + " END";
   }
 
   private AgenceClassement loadGrainTopAgences(

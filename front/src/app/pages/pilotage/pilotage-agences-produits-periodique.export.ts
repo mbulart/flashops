@@ -136,7 +136,7 @@ function writeMonthSheet(
   });
   cursor = writePeriodTotal(ws, cursor, period);
 
-  setWidths(ws, [8, 34, 16, 16, 16, 18, 18, 22, 14, 18, 16, 16, 18, 20]);
+  setWidths(ws, [8, 34, 16, 16, 16, 18, 18, 28, 14, 18, 16, 16, 18, 20]);
   footer(
     ws,
     cursor + 2,
