@@ -473,6 +473,8 @@ public class PilotageController {
       @RequestParam("from") String from,
       @RequestParam("to") String to,
       @RequestParam(value = "grain", defaultValue = "month") String grain,
+      @RequestParam(value = "ordre", defaultValue = "top") String ordre,
+      @RequestParam(value = "tri", defaultValue = "montant") String tri,
       @RequestParam(value = "produit_id", required = false) List<Integer> produitIds,
       @RequestParam(value = "ecran", required = false) String ecran,
       @RequestParam(value = "statut_uniforme", required = false) List<String> statutUniformes,
@@ -512,7 +514,10 @@ public class PilotageController {
             villeId,
             territoireId,
             communeId);
-    return Map.of("data", analyticsService.exportAgencesProduitsPeriodique(query, grain));
+    return Map.of(
+        "data",
+        analyticsService.exportAgencesProduitsPeriodique(
+            query, grain, "pire".equalsIgnoreCase(ordre), "volume".equalsIgnoreCase(tri)));
   }
 
   @GetMapping("/filtres")

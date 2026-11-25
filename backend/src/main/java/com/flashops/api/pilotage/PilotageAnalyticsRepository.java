@@ -1277,16 +1277,17 @@ public class PilotageAnalyticsRepository {
   }
 
   /**
-   * Export agence × produit découpé par mois (ou semaine ISO). Tri : période DESC, agence, produit.
+   * Export agence × produit découpé par mois (ou semaine ISO).
+   * Tri : période DESC, total agence (montant/volume top|pire), puis ligne produit.
    */
   public List<AgenceProduitPeriodiqueRow> loadAgencesProduitsPeriodiques(
-      PilotageBundleQuery q, String grain) {
+      PilotageBundleQuery q, String grain, boolean worst, boolean byVolume) {
     String trunc = "week".equalsIgnoreCase(grain) ? "week" : "month";
     try {
       if (q.couloirOnFact()) {
-        return loadFaitAgencesProduitsPeriodiques(q, trunc);
+        return loadFaitAgencesProduitsPeriodiques(q, trunc, worst, byVolume);
       }
-      return loadGrainAgencesProduitsPeriodiques(q, trunc);
+      return loadGrainAgencesProduitsPeriodiques(q, trunc, worst, byVolume);
     } catch (DataAccessException ex) {
       log.error("Agences×produits périodiques pilotage indisponibles", ex);
       return List.of();
@@ -1294,13 +1295,17 @@ public class PilotageAnalyticsRepository {
   }
 
   private List<AgenceProduitPeriodiqueRow> loadGrainAgencesProduitsPeriodiques(
-      PilotageBundleQuery q, String trunc) {
+      PilotageBundleQuery q, String trunc, boolean worst, boolean byVolume) {
     Grain grain = resolveAgenceRankGrain(q);
     var scoped =
         PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
     String periodSelect = periodSelectSql("g.jour", trunc);
     String periodGroup = periodGroupSql("g.jour", trunc);
     String from = ensureProduitJoin(withAgenceGeo(scoped.fromAndWhere(), "d"), "g");
+    String order =
+        " ORDER BY periode DESC, "
+            + orderByMontantVolume("sum(g.montant)", "sum(g.nb)", worst, byVolume)
+                .replace(" ORDER BY ", "");
     StringBuilder sql = new StringBuilder();
     sql.append("SELECT ").append(periodSelect);
     sql.append(
@@ -1333,15 +1338,13 @@ public class PilotageAnalyticsRepository {
         """
         , g.agence_id, d.code_agence, d.nom, d.categorie, d.pos_id, rg.libelle, zn.libelle,
           g.produit_id, p.module, p.produit, p.ecran
-         ORDER BY periode DESC, lower(coalesce(nullif(btrim(d.nom), ''), d.code_agence)),
-                  lower(""");
-    sql.append(produitLabelWithEcranSql("p"));
-    sql.append("), sum(g.montant) DESC");
+        """);
+    sql.append(order);
     return jdbc.query(sql.toString(), this::mapAgenceProduitPeriodique, scoped.args().toArray());
   }
 
   private List<AgenceProduitPeriodiqueRow> loadFaitAgencesProduitsPeriodiques(
-      PilotageBundleQuery q, String trunc) {
+      PilotageBundleQuery q, String trunc, boolean worst, boolean byVolume) {
     var scoped = PilotageSqlScope.buildFait(jdbc, q);
     String from = scoped.fromAndWhere();
     if (scoped.agenceAlias() == null) {
@@ -1354,6 +1357,10 @@ public class PilotageAnalyticsRepository {
     from = ensureProduitJoin(withAgenceGeo(from, ag), "f");
     String periodSelect = periodSelectSql("d.jour", trunc);
     String periodGroup = periodGroupSql("d.jour", trunc);
+    String order =
+        " ORDER BY periode DESC, "
+            + orderByMontantVolume("sum(f.montant)", "count(*)", worst, byVolume)
+                .replace(" ORDER BY ", "");
     StringBuilder sql = new StringBuilder();
     sql.append("SELECT ").append(periodSelect);
     sql.append(" f.agence_id, ");
@@ -1388,13 +1395,7 @@ public class PilotageAnalyticsRepository {
         .append(".categorie, ")
         .append(ag)
         .append(".pos_id, rg.libelle, zn.libelle, f.produit_id, p.module, p.produit, p.ecran ");
-    sql.append(" ORDER BY periode DESC, lower(coalesce(nullif(btrim(")
-        .append(ag)
-        .append(".nom), ''), ")
-        .append(ag)
-        .append(".code_agence)), lower(")
-        .append(produitLabelWithEcranSql("p"))
-        .append("), sum(f.montant) DESC");
+    sql.append(order);
     return jdbc.query(sql.toString(), this::mapAgenceProduitPeriodique, scoped.args().toArray());
   }
 

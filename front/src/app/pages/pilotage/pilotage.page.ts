@@ -2571,8 +2571,12 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.exportProgress.set(3);
     this.startExportCreep();
     this.pilotage
-      .loadAgencesProduitsPeriodique(criteria, 'month', (ratio) =>
-        this.bumpExportProgress(ratio * 100)
+      .loadAgencesProduitsPeriodique(
+        criteria,
+        'month',
+        this.agencyOrder(),
+        this.agencyTri(),
+        (ratio) => this.bumpExportProgress(ratio * 100)
       )
       .subscribe({
         next: (data) => {

@@ -262,9 +262,14 @@ export class PilotageService {
   loadAgencesProduitsPeriodique(
     criteria: PilotageCriteria,
     grain: 'month' | 'week' = 'month',
+    ordre: 'top' | 'pire' = 'top',
+    tri: 'montant' | 'volume' = 'montant',
     onProgress?: (ratio: number) => void
   ) {
-    const params = this.criteriaParams(criteria).set('grain', grain);
+    const params = this.criteriaParams(criteria)
+      .set('grain', grain)
+      .set('ordre', ordre)
+      .set('tri', tri);
     return this.http
       .get<{ data: PilotageAgencesProduitsPeriodiqueExport }>(
         `${this.baseUrl}/export/agences-produits-periodique`,

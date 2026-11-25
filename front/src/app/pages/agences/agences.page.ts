@@ -961,7 +961,7 @@ export class AgencesPageComponent implements OnInit {
     this.exportMenuOpen.set(false);
     this.exporting.set(true);
     const criteria = this.buildActivityExportCriteria();
-    this.pilotage.loadAgencesProduitsPeriodique(criteria, 'month').subscribe({
+    this.pilotage.loadAgencesProduitsPeriodique(criteria, 'month', 'top', 'montant').subscribe({
       next: (data) => {
         const settings = this.appSettings.settings();
         const identity = buildPilotageReportIdentity({

@@ -536,11 +536,11 @@ public class PilotageAnalyticsService {
   }
 
   public PilotageDtos.AgencesProduitsPeriodiqueExport exportAgencesProduitsPeriodique(
-      PilotageBundleQuery q, String grain) {
+      PilotageBundleQuery q, String grain, boolean worst, boolean byVolume) {
     q = withMoneyContext(q);
     validate(q);
     String resolved = "week".equalsIgnoreCase(grain) ? "week" : "month";
-    var flat = repository.loadAgencesProduitsPeriodiques(q, resolved);
+    var flat = repository.loadAgencesProduitsPeriodiques(q, resolved, worst, byVolume);
     var byPeriod =
         new java.util.LinkedHashMap<
             String, java.util.List<PilotageAnalyticsRepository.AgenceProduitPeriodiqueRow>>();
@@ -553,6 +553,7 @@ public class PilotageAnalyticsService {
       if (rows.isEmpty()) {
         continue;
       }
+      sortAgenceProduitRows(rows, worst, byVolume);
       var first = rows.get(0);
       long volume = 0L;
       java.math.BigDecimal montant = java.math.BigDecimal.ZERO;
@@ -607,6 +608,72 @@ public class PilotageAnalyticsService {
         String.join(",", q.resolvedDomaines()),
         q.devise(),
         periods);
+  }
+
+  /**
+   * Top/Pire par montant ou volume : agences classées sur leur total période, produits sous
+   * chaque agence classés sur la même métrique.
+   */
+  private static void sortAgenceProduitRows(
+      java.util.List<PilotageAnalyticsRepository.AgenceProduitPeriodiqueRow> rows,
+      boolean worst,
+      boolean byVolume) {
+    var agencyMontant = new java.util.HashMap<Integer, java.math.BigDecimal>();
+    var agencyVolume = new java.util.HashMap<Integer, Long>();
+    for (var r : rows) {
+      agencyMontant.merge(r.agenceId(), nullToZero(r.montant()), java.math.BigDecimal::add);
+      agencyVolume.merge(r.agenceId(), r.nb(), Long::sum);
+    }
+    int dir = worst ? 1 : -1;
+    rows.sort(
+        (a, b) -> {
+          int byAgency;
+          if (byVolume) {
+            byAgency =
+                Long.compare(
+                    agencyVolume.getOrDefault(a.agenceId(), 0L),
+                    agencyVolume.getOrDefault(b.agenceId(), 0L));
+            if (byAgency == 0) {
+              byAgency =
+                  agencyMontant
+                      .getOrDefault(a.agenceId(), java.math.BigDecimal.ZERO)
+                      .compareTo(agencyMontant.getOrDefault(b.agenceId(), java.math.BigDecimal.ZERO));
+            }
+          } else {
+            byAgency =
+                agencyMontant
+                    .getOrDefault(a.agenceId(), java.math.BigDecimal.ZERO)
+                    .compareTo(agencyMontant.getOrDefault(b.agenceId(), java.math.BigDecimal.ZERO));
+            if (byAgency == 0) {
+              byAgency =
+                  Long.compare(
+                      agencyVolume.getOrDefault(a.agenceId(), 0L),
+                      agencyVolume.getOrDefault(b.agenceId(), 0L));
+            }
+          }
+          if (byAgency != 0) {
+            return byAgency * dir;
+          }
+          if (a.agenceId() != b.agenceId()) {
+            return Integer.compare(a.agenceId(), b.agenceId());
+          }
+          int byLine;
+          if (byVolume) {
+            byLine = Long.compare(a.nb(), b.nb());
+            if (byLine == 0) {
+              byLine = nullToZero(a.montant()).compareTo(nullToZero(b.montant()));
+            }
+          } else {
+            byLine = nullToZero(a.montant()).compareTo(nullToZero(b.montant()));
+            if (byLine == 0) {
+              byLine = Long.compare(a.nb(), b.nb());
+            }
+          }
+          if (byLine != 0) {
+            return byLine * dir;
+          }
+          return Integer.compare(a.produitId(), b.produitId());
+        });
   }
 
   private static java.math.BigDecimal nullToZero(java.math.BigDecimal value) {
