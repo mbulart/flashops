@@ -1300,43 +1300,43 @@ public class PilotageAnalyticsRepository {
         PilotageSqlScope.build(jdbc, q, grain.table(), grain.alias(), true, grain.agent());
     String periodSelect = periodSelectSql("g.jour", trunc);
     String periodGroup = periodGroupSql("g.jour", trunc);
-    String from =
-        ensureProduitJoin(withAgenceGeo(scoped.fromAndWhere(), "d"), "g");
-    String grouped =
-        from
-            + """
-             AND g.agence_id <> 0
-             AND g.produit_id <> 0
-             GROUP BY
-            """
-            + periodGroup
-            + """, g.agence_id, d.code_agence, d.nom, d.categorie, d.pos_id, rg.libelle, zn.libelle,
-               g.produit_id, p.module, p.produit
-             ORDER BY periode DESC, lower(coalesce(nullif(btrim(d.nom), ''), d.code_agence)),
-                      lower(coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), '')),
-                      sum(g.montant) DESC""";
-    var sql =
+    String from = ensureProduitJoin(withAgenceGeo(scoped.fromAndWhere(), "d"), "g");
+    StringBuilder sql = new StringBuilder();
+    sql.append("SELECT ").append(periodSelect);
+    sql.append(
         """
-        SELECT
+        g.agence_id,
+        coalesce(nullif(btrim(d.code_agence), ''), '') AS code_agence,
+        coalesce(nullif(btrim(d.nom), ''), '') AS nom,
+        coalesce(nullif(btrim(d.categorie), ''), '') AS categorie,
+        coalesce(nullif(btrim(d.pos_id), ''), '') AS pos_id,
+        """);
+    sql.append(AGENCE_GEO_SELECT);
+    sql.append(
         """
-            + periodSelect
-            + """
-               g.agence_id,
-               coalesce(nullif(btrim(d.code_agence), ''), '') AS code_agence,
-               coalesce(nullif(btrim(d.nom), ''), '') AS nom,
-               coalesce(nullif(btrim(d.categorie), ''), '') AS categorie,
-               coalesce(nullif(btrim(d.pos_id), ''), '') AS pos_id,
+        g.produit_id,
+        coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), 'Non renseigné') AS produit,
+        coalesce(sum(g.nb), 0)::bigint AS nb,
+        coalesce(sum(g.montant), 0) AS montant,
+        """);
+    sql.append(commissionSelect(grain.table(), "g", q));
+    sql.append(from);
+    sql.append(
         """
-            + AGENCE_GEO_SELECT
-            + """
-               g.produit_id,
-               coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), 'Non renseigné') AS produit,
-               coalesce(sum(g.nb), 0)::bigint AS nb,
-               coalesce(sum(g.montant), 0) AS montant,
+         AND g.agence_id <> 0
+         AND g.produit_id <> 0
+         GROUP BY
+        """);
+    sql.append(periodGroup);
+    sql.append(
         """
-            + commissionSelect(grain.table(), "g", q)
-            + grouped;
-    return jdbc.query(sql, this::mapAgenceProduitPeriodique, scoped.args().toArray());
+        , g.agence_id, d.code_agence, d.nom, d.categorie, d.pos_id, rg.libelle, zn.libelle,
+          g.produit_id, p.module, p.produit
+         ORDER BY periode DESC, lower(coalesce(nullif(btrim(d.nom), ''), d.code_agence)),
+                  lower(coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), '')),
+                  sum(g.montant) DESC
+        """);
+    return jdbc.query(sql.toString(), this::mapAgenceProduitPeriodique, scoped.args().toArray());
   }
 
   private List<AgenceProduitPeriodiqueRow> loadFaitAgencesProduitsPeriodiques(
@@ -1353,61 +1353,47 @@ public class PilotageAnalyticsRepository {
     from = ensureProduitJoin(withAgenceGeo(from, ag), "f");
     String periodSelect = periodSelectSql("d.jour", trunc);
     String periodGroup = periodGroupSql("d.jour", trunc);
-    String grouped =
-        from
-            + """
-             AND f.agence_id <> 0
-             AND f.produit_id <> 0
-             GROUP BY
-            """
-            + periodGroup
-            + ", f.agence_id, "
-            + ag
-            + ".code_agence, "
-            + ag
-            + ".nom, "
-            + ag
-            + ".categorie, "
-            + ag
-            + ".pos_id, rg.libelle, zn.libelle, f.produit_id, p.module, p.produit"
-            + """
-             ORDER BY periode DESC, lower(coalesce(nullif(btrim("""
-            + ag
-            + """.nom), ''), """
-            + ag
-            + """.code_agence)),
-                      lower(coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), '')),
-                      sum(f.montant) DESC""";
-    var sql =
+    StringBuilder sql = new StringBuilder();
+    sql.append("SELECT ").append(periodSelect);
+    sql.append(" f.agence_id, ");
+    sql.append("coalesce(nullif(btrim(").append(ag).append(".code_agence), ''), '') AS code_agence, ");
+    sql.append("coalesce(nullif(btrim(").append(ag).append(".nom), ''), '') AS nom, ");
+    sql.append("coalesce(nullif(btrim(").append(ag).append(".categorie), ''), '') AS categorie, ");
+    sql.append("coalesce(nullif(btrim(").append(ag).append(".pos_id), ''), '') AS pos_id, ");
+    sql.append(AGENCE_GEO_SELECT);
+    sql.append(
         """
-        SELECT
+        f.produit_id,
+        coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), 'Non renseigné') AS produit,
+        count(*)::bigint AS nb,
+        coalesce(sum(f.montant), 0) AS montant,
+        """);
+    sql.append(commissionSelect("pilotage.fait_operation", "f", q));
+    sql.append(from);
+    sql.append(
         """
-            + periodSelect
-            + """
-               f.agence_id,
-               coalesce(nullif(btrim("""
-            + ag
-            + """.code_agence), ''), '') AS code_agence,
-               coalesce(nullif(btrim("""
-            + ag
-            + """.nom), ''), '') AS nom,
-               coalesce(nullif(btrim("""
-            + ag
-            + """.categorie), ''), '') AS categorie,
-               coalesce(nullif(btrim("""
-            + ag
-            + """.pos_id), ''), '') AS pos_id,
-        """
-            + AGENCE_GEO_SELECT
-            + """
-               f.produit_id,
-               coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), 'Non renseigné') AS produit,
-               count(*)::bigint AS nb,
-               coalesce(sum(f.montant), 0) AS montant,
-        """
-            + commissionSelect("pilotage.fait_operation", "f", q)
-            + grouped;
-    return jdbc.query(sql, this::mapAgenceProduitPeriodique, scoped.args().toArray());
+         AND f.agence_id <> 0
+         AND f.produit_id <> 0
+         GROUP BY
+        """);
+    sql.append(periodGroup);
+    sql.append(", f.agence_id, ")
+        .append(ag)
+        .append(".code_agence, ")
+        .append(ag)
+        .append(".nom, ")
+        .append(ag)
+        .append(".categorie, ")
+        .append(ag)
+        .append(".pos_id, rg.libelle, zn.libelle, f.produit_id, p.module, p.produit ");
+    sql.append(" ORDER BY periode DESC, lower(coalesce(nullif(btrim(")
+        .append(ag)
+        .append(".nom), ''), ")
+        .append(ag)
+        .append(".code_agence)), ")
+        .append(
+            "lower(coalesce(nullif(btrim(p.produit), ''), nullif(btrim(p.module), ''), '')), sum(f.montant) DESC");
+    return jdbc.query(sql.toString(), this::mapAgenceProduitPeriodique, scoped.args().toArray());
   }
 
   private AgenceProduitPeriodiqueRow mapAgenceProduitPeriodique(java.sql.ResultSet rs, int rowNum)
