@@ -80,8 +80,8 @@ export class OnboardingSuiviPageComponent implements OnInit {
   jeton = '';
 
   ngOnInit(): void {
-    this.reference = this.route.snapshot.queryParamMap.get('reference') || localStorage.getItem('flashops_onboarding_reference') || '';
-    this.jeton = this.route.snapshot.queryParamMap.get('jeton') || localStorage.getItem('flashops_onboarding_jeton') || '';
+    this.reference = this.route.snapshot.queryParamMap.get('reference') || '';
+    this.jeton = this.route.snapshot.queryParamMap.get('jeton') || '';
     if (this.reference && this.jeton) void this.search();
   }
 
@@ -91,8 +91,6 @@ export class OnboardingSuiviPageComponent implements OnInit {
     try {
       const result = await firstValueFrom(this.service.track(this.reference.trim(), this.jeton.trim()));
       this.candidature.set(result);
-      localStorage.setItem('flashops_onboarding_reference', this.reference.trim());
-      localStorage.setItem('flashops_onboarding_jeton', this.jeton.trim());
     } catch {
       this.candidature.set(null);
       this.toast.error('Candidature introuvable ou jeton invalide.');
