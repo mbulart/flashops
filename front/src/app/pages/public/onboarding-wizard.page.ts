@@ -10,6 +10,7 @@ import {
   OnboardingReferentiels,
   PointVente,
 } from '../../core/models/onboarding.models';
+import { AppSettingsService } from '../../core/services/app-settings.service';
 import { OnboardingService } from '../../core/services/onboarding.service';
 import { ToastService } from '../../core/services/toast.service';
 
@@ -23,7 +24,9 @@ const STORAGE_TOKEN = 'flashops_onboarding_jeton';
   template: `
     <main class="wizard-shell">
       <header>
-        <a routerLink="/devenir-distributeur" class="brand">Flash</a>
+        <a routerLink="/devenir-distributeur" class="brand" aria-label="Flash">
+          <img [src]="logoUrl()" alt="Flash" class="brand-logo" />
+        </a>
         <a routerLink="/devenir-distributeur/suivi" class="btn btn-outline-secondary btn-sm">Suivre un dossier</a>
       </header>
 
@@ -146,7 +149,8 @@ const STORAGE_TOKEN = 'flashops_onboarding_jeton';
     :host { display:block; min-height:100vh; background:#f5f5f3; }
     .wizard-shell { max-width:900px; margin:auto; padding:1rem 1rem 4rem; }
     header { display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem; }
-    .brand { color:#191919; text-decoration:none; font-size:1.45rem; font-weight:800; }
+    .brand { display:inline-flex; align-items:center; text-decoration:none; }
+    .brand-logo { height:2.1rem; width:auto; display:block; object-fit:contain; }
     .wizard-card { background:var(--bs-body-bg); border:1px solid var(--bs-border-color); border-radius:1rem; padding:clamp(1.2rem,4vw,2.5rem); box-shadow:0 12px 35px rgba(0,0,0,.06); }
     .wizard-title, footer { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
     h1 { font-size:1.55rem; margin:.15rem 0 0; }
@@ -171,6 +175,11 @@ export class OnboardingWizardPageComponent implements OnInit {
   private readonly service = inject(OnboardingService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly appSettings = inject(AppSettingsService);
+
+  readonly logoUrl = computed(
+    () => this.appSettings.settings().logo_light || '/branding/logo-light1.png'
+  );
 
   readonly steps = [
     { label: 'Identification' }, { label: 'Représentant' }, { label: 'Entreprise' },
