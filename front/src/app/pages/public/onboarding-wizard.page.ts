@@ -35,111 +35,121 @@ const STORAGE_TOKEN = 'flashops_onboarding_jeton';
           <div><span class="text-muted small">Candidature distributeur</span><h1>{{ steps[step()].label }}</h1></div>
           <span class="small text-muted">Étape {{ step() + 1 }} / {{ steps.length }}</span>
         </div>
-        <div class="progress mb-4" role="progressbar"><div class="progress-bar" [style.width.%]="progress()"></div></div>
+        <div class="progress mb-4" role="progressbar" [attr.aria-valuenow]="progress()">
+          <div class="progress-bar" [style.width.%]="progress()"></div>
+        </div>
 
         @if (loading()) {
           <div class="py-5 text-center"><span class="spinner-border spinner-border-sm me-2"></span>Chargement…</div>
         } @else {
-          @switch (step()) {
-            @case (0) {
-              <div class="form-grid">
-                <label>Adresse e-mail<input class="form-control form-control-sm" type="email" [(ngModel)]="draft.email" /></label>
-                <label>Téléphone<input class="form-control form-control-sm" [(ngModel)]="draft.telephone" /></label>
-              </div>
-            }
-            @case (1) {
-              <div class="form-grid">
-                <label>Nom<input class="form-control form-control-sm" [(ngModel)]="draft.representant.nom" /></label>
-                <label>Prénom<input class="form-control form-control-sm" [(ngModel)]="draft.representant.prenom" /></label>
-                <label>Téléphone<input class="form-control form-control-sm" [(ngModel)]="draft.representant.telephone" /></label>
-                <label>E-mail<input class="form-control form-control-sm" type="email" [(ngModel)]="draft.representant.email" /></label>
-                <label>Fonction<input class="form-control form-control-sm" [(ngModel)]="draft.representant.fonction" /></label>
-                <label>Pièce d’identité<input class="form-control form-control-sm" [(ngModel)]="draft.representant.piece_identite" /></label>
-              </div>
-            }
-            @case (2) {
-              <div class="form-grid">
-                <label>Raison sociale<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.raison_sociale" /></label>
-                <label>Nom commercial<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.nom_commercial" /></label>
-                <label>Forme juridique
-                  <select class="form-select form-select-sm" [(ngModel)]="draft.entreprise.forme_juridique">
-                    <option value="">Sélectionner</option>
-                    @for (option of refs().formes_juridiques || []; track option.code) {
-                      <option [value]="option.code">{{ option.libelle }}</option>
-                    }
-                  </select>
-                </label>
-                <label>RCCM<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.rccm" /></label>
-                <label>ID national<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.id_nat" /></label>
-                <label>NIF<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.nif" /></label>
-                <label class="span-2">Adresse<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.adresse" /></label>
-                <label>Ville<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.ville" /></label>
-                <label>Province<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.province" /></label>
-              </div>
-            }
-            @case (3) {
-              @for (family of serviceFamilies(); track family.name) {
-                <fieldset class="choice-group"><legend>{{ family.name }}</legend>
-                  <div class="choice-grid">
-                    @for (service of family.items; track service.code) {
-                      <label class="form-check">
-                        <input class="form-check-input" type="checkbox" [checked]="draft.services.includes(service.code)" (change)="toggleService(service.code, $any($event.target).checked)" />
-                        <span class="form-check-label">{{ service.libelle }}</span>
-                      </label>
-                    }
-                  </div>
-                </fieldset>
-              } @empty { <p class="text-muted">Aucun service disponible.</p> }
-            }
-            @case (4) {
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <p class="text-muted small mb-0">Indiquez au moins un emplacement envisagé.</p>
-                <button class="btn btn-outline-dark btn-sm" (click)="addOutlet()"><i class="bi bi-plus-lg me-1"></i>Ajouter</button>
-              </div>
-              @for (outlet of draft.points_vente; track $index) {
-                <div class="outlet">
+          <div
+            class="step-viewport"
+            [attr.data-dir]="slideDir()"
+            [attr.data-phase]="slidePhase()"
+          >
+            <div class="step-panel">
+              @switch (step()) {
+                @case (0) {
                   <div class="form-grid">
-                    <label>Nom<input class="form-control form-control-sm" [(ngModel)]="outlet.nom" /></label>
-                    <label>Adresse<input class="form-control form-control-sm" [(ngModel)]="outlet.adresse" /></label>
-                    <label>Ville<input class="form-control form-control-sm" [(ngModel)]="outlet.ville" /></label>
-                    <label>Province<input class="form-control form-control-sm" [(ngModel)]="outlet.province" /></label>
+                    <label>Adresse e-mail<input class="form-control form-control-sm" type="email" [(ngModel)]="draft.email" /></label>
+                    <label>Téléphone<input class="form-control form-control-sm" [(ngModel)]="draft.telephone" /></label>
                   </div>
-                  <div class="d-flex justify-content-between mt-2">
-                    <label class="form-check"><input type="radio" class="form-check-input" name="principal" [checked]="outlet.principal" (change)="setPrincipal($index)" /> Point principal</label>
-                    <button class="btn btn-link btn-sm text-danger" (click)="removeOutlet($index)">Retirer</button>
+                }
+                @case (1) {
+                  <div class="form-grid">
+                    <label>Nom<input class="form-control form-control-sm" [(ngModel)]="draft.representant.nom" /></label>
+                    <label>Prénom<input class="form-control form-control-sm" [(ngModel)]="draft.representant.prenom" /></label>
+                    <label>Téléphone<input class="form-control form-control-sm" [(ngModel)]="draft.representant.telephone" /></label>
+                    <label>E-mail<input class="form-control form-control-sm" type="email" [(ngModel)]="draft.representant.email" /></label>
+                    <label>Fonction<input class="form-control form-control-sm" [(ngModel)]="draft.representant.fonction" /></label>
+                    <label>Pièce d’identité<input class="form-control form-control-sm" [(ngModel)]="draft.representant.piece_identite" /></label>
                   </div>
-                </div>
+                }
+                @case (2) {
+                  <div class="form-grid">
+                    <label>Raison sociale<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.raison_sociale" /></label>
+                    <label>Nom commercial<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.nom_commercial" /></label>
+                    <label>Forme juridique
+                      <select class="form-select form-select-sm" [(ngModel)]="draft.entreprise.forme_juridique">
+                        <option value="">Sélectionner</option>
+                        @for (option of refs().formes_juridiques || []; track option.code) {
+                          <option [value]="option.code">{{ option.libelle }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label>RCCM<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.rccm" /></label>
+                    <label>ID national<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.id_nat" /></label>
+                    <label>NIF<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.nif" /></label>
+                    <label class="span-2">Adresse<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.adresse" /></label>
+                    <label>Ville<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.ville" /></label>
+                    <label>Province<input class="form-control form-control-sm" [(ngModel)]="draft.entreprise.province" /></label>
+                  </div>
+                }
+                @case (3) {
+                  @for (family of serviceFamilies(); track family.name) {
+                    <fieldset class="choice-group"><legend>{{ family.name }}</legend>
+                      <div class="choice-grid">
+                        @for (service of family.items; track service.code) {
+                          <label class="form-check">
+                            <input class="form-check-input" type="checkbox" [checked]="draft.services.includes(service.code)" (change)="toggleService(service.code, $any($event.target).checked)" />
+                            <span class="form-check-label">{{ service.libelle }}</span>
+                          </label>
+                        }
+                      </div>
+                    </fieldset>
+                  } @empty { <p class="text-muted">Aucun service disponible.</p> }
+                }
+                @case (4) {
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <p class="text-muted small mb-0">Indiquez au moins un emplacement envisagé.</p>
+                    <button class="btn btn-outline-dark btn-sm" (click)="addOutlet()"><i class="bi bi-plus-lg me-1"></i>Ajouter</button>
+                  </div>
+                  @for (outlet of draft.points_vente; track $index) {
+                    <div class="outlet">
+                      <div class="form-grid">
+                        <label>Nom<input class="form-control form-control-sm" [(ngModel)]="outlet.nom" /></label>
+                        <label>Adresse<input class="form-control form-control-sm" [(ngModel)]="outlet.adresse" /></label>
+                        <label>Ville<input class="form-control form-control-sm" [(ngModel)]="outlet.ville" /></label>
+                        <label>Province<input class="form-control form-control-sm" [(ngModel)]="outlet.province" /></label>
+                      </div>
+                      <div class="d-flex justify-content-between mt-2">
+                        <label class="form-check"><input type="radio" class="form-check-input" name="principal" [checked]="outlet.principal" (change)="setPrincipal($index)" /> Point principal</label>
+                        <button class="btn btn-link btn-sm text-danger" (click)="removeOutlet($index)">Retirer</button>
+                      </div>
+                    </div>
+                  }
+                }
+                @case (5) {
+                  <p class="text-muted small">Préparez les documents demandés. Ajoutez une note si nécessaire.</p>
+                  @for (doc of draft.documents; track doc.type_code) {
+                    <div class="document-row">
+                      <div><strong>{{ doc.type_libelle }}</strong><small class="d-block text-muted">{{ doc.statut || 'À fournir' }}</small></div>
+                      <input class="form-control form-control-sm" [(ngModel)]="doc.note" placeholder="Note (facultatif)" />
+                    </div>
+                  } @empty { <p class="text-muted">Aucun type de document n’est configuré.</p> }
+                }
+                @case (6) {
+                  <div class="recap">
+                    <div><span>Contact</span><strong>{{ draft.email || '—' }} · {{ draft.telephone || '—' }}</strong></div>
+                    <div><span>Représentant</span><strong>{{ draft.representant.prenom }} {{ draft.representant.nom }}</strong></div>
+                    <div><span>Entreprise</span><strong>{{ draft.entreprise.raison_sociale || '—' }}</strong></div>
+                    <div><span>Services</span><strong>{{ draft.services.length }}</strong></div>
+                    <div><span>Points de vente</span><strong>{{ draft.points_vente.length }}</strong></div>
+                    <div><span>Documents attendus</span><strong>{{ draft.documents.length }}</strong></div>
+                  </div>
+                  <div class="alert alert-warning mt-4 mb-0">Après soumission, votre dossier sera transmis pour traitement.</div>
+                }
               }
-            }
-            @case (5) {
-              <p class="text-muted small">Préparez les documents demandés. Ajoutez une note si nécessaire.</p>
-              @for (doc of draft.documents; track doc.type_code) {
-                <div class="document-row">
-                  <div><strong>{{ doc.type_libelle }}</strong><small class="d-block text-muted">{{ doc.statut || 'À fournir' }}</small></div>
-                  <input class="form-control form-control-sm" [(ngModel)]="doc.note" placeholder="Note (facultatif)" />
-                </div>
-              } @empty { <p class="text-muted">Aucun type de document n’est configuré.</p> }
-            }
-            @case (6) {
-              <div class="recap">
-                <div><span>Contact</span><strong>{{ draft.email || '—' }} · {{ draft.telephone || '—' }}</strong></div>
-                <div><span>Représentant</span><strong>{{ draft.representant.prenom }} {{ draft.representant.nom }}</strong></div>
-                <div><span>Entreprise</span><strong>{{ draft.entreprise.raison_sociale || '—' }}</strong></div>
-                <div><span>Services</span><strong>{{ draft.services.length }}</strong></div>
-                <div><span>Points de vente</span><strong>{{ draft.points_vente.length }}</strong></div>
-                <div><span>Documents attendus</span><strong>{{ draft.documents.length }}</strong></div>
-              </div>
-              <div class="alert alert-warning mt-4 mb-0">Après soumission, votre dossier sera transmis pour traitement.</div>
-            }
-          }
+            </div>
+          </div>
         }
 
         <footer>
-          <button class="btn btn-outline-secondary" [disabled]="step() === 0 || saving()" (click)="previous()">Précédent</button>
+          <button class="btn btn-outline-secondary" [disabled]="step() === 0 || saving() || sliding()" (click)="previous()">Précédent</button>
           @if (step() < steps.length - 1) {
-            <button class="btn btn-primary" [disabled]="saving()" (click)="next()">{{ saving() ? 'Enregistrement…' : 'Continuer' }}</button>
+            <button class="btn btn-primary" [disabled]="saving() || sliding()" (click)="next()">{{ saving() ? 'Enregistrement…' : 'Continuer' }}</button>
           } @else {
-            <button class="btn btn-primary" [disabled]="saving() || submitting()" (click)="submit()">{{ submitting() ? 'Envoi…' : 'Soumettre la candidature' }}</button>
+            <button class="btn btn-primary" [disabled]="saving() || submitting() || sliding()" (click)="submit()">{{ submitting() ? 'Envoi…' : 'Soumettre la candidature' }}</button>
           }
         </footer>
       </section>
@@ -154,7 +164,56 @@ const STORAGE_TOKEN = 'flashops_onboarding_jeton';
     .wizard-card { background:var(--bs-body-bg); border:1px solid var(--bs-border-color); border-radius:1rem; padding:clamp(1.2rem,4vw,2.5rem); box-shadow:0 12px 35px rgba(0,0,0,.06); }
     .wizard-title, footer { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
     h1 { font-size:1.55rem; margin:.15rem 0 0; }
-    .progress { height:.3rem; }
+    .progress {
+      height: .35rem;
+      background: #f0e7b0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      background: #ffd500 !important;
+      transition: width .35s ease;
+    }
+    .step-viewport {
+      overflow: hidden;
+      position: relative;
+      min-height: 8rem;
+    }
+    .step-panel {
+      will-change: transform, opacity;
+    }
+    .step-viewport[data-phase='out'][data-dir='next'] .step-panel {
+      animation: wizard-out-left .28s ease forwards;
+    }
+    .step-viewport[data-phase='out'][data-dir='prev'] .step-panel {
+      animation: wizard-out-right .28s ease forwards;
+    }
+    .step-viewport[data-phase='in'][data-dir='next'] .step-panel {
+      animation: wizard-in-right .32s ease both;
+    }
+    .step-viewport[data-phase='in'][data-dir='prev'] .step-panel {
+      animation: wizard-in-left .32s ease both;
+    }
+    @keyframes wizard-out-left {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(-28%); opacity: 0; }
+    }
+    @keyframes wizard-out-right {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(28%); opacity: 0; }
+    }
+    @keyframes wizard-in-right {
+      from { transform: translateX(32%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes wizard-in-left {
+      from { transform: translateX(-32%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .step-viewport[data-phase] .step-panel { animation: none !important; }
+      .progress-bar { transition: none; }
+    }
     .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
     label { font-size:.82rem; font-weight:600; color:var(--bs-secondary-color); }
     label input, label select { margin-top:.3rem; }
@@ -190,6 +249,9 @@ export class OnboardingWizardPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly submitting = signal(false);
+  readonly sliding = signal(false);
+  readonly slideDir = signal<'next' | 'prev'>('next');
+  readonly slidePhase = signal<'idle' | 'out' | 'in'>('idle');
   readonly refs = signal<OnboardingReferentiels>({});
   readonly progress = computed(() => ((this.step() + 1) / this.steps.length) * 100);
   readonly serviceFamilies = computed(() => {
@@ -247,13 +309,28 @@ export class OnboardingWizardPageComponent implements OnInit {
   }
 
   async next(): Promise<void> {
+    if (this.sliding() || this.saving()) return;
     if (!(await this.save())) return;
-    this.step.update((value) => Math.min(value + 1, this.steps.length - 1));
+    await this.goToStep(Math.min(this.step() + 1, this.steps.length - 1), 'next');
   }
 
   async previous(): Promise<void> {
+    if (this.sliding() || this.saving() || this.step() === 0) return;
     await this.save();
-    this.step.update((value) => Math.max(value - 1, 0));
+    await this.goToStep(Math.max(this.step() - 1, 0), 'prev');
+  }
+
+  private async goToStep(target: number, dir: 'next' | 'prev'): Promise<void> {
+    if (target === this.step()) return;
+    this.sliding.set(true);
+    this.slideDir.set(dir);
+    this.slidePhase.set('out');
+    await wait(280);
+    this.step.set(target);
+    this.slidePhase.set('in');
+    await wait(320);
+    this.slidePhase.set('idle');
+    this.sliding.set(false);
   }
 
   async submit(): Promise<void> {
@@ -297,4 +374,8 @@ export class OnboardingWizardPageComponent implements OnInit {
     if (reference) localStorage.setItem(STORAGE_REFERENCE, reference);
     if (token) localStorage.setItem(STORAGE_TOKEN, token);
   }
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
