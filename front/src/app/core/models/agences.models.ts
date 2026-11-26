@@ -54,17 +54,17 @@ export interface AgenceAdminInput {
 export interface AgenceAdminFilters {
   q?: string;
   identifiant?: string;
-  region_id?: number | null;
+  region_ids?: number[];
   zone_id?: number | null;
   ville?: string;
   commune?: string;
   province?: string;
   pays?: string;
-  categorie?: string;
+  categories?: string[];
   activity_days?: number | null;
   /**
-   * Tranche d'âge de la dernière transaction (jours).
-   * 3→[3,7), 7→[7,15), 15→[15,30), 30→[30,60), 60→[60,90), 90→[90,+∞).
+   * Âge mini de la dernière transaction (jours).
+   * Presets : 3→[3,7), 7→[7,15), … ; autre valeur = au moins N jours.
    */
   inactive_since_days?: number | null;
   /** Nouveau | Actif | Inactif */
@@ -76,3 +76,6 @@ export interface AgenceAdminFilters {
   page?: number;
   size?: number;
 }
+
+/** Catégories réseau Flash affichées par défaut dans le registre. */
+export const DEFAULT_AGENCE_CATEGORIES = ['SAG WU', 'Franchise BGFI', 'CFC'] as const;

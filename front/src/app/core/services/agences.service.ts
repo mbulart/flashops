@@ -57,13 +57,17 @@ export class AgencesService {
     };
     set('q', filters.q);
     set('identifiant', filters.identifiant);
-    set('region_id', filters.region_id);
+    for (const id of filters.region_ids ?? []) {
+      if (id != null && id > 0) params = params.append('region_id', String(id));
+    }
     set('zone_id', filters.zone_id);
     set('ville', filters.ville);
     set('commune', filters.commune);
     set('province', filters.province);
     set('pays', filters.pays);
-    set('categorie', filters.categorie);
+    for (const cat of filters.categories ?? []) {
+      if (cat?.trim()) params = params.append('categorie', cat.trim());
+    }
     set('activity_days', filters.activity_days);
     set('inactive_since_days', filters.inactive_since_days);
     for (const s of filters.statut_activite ?? []) {

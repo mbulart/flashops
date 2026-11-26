@@ -2,7 +2,12 @@ import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import { AgenceAdmin, AgenceAdminFilters, AgenceAdminInput } from '../../core/models/agences.models';
+import {
+  AgenceAdmin,
+  AgenceAdminFilters,
+  AgenceAdminInput,
+  DEFAULT_AGENCE_CATEGORIES,
+} from '../../core/models/agences.models';
 import {
   PilotageAgenceRank,
   PilotageCriteria,
@@ -16,16 +21,27 @@ import { AuthService } from '../../core/services/auth.service';
 import { PilotageService } from '../../core/services/pilotage.service';
 import { ToastService } from '../../core/services/toast.service';
 import { FilterPanelComponent } from '../../shared/components/filter-panel/filter-panel.component';
+import {
+  MultiSelectComponent,
+  MultiSelectOption,
+} from '../../shared/components/multi-select/multi-select.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SectionCardComponent } from '../../shared/components/section-card/section-card.component';
 import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.component';
 import { exportExcel, periodPresetRange } from '../../shared/utils/format.utils';
 import { TableActionsMenuComponent } from '../parametrages/components/table-actions-menu.component';
 import { PilotageAgencyModalComponent } from '../pilotage/components/pilotage-agency-modal.component';
+import { pilotageCategoryOptionId } from '../pilotage/pilotage-filtres.config';
 import { downloadPilotageAgencesPeriodiqueExcel } from '../pilotage/pilotage-agences-periodique.export';
 import { downloadPilotageAgencesProduitsPeriodiqueExcel } from '../pilotage/pilotage-agences-produits-periodique.export';
 import { buildPilotageReportIdentity } from '../pilotage/pilotage-report-identity';
 import { AgenceFormModalComponent } from './components/agence-form-modal.component';
+
+const STATUT_OPTIONS: MultiSelectOption[] = [
+  { id: pilotageCategoryOptionId('statut:Nouveau'), label: 'Nouveau' },
+  { id: pilotageCategoryOptionId('statut:Actif'), label: 'Actif' },
+  { id: pilotageCategoryOptionId('statut:Inactif'), label: 'Inactif' },
+];
 
 const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
   { code: 'transfert', label: 'Transferts' },
@@ -41,6 +57,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
     FormsModule,
     PageHeaderComponent,
     FilterPanelComponent,
+    MultiSelectComponent,
     SectionCardComponent,
     SkeletonComponent,
     TableActionsMenuComponent,
@@ -88,40 +105,59 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
             />
           </div>
           <div class="filter-field">
-            <label class="form-label" for="ag-activity">Activité récente</label>
-            <select id="ag-activity" class="form-select form-select-sm" [(ngModel)]="draftActivityDays" (ngModelChange)="onActivityDaysChange()">
-              <option [ngValue]="null">Toutes</option>
-              <option [ngValue]="30">≤ 30 jours</option>
-              <option [ngValue]="60">≤ 60 jours</option>
-              <option [ngValue]="90">≤ 90 jours</option>
-            </select>
-          </div>
-          <div class="filter-field">
-            <label class="form-label" for="ag-inactive">Dernière transaction</label>
+            <label class="form-label" for="ag-activity">Active dans les</label>
             <select
-              id="ag-inactive"
+              id="ag-activity"
               class="form-select form-select-sm"
-              [(ngModel)]="draftInactiveSinceDays"
-              (ngModelChange)="onInactiveSinceChange()"
-              title="Tranche d’âge de la dernière transaction (agences qui ont déjà eu de l’activité)"
+              [(ngModel)]="draftActivityDays"
+              (ngModelChange)="onActivityDaysChange()"
+              title="Agences dont la dernière transaction date d’au plus X jours"
             >
-              <option [ngValue]="null">—</option>
-              <option [ngValue]="3">Il y a 3–7 jours</option>
-              <option [ngValue]="7">Il y a 7–15 jours</option>
-              <option [ngValue]="15">Il y a 15–30 jours</option>
-              <option [ngValue]="30">Il y a 1–2 mois</option>
-              <option [ngValue]="60">Il y a 2–3 mois</option>
-              <option [ngValue]="90">Il y a plus de 3 mois</option>
+              <option [ngValue]="null">Toutes</option>
+              <option [ngValue]="30">30 derniers jours</option>
+              <option [ngValue]="60">60 derniers jours</option>
+              <option [ngValue]="90">90 derniers jours</option>
             </select>
           </div>
+          <div class="filter-field filter-field--inactive">
+            <label class="form-label" for="ag-inactive">Sans activité depuis</label>
+            <div class="agences-inactive-fields">
+              <select
+                id="ag-inactive"
+                class="form-select form-select-sm"
+                [(ngModel)]="draftInactivePreset"
+                (ngModelChange)="onInactivePresetChange()"
+                title="Agences déjà actives un jour, sans transaction depuis cette durée"
+              >
+                <option [ngValue]="null">—</option>
+                <option [ngValue]="3">3 à 7 jours</option>
+                <option [ngValue]="7">7 à 15 jours</option>
+                <option [ngValue]="15">15 à 30 jours</option>
+                <option [ngValue]="30">1 à 2 mois</option>
+                <option [ngValue]="60">2 à 3 mois</option>
+                <option [ngValue]="90">Plus de 3 mois</option>
+              </select>
+              <input
+                id="ag-inactive-custom"
+                type="number"
+                min="1"
+                step="1"
+                class="form-control form-control-sm"
+                [(ngModel)]="draftInactiveCustomDays"
+                (ngModelChange)="onInactiveCustomChange()"
+                placeholder="Jours…"
+                title="Saisie libre : sans transaction depuis au moins N jours"
+              />
+            </div>
+          </div>
           <div class="filter-field">
-            <label class="form-label" for="ag-statut">Statut</label>
-            <select id="ag-statut" class="form-select form-select-sm" [(ngModel)]="draftStatutActivite">
-              <option value="">Tous</option>
-              <option value="Nouveau">Nouveau</option>
-              <option value="Actif">Actif</option>
-              <option value="Inactif">Inactif</option>
-            </select>
+            <label class="form-label">Statut</label>
+            <app-multi-select
+              [options]="statutOptions"
+              [selectedIds]="draftStatutIds"
+              (selectedIdsChange)="draftStatutIds = $event"
+              placeholder="Tous les statuts"
+            />
           </div>
           <div class="filter-field">
             <label class="form-label" for="ag-coords">Géoloc.</label>
@@ -134,13 +170,13 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
 
         <div class="agences-filter-row">
           <div class="filter-field">
-            <label class="form-label" for="ag-f-region">Région</label>
-            <select id="ag-f-region" class="form-select form-select-sm" [(ngModel)]="draftRegionId" (ngModelChange)="onFilterRegionChange()">
-              <option [ngValue]="null">Toutes</option>
-              @for (r of regions(); track r.id) {
-                <option [ngValue]="r.id">{{ r.libelle }}</option>
-              }
-            </select>
+            <label class="form-label">Région</label>
+            <app-multi-select
+              [options]="regionOptions()"
+              [selectedIds]="draftRegionIds"
+              (selectedIdsChange)="onFilterRegionsChange($event)"
+              placeholder="Toutes les régions"
+            />
           </div>
           <div class="filter-field">
             <label class="form-label" for="ag-f-zone">Zone</label>
@@ -160,13 +196,13 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
             <input id="ag-f-commune" class="form-control form-control-sm" [(ngModel)]="draftCommune" />
           </div>
           <div class="filter-field">
-            <label class="form-label" for="ag-f-cat">Catégorie</label>
-            <select id="ag-f-cat" class="form-select form-select-sm" [(ngModel)]="draftCategorie">
-              <option value="">Toutes</option>
-              @for (c of categories(); track c) {
-                <option [value]="c">{{ c }}</option>
-              }
-            </select>
+            <label class="form-label">Catégorie</label>
+            <app-multi-select
+              [options]="categoryOptions()"
+              [selectedIds]="draftCategorieIds"
+              (selectedIdsChange)="draftCategorieIds = $event"
+              placeholder="Toutes les catégories"
+            />
           </div>
           <div class="filter-field filter-field--actions">
             <label class="form-label" aria-hidden="true">&nbsp;</label>
@@ -445,6 +481,19 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
       gap: 0.4rem;
       flex-wrap: wrap;
     }
+    .agences-inactive-fields {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(4.5rem, 0.7fr);
+      gap: 0.35rem;
+      align-items: stretch;
+    }
+    .agences-inactive-fields input[type='number'] {
+      min-width: 0;
+    }
+    .agences-filters ::ng-deep .multi-select-control {
+      min-height: calc(1.5em + 0.5rem + 2px);
+      font-size: 0.875rem;
+    }
     .agences-table-actions {
       display: flex;
       align-items: center;
@@ -597,17 +646,20 @@ export class AgencesPageComponent implements OnInit {
   readonly pageSizes = [25, 50, 100];
   readonly exportMenuOpen = signal(false);
 
+  readonly statutOptions = STATUT_OPTIONS;
+
   draftActivityDays: number | null = null;
-  draftInactiveSinceDays: number | null = null;
-  draftStatutActivite = '';
+  draftInactivePreset: number | null = null;
+  draftInactiveCustomDays: number | null = null;
+  draftStatutIds: number[] = [];
   draftSansCoords = false;
   draftIdentifiant = '';
   draftQ = '';
-  draftRegionId: number | null = null;
+  draftRegionIds: number[] = [];
   draftZoneId: number | null = null;
   draftVille = '';
   draftCommune = '';
-  draftCategorie = '';
+  draftCategorieIds: number[] = [];
 
   readonly statutActiviteBadgeColors = {
     Nouveau: { bg: 'FFDBEAFE', fg: 'FF1D4ED8' },
@@ -661,11 +713,18 @@ export class AgencesPageComponent implements OnInit {
       error: () => this.regions.set([]),
     });
     this.agencesApi.categories().subscribe({
-      next: (rows) => this.categories.set(rows ?? []),
-      error: () => this.categories.set([]),
+      next: (rows) => {
+        this.categories.set(rows ?? []);
+        this.applyDefaultCategories();
+        this.applyFilters();
+      },
+      error: () => {
+        this.categories.set([...DEFAULT_AGENCE_CATEGORIES]);
+        this.applyDefaultCategories();
+        this.applyFilters();
+      },
     });
-    this.loadZones(null);
-    this.applyFilters();
+    this.loadZones([]);
   }
 
   tableTitle(): string {
@@ -681,32 +740,57 @@ export class AgencesPageComponent implements OnInit {
     return this.zones();
   }
 
-  onFilterRegionChange(): void {
+  regionOptions(): MultiSelectOption[] {
+    return this.regions().map((r) => ({ id: r.id, label: r.libelle }));
+  }
+
+  categoryOptions(): MultiSelectOption[] {
+    return this.categories().map((c) => ({ id: pilotageCategoryOptionId(c), label: c }));
+  }
+
+  onFilterRegionsChange(ids: number[]): void {
+    this.draftRegionIds = ids;
     this.draftZoneId = null;
-    this.loadZones(this.draftRegionId);
+    this.loadZones(ids);
   }
 
   onActivityDaysChange(): void {
-    if (this.draftActivityDays != null) this.draftInactiveSinceDays = null;
+    if (this.draftActivityDays != null) {
+      this.draftInactivePreset = null;
+      this.draftInactiveCustomDays = null;
+    }
   }
 
-  onInactiveSinceChange(): void {
-    if (this.draftInactiveSinceDays != null) this.draftActivityDays = null;
+  onInactivePresetChange(): void {
+    if (this.draftInactivePreset != null) {
+      this.draftInactiveCustomDays = null;
+      this.draftActivityDays = null;
+    }
+  }
+
+  onInactiveCustomChange(): void {
+    const n = this.normalizeCustomDays(this.draftInactiveCustomDays);
+    this.draftInactiveCustomDays = n;
+    if (n != null) {
+      this.draftInactivePreset = null;
+      this.draftActivityDays = null;
+    }
   }
 
   resetFilters(): void {
     this.draftActivityDays = null;
-    this.draftInactiveSinceDays = null;
-    this.draftStatutActivite = '';
+    this.draftInactivePreset = null;
+    this.draftInactiveCustomDays = null;
+    this.draftStatutIds = [];
     this.draftSansCoords = false;
     this.draftIdentifiant = '';
     this.draftQ = '';
-    this.draftRegionId = null;
+    this.draftRegionIds = [];
     this.draftZoneId = null;
     this.draftVille = '';
     this.draftCommune = '';
-    this.draftCategorie = '';
-    this.loadZones(null);
+    this.applyDefaultCategories();
+    this.loadZones([]);
     this.applyFilters();
   }
 
@@ -757,14 +841,14 @@ export class AgencesPageComponent implements OnInit {
   openCreate(): void {
     this.editingId.set(null);
     this.editingAgency.set(null);
-    this.loadZones(null);
+    this.loadZones([]);
     this.editorOpen.set(true);
   }
 
   openEdit(row: AgenceAdmin): void {
     this.editingId.set(row.agenceId);
     this.editingAgency.set(row);
-    this.loadZones(row.regionId);
+    this.loadZones(row.regionId != null ? [row.regionId] : []);
     this.editorOpen.set(true);
   }
 
@@ -1000,17 +1084,18 @@ export class AgencesPageComponent implements OnInit {
   private buildActivityExportCriteria(): PilotageCriteria {
     const base = this.buildAgencyCriteria();
     const range = periodPresetRange('year');
-    const regionLabel =
-      this.applied.region_id != null
-        ? this.regions().find((r) => r.id === this.applied.region_id)?.libelle?.trim() || ''
-        : '';
+    const regionIds = this.applied.region_ids ?? [];
+    const reseauRegions = this.regions()
+      .filter((r) => regionIds.includes(r.id))
+      .map((r) => r.libelle?.trim() || '')
+      .filter(Boolean);
     return {
       ...base,
       from: range.from,
       to: range.to,
-      categories: this.applied.categorie ? [this.applied.categorie] : [],
+      categories: [...(this.applied.categories ?? [])],
       zoneIds: this.applied.zone_id != null ? [this.applied.zone_id] : [],
-      reseauRegions: regionLabel ? [regionLabel] : [],
+      reseauRegions,
     };
   }
 
@@ -1023,15 +1108,21 @@ export class AgencesPageComponent implements OnInit {
 
   private exportScopeChips(): string[] {
     const chips: string[] = [];
-    if (this.applied.region_id != null) {
-      const label = this.regions().find((r) => r.id === this.applied.region_id)?.libelle;
-      if (label) chips.push(`Région : ${label}`);
+    const regionIds = this.applied.region_ids ?? [];
+    if (regionIds.length) {
+      const labels = this.regions()
+        .filter((r) => regionIds.includes(r.id))
+        .map((r) => r.libelle)
+        .filter(Boolean);
+      if (labels.length) chips.push(`Région : ${labels.join(', ')}`);
     }
     if (this.applied.zone_id != null) {
       const label = this.zones().find((z) => z.id === this.applied.zone_id)?.libelle;
       if (label) chips.push(`Zone : ${label}`);
     }
-    if (this.applied.categorie) chips.push(`Catégorie : ${this.applied.categorie}`);
+    if (this.applied.categories?.length) {
+      chips.push(`Catégorie : ${this.applied.categories.join(', ')}`);
+    }
     return chips;
   }
 
@@ -1042,23 +1133,60 @@ export class AgencesPageComponent implements OnInit {
   }
 
   private buildFilters(page: number): AgenceAdminFilters {
+    const categories = this.selectedCategories();
+    const statutIds = new Set(this.draftStatutIds);
+    const statut_activite = this.statutOptions
+      .filter((o) => statutIds.has(o.id))
+      .map((o) => o.label);
     return {
       q: this.draftQ.trim() || undefined,
       identifiant: this.draftIdentifiant.trim() || undefined,
-      region_id: this.draftRegionId,
+      region_ids: this.draftRegionIds.length ? [...this.draftRegionIds] : undefined,
       zone_id: this.draftZoneId,
       ville: this.draftVille.trim() || undefined,
       commune: this.draftCommune.trim() || undefined,
-      categorie: this.draftCategorie.trim() || undefined,
+      categories: categories.length ? categories : undefined,
       activity_days: this.draftActivityDays,
-      inactive_since_days: this.draftInactiveSinceDays,
-      statut_activite: this.draftStatutActivite.trim()
-        ? [this.draftStatutActivite.trim()]
-        : undefined,
+      inactive_since_days: this.resolveInactiveSinceDays(),
+      statut_activite: statut_activite.length ? statut_activite : undefined,
       sans_coords: this.draftSansCoords || undefined,
       page,
       size: this.pageSize(),
     };
+  }
+
+  private resolveInactiveSinceDays(): number | null {
+    const custom = this.normalizeCustomDays(this.draftInactiveCustomDays);
+    if (custom != null) return custom;
+    return this.draftInactivePreset;
+  }
+
+  private normalizeCustomDays(value: number | null | undefined): number | null {
+    if (value == null || value === ('' as unknown as number)) return null;
+    const n = Math.floor(Number(value));
+    if (!Number.isFinite(n) || n < 1) return null;
+    return n;
+  }
+
+  private selectedCategories(): string[] {
+    const ids = new Set(this.draftCategorieIds);
+    return this.categories().filter((c) => ids.has(pilotageCategoryOptionId(c)));
+  }
+
+  private applyDefaultCategories(): void {
+    const available = this.categories();
+    const picked: string[] = [];
+    for (const wanted of DEFAULT_AGENCE_CATEGORIES) {
+      const match =
+        available.find((c) => c.trim().toLowerCase() === wanted.toLowerCase()) ||
+        available.find((c) => c.trim().toLowerCase().includes(wanted.toLowerCase()));
+      if (match && !picked.includes(match)) picked.push(match);
+    }
+    const source = picked.length ? picked : [...DEFAULT_AGENCE_CATEGORIES];
+    if (!picked.length && !available.length) {
+      this.categories.set([...DEFAULT_AGENCE_CATEGORIES]);
+    }
+    this.draftCategorieIds = source.map((c) => pilotageCategoryOptionId(c));
   }
 
   private reload(): void {
@@ -1087,13 +1215,15 @@ export class AgencesPageComponent implements OnInit {
     return `${match[3]}/${match[2]}/${match[1]}`;
   }
 
-  loadZones(regionId: number | null): void {
+  loadZones(regionIds: number[]): void {
+    const idSet = new Set(regionIds);
     const labels =
-      regionId == null
+      idSet.size === 0
         ? []
         : this.regions()
-            .filter((r) => r.id === regionId)
-            .map((r) => r.libelle);
+            .filter((r) => idSet.has(r.id))
+            .map((r) => r.libelle)
+            .filter(Boolean);
     this.pilotage.listReseauZones(labels).subscribe({
       next: (rows) => this.zones.set(rows ?? []),
       error: () => this.zones.set([]),

@@ -266,9 +266,13 @@ public class AgenceAdminRepository {
       args.add(id);
       args.add(id);
     }
-    if (q.regionId() != null && q.regionId() > 0) {
-      where.append(" AND d.region_id = ? ");
-      args.add(q.regionId());
+    if (q.regionIds() != null && !q.regionIds().isEmpty()) {
+      List<Integer> regionIds =
+          q.regionIds().stream().filter(id -> id != null && id > 0).distinct().toList();
+      if (!regionIds.isEmpty()) {
+        where.append(" AND d.region_id = ANY(?) ");
+        args.add(regionIds.toArray(new Integer[0]));
+      }
     }
     if (q.zoneId() != null && q.zoneId() > 0) {
       where.append(" AND d.zone_id = ? ");
@@ -290,9 +294,17 @@ public class AgenceAdminRepository {
       where.append(" AND d.pays ILIKE ? ");
       args.add(q.pays().trim());
     }
-    if (notBlank(q.categorie())) {
-      where.append(" AND lower(btrim(d.categorie)) = lower(?) ");
-      args.add(q.categorie().trim());
+    if (q.categories() != null && !q.categories().isEmpty()) {
+      List<String> cats =
+          q.categories().stream()
+              .filter(AgenceAdminRepository::notBlank)
+              .map(s -> s.trim().toLowerCase())
+              .distinct()
+              .toList();
+      if (!cats.isEmpty()) {
+        where.append(" AND lower(btrim(d.categorie)) = ANY(?) ");
+        args.add(cats.toArray(new String[0]));
+      }
     }
     if (q.parentAgenceId() != null && q.parentAgenceId() > 0) {
       where.append(" AND d.parent_agence_id = ? ");
