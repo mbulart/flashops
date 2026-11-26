@@ -82,7 +82,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
     <app-filter-panel title="Filtres" [expanded]="true">
       <div class="agences-filters">
         <div class="agences-filter-row">
-          <div class="filter-field filter-field--search">
+          <div class="filter-field">
             <label class="form-label" for="ag-q">Recherche</label>
             <input
               id="ag-q"
@@ -129,7 +129,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 (ngModelChange)="onInactivePresetChange()"
                 title="Agences déjà actives un jour, sans transaction depuis cette durée"
               >
-                <option [ngValue]="null">—</option>
+                <option [ngValue]="null">Tranche…</option>
                 <option [ngValue]="3">3 à 7 jours</option>
                 <option [ngValue]="7">7 à 15 jours</option>
                 <option [ngValue]="15">15 à 30 jours</option>
@@ -137,17 +137,20 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 <option [ngValue]="60">2 à 3 mois</option>
                 <option [ngValue]="90">Plus de 3 mois</option>
               </select>
-              <input
-                id="ag-inactive-custom"
-                type="number"
-                min="1"
-                step="1"
-                class="form-control form-control-sm"
-                [(ngModel)]="draftInactiveCustomDays"
-                (ngModelChange)="onInactiveCustomChange()"
-                placeholder="Jours…"
-                title="Saisie libre : sans transaction depuis au moins N jours"
-              />
+              <div class="agences-inactive-custom input-group input-group-sm">
+                <input
+                  id="ag-inactive-custom"
+                  type="number"
+                  min="1"
+                  step="1"
+                  class="form-control form-control-sm"
+                  [(ngModel)]="draftInactiveCustomDays"
+                  (ngModelChange)="onInactiveCustomChange()"
+                  placeholder="N"
+                  title="Saisie libre : sans transaction depuis au moins N jours"
+                />
+                <span class="input-group-text">j</span>
+              </div>
             </div>
           </div>
           <div class="filter-field">
@@ -195,7 +198,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
             <label class="form-label" for="ag-f-commune">Commune</label>
             <input id="ag-f-commune" class="form-control form-control-sm" [(ngModel)]="draftCommune" />
           </div>
-          <div class="filter-field">
+          <div class="filter-field filter-field--category">
             <label class="form-label">Catégorie</label>
             <app-multi-select
               [options]="categoryOptions()"
@@ -430,25 +433,19 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
     .agences-filter-row {
       display: grid;
       grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 0.45rem 0.65rem;
-      align-items: end;
-    }
-    .agences-filter-row .filter-field--search {
-      grid-column: span 2;
+      gap: 0.55rem 0.7rem;
+      align-items: start;
     }
     @media (max-width: 1199.98px) {
       .agences-filter-row {
         grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-      .agences-filter-row .filter-field--search {
-        grid-column: span 1;
       }
     }
     @media (max-width: 767.98px) {
       .agences-filter-row {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-      .agences-filter-row .filter-field--search,
+      .agences-filter-row .filter-field--category,
       .agences-filter-row .filter-field--actions {
         grid-column: 1 / -1;
       }
@@ -467,9 +464,11 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
     }
     .agences-filters .filter-field {
       min-width: 0;
+      display: flex;
+      flex-direction: column;
     }
     .agences-filters .form-label {
-      margin-bottom: 0.15rem;
+      margin-bottom: 0.2rem;
       font-size: 0.72rem;
       font-weight: 600;
       letter-spacing: 0.01em;
@@ -478,17 +477,27 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
     .agences-filters-actions {
       display: flex;
       justify-content: flex-end;
+      align-items: center;
       gap: 0.4rem;
       flex-wrap: wrap;
+      min-height: calc(1.5em + 0.5rem + 2px);
     }
     .agences-inactive-fields {
       display: grid;
-      grid-template-columns: minmax(0, 1.4fr) minmax(4.5rem, 0.7fr);
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 0.35rem;
       align-items: stretch;
     }
-    .agences-inactive-fields input[type='number'] {
+    .agences-inactive-custom {
+      width: 5.25rem;
+      flex-wrap: nowrap;
+    }
+    .agences-inactive-custom .form-control {
       min-width: 0;
+    }
+    .agences-inactive-custom .input-group-text {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.4rem;
     }
     .agences-filters ::ng-deep .multi-select-control {
       min-height: calc(1.5em + 0.5rem + 2px);

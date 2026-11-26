@@ -116,7 +116,7 @@ public class AgenceAdminRepository {
         jdbc.query(
             SELECT_LIST
                 + where
-                + " ORDER BY d.nom NULLS LAST, d.code_agence NULLS LAST, d.agence_id "
+                + " ORDER BY last_tx.derniere_tx DESC NULLS LAST, d.nom NULLS LAST, d.agence_id "
                 + " LIMIT ? OFFSET ? ",
             this::mapRow,
             pageArgs.toArray());
@@ -140,7 +140,7 @@ public class AgenceAdminRepository {
     return jdbc.query(
         SELECT_LIST
             + where
-            + " ORDER BY d.nom NULLS LAST, d.code_agence NULLS LAST, d.agence_id ",
+            + " ORDER BY last_tx.derniere_tx DESC NULLS LAST, d.nom NULLS LAST, d.agence_id ",
         this::mapRow,
         args.toArray());
   }
