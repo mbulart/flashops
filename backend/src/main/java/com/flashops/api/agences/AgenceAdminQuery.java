@@ -15,9 +15,9 @@ public record AgenceAdminQuery(
     List<String> categories,
     Integer activityDays,
     /**
-     * Âge mini de la dernière transaction (jours).
+     * Âge de la dernière transaction (jours).
      * Bornes presets : 3→[3,7), 7→[7,15), 15→[15,30), 30→[30,60), 60→[60,90), 90→[90,+∞).
-     * Autre valeur (saisie libre) → dernière TX il y a au moins N jours (sans borne max).
+     * Saisie libre N → fenêtre [N, N+1) (ex. 1 = TX hier, exclut les vieux inactifs).
      */
     Integer inactiveSinceDays,
     /** Nouveau | Actif | Inactif — vide = pas de filtre. */

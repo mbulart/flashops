@@ -63,8 +63,8 @@ export interface AgenceAdminFilters {
   categories?: string[];
   activity_days?: number | null;
   /**
-   * Âge mini de la dernière transaction (jours).
-   * Presets : 3→[3,7), 7→[7,15), … ; autre valeur = au moins N jours.
+   * Âge de la dernière transaction (jours).
+   * Presets : 3→[3,7), … ; saisie libre N → [N, N+1).
    */
   inactive_since_days?: number | null;
   /** Nouveau | Actif | Inactif */

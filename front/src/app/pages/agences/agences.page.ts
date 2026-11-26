@@ -147,7 +147,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                   [(ngModel)]="draftInactiveCustomDays"
                   (ngModelChange)="onInactiveCustomChange()"
                   placeholder="N"
-                  title="Saisie libre : sans transaction depuis au moins N jours"
+                  title="Saisie libre : dernière TX il y a exactement N jours (pas les plus anciens)"
                 />
                 <span class="input-group-text">j</span>
               </div>

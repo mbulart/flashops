@@ -468,7 +468,11 @@ public class AgenceAdminRepository {
     return t.isEmpty() ? null : t;
   }
 
-  /** Borne exclusive supérieure de la tranche « dernière TX », ou null = pas de plafond. */
+  /**
+   * Borne exclusive supérieure de la tranche « dernière TX ».
+   * Presets : 3→[3,7), …, 90→[90,+∞).
+   * Saisie libre N : [N, N+1) — ex. 1 → TX il y a 1 jour, pas les vieux inactifs.
+   */
   private static Integer nextInactiveBucketExclusive(int minDays) {
     return switch (minDays) {
       case 3 -> 7;
@@ -477,7 +481,7 @@ public class AgenceAdminRepository {
       case 30 -> 60;
       case 60 -> 90;
       case 90 -> null;
-      default -> null;
+      default -> minDays + 1;
     };
   }
 }
