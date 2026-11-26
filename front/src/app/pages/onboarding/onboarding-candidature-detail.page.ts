@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { Candidature } from '../../core/models/onboarding.models';
+import { AuthService } from '../../core/services/auth.service';
 import { OnboardingService } from '../../core/services/onboarding.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -17,7 +18,19 @@ type DetailTab = 'apercu' | 'entreprise' | 'points' | 'documents' | 'workflow';
   imports: [CommonModule, RouterLink, PageHeaderComponent, SectionCardComponent, SkeletonComponent],
   template: `
     <app-page-header [title]="item()?.reference || 'Candidature'" subtitle="Détail du dossier">
-      <a actions routerLink="/onboarding/candidatures" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Retour</a>
+      <div actions class="d-flex flex-wrap gap-2">
+        <a routerLink="/onboarding/candidatures" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Retour</a>
+        @if (isSuperAdmin()) {
+          <button
+            type="button"
+            class="btn btn-outline-danger btn-sm"
+            [disabled]="deleting()"
+            (click)="deleteCandidature()"
+          >
+            <i class="bi bi-trash me-1"></i>{{ deleting() ? 'Suppression…' : 'Supprimer' }}
+          </button>
+        }
+      </div>
     </app-page-header>
     @if (loading()) { <app-section-card><app-skeleton type="text" [rows]="8" /></app-section-card> }
     @else if (item(); as c) {
@@ -93,11 +106,15 @@ type DetailTab = 'apercu' | 'entreprise' | 'points' | 'documents' | 'workflow';
 })
 export class OnboardingCandidatureDetailPageComponent implements OnInit {
   private readonly service = inject(OnboardingService);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   readonly loading = signal(true);
+  readonly deleting = signal(false);
   readonly item = signal<Candidature | null>(null);
   readonly activeTab = signal<DetailTab>('apercu');
+  readonly isSuperAdmin = computed(() => this.auth.roleCode() === 'SUPER_ADMIN');
   readonly tabs: { key: DetailTab; label: string }[] = [
     { key: 'apercu', label: 'Aperçu' }, { key: 'entreprise', label: 'Entreprise' },
     { key: 'points', label: 'Points de vente' }, { key: 'documents', label: 'Documents' },
@@ -111,6 +128,26 @@ export class OnboardingCandidatureDetailPageComponent implements OnInit {
       this.toast.error('Impossible de charger la candidature.');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  async deleteCandidature(): Promise<void> {
+    const c = this.item();
+    const id = c?.id ?? this.route.snapshot.paramMap.get('id');
+    if (!c || !id || this.deleting()) return;
+    const ref = c.reference || `#${id}`;
+    if (!confirm(`Supprimer définitivement la candidature ${ref} ? Cette action est irréversible.`)) {
+      return;
+    }
+    this.deleting.set(true);
+    try {
+      await firstValueFrom(this.service.deleteCandidature(id));
+      this.toast.success('Candidature supprimée.');
+      await this.router.navigateByUrl('/onboarding/candidatures');
+    } catch {
+      this.toast.error('Impossible de supprimer la candidature.');
+    } finally {
+      this.deleting.set(false);
     }
   }
 }

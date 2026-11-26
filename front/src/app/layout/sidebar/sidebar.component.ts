@@ -56,24 +56,27 @@ const STORAGE_KEY = 'flashops_sidebar_groups_open';
             <div
               class="sidebar-group-items"
               [id]="'nav-group-' + groupKey(group.label)"
-              [hidden]="!collapsed && !isGroupOpen(group.label)"
+              [class.is-collapsed]="!collapsed && !isGroupOpen(group.label)"
+              [attr.aria-hidden]="!collapsed && !isGroupOpen(group.label) ? 'true' : null"
             >
-              @for (item of group.items; track item.path) {
-                <ng-container *appCanPermission="item.permission">
-                  <a
-                    [routerLink]="item.path"
-                    routerLinkActive="active"
-                    [routerLinkActiveOptions]="{ exact: item.path === '/' }"
-                    class="sidebar-link"
-                    (click)="navigate.emit()"
-                  >
-                    <i [class]="item.icon"></i>
-                    @if (!collapsed) {
-                      <span>{{ item.label }}</span>
-                    }
-                  </a>
-                </ng-container>
-              }
+              <div class="sidebar-group-items-inner">
+                @for (item of group.items; track item.path) {
+                  <ng-container *appCanPermission="item.permission">
+                    <a
+                      [routerLink]="item.path"
+                      routerLinkActive="active"
+                      [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+                      class="sidebar-link"
+                      (click)="navigate.emit()"
+                    >
+                      <i [class]="item.icon"></i>
+                      @if (!collapsed) {
+                        <span>{{ item.label }}</span>
+                      }
+                    </a>
+                  </ng-container>
+                }
+              </div>
             </div>
           </div>
         }
@@ -115,16 +118,30 @@ const STORAGE_KEY = 'flashops_sidebar_groups_open';
       font-size: 0.75rem;
       opacity: 0.75;
       flex: 0 0 auto;
+      transition: transform 0.22s ease;
     }
 
     .sidebar-group-items {
+      display: grid;
+      grid-template-rows: 1fr;
+      opacity: 1;
+      transition:
+        grid-template-rows 0.28s ease,
+        opacity 0.22s ease;
+    }
+
+    .sidebar-group-items.is-collapsed {
+      grid-template-rows: 0fr;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .sidebar-group-items-inner {
+      min-height: 0;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
-    }
-
-    .sidebar-group-items[hidden] {
-      display: none !important;
     }
   `,
 })
@@ -160,6 +177,11 @@ export class SidebarComponent implements OnInit {
           icon: 'bi bi-receipt',
           permission: ['transactions.lire', 'dashboard.voir'],
         },
+      ],
+    },
+    {
+      label: 'Appros',
+      items: [
         {
           label: 'Appro. MOMO',
           path: '/approvisionnement-vas/momo',

@@ -93,6 +93,10 @@ export class OnboardingService {
       .pipe(map((value) => this.unwrap(value)));
   }
 
+  deleteCandidature(id: number | string) {
+    return this.http.delete<{ ok?: boolean }>(`${this.onboardingUrl}/candidatures/${id}`);
+  }
+
   listTasks() {
     return this.http
       .get<Envelope<OnboardingTask[]>>(`${this.onboardingUrl}/taches`)

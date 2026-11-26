@@ -60,6 +60,13 @@ public class OnboardingService {
     return onboarding.get(id, true, false);
   }
 
+  @Transactional
+  public void delete(long id) {
+    if (!onboarding.delete(id)) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "candidature introuvable");
+    }
+  }
+
   public List<OnboardingDtos.Task> tasks(int userId) {
     return workflows.tasks(userId);
   }

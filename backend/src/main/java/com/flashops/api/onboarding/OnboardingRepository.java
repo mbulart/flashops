@@ -210,6 +210,25 @@ public class OnboardingRepository {
     return get(id, false, true);
   }
 
+  public boolean delete(long id) {
+    Integer exists =
+        jdbc.query(
+                "SELECT 1 FROM onboarding.candidatures WHERE id=?",
+                (rs, n) -> 1,
+                id)
+            .stream()
+            .findFirst()
+            .orElse(null);
+    if (exists == null) {
+      return false;
+    }
+    // Instances workflow (tasks / action_logs en cascade) — pas de FK physique vers candidatures.
+    jdbc.update(
+        "DELETE FROM workflow.instances WHERE domaine='onboarding' AND dossier_id=?", id);
+    jdbc.update("DELETE FROM onboarding.candidatures WHERE id=?", id);
+    return true;
+  }
+
   public OnboardingDtos.CandidaturePage list(String q, String statut, int page, int size) {
     int safePage = Math.max(1, page);
     int safeSize = Math.min(200, Math.max(1, size));

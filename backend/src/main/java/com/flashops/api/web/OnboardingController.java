@@ -5,6 +5,8 @@ import com.flashops.api.onboarding.OnboardingService;
 import com.flashops.api.web.dto.OnboardingDtos;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/onboarding")
@@ -38,6 +41,16 @@ public class OnboardingController {
   public Map<String, OnboardingDtos.Candidature> detail(@PathVariable long id) {
     permissions.require(AuthSupport.currentUserId(), "onboarding.candidatures.lire");
     return Map.of("data", onboarding.detail(id));
+  }
+
+  @DeleteMapping("/candidatures/{id}")
+  public Map<String, Object> delete(@PathVariable long id) {
+    int userId = AuthSupport.currentUserId();
+    if (!permissions.isSuperAdmin(userId)) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "réservé au SUPER_ADMIN");
+    }
+    onboarding.delete(id);
+    return Map.of("ok", true);
   }
 
   @GetMapping("/taches")
