@@ -418,7 +418,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
       [categories]="categories()"
       (cancel)="closeEditor()"
       (save)="saveAgency($event)"
-      (regionChange)="loadZones($event)"
+      (regionChange)="loadZones($event != null ? [$event] : [])"
     />
   `,
   styles: `
