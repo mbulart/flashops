@@ -58,7 +58,7 @@ type DetailTab = 'apercu' | 'entreprise' | 'points' | 'documents' | 'workflow';
         @switch (activeTab()) {
           @case ('apercu') {
             <div class="details">
-              <div><span>Représentant</span><strong>{{ c.representant?.prenom }} {{ c.representant?.nom }}</strong></div>
+              <div><span>Gérant</span><strong>{{ c.representant?.prenom }} {{ c.representant?.nom }}</strong></div>
               <div><span>Téléphone</span><strong>{{ c.telephone || c.representant?.telephone || '—' }}</strong></div>
               <div><span>E-mail</span><strong>{{ c.email || c.representant?.email || '—' }}</strong></div>
               <div><span>Services</span><strong>{{ (c.services || []).join(', ') || '—' }}</strong></div>

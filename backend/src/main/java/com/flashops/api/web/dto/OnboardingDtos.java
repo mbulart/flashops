@@ -35,7 +35,8 @@ public final class OnboardingDtos {
       String nif,
       String adresse,
       String ville,
-      String province) {}
+      String province,
+      String commune) {}
 
   public record PointVente(
       Long id,
@@ -43,6 +44,7 @@ public final class OnboardingDtos {
       String adresse,
       String ville,
       String province,
+      String commune,
       String telephone,
       boolean principal) {}
 
@@ -52,7 +54,13 @@ public final class OnboardingDtos {
       @JsonProperty("type_libelle") String typeLibelle,
       @JsonProperty("nom_fichier") String nomFichier,
       String statut,
-      String note) {}
+      String note,
+      @JsonProperty("content_type") String contentType,
+      @JsonProperty("a_fichier") boolean aFichier) {}
+
+  public record Lieu(Number id, String libelle) {}
+
+  public record FichierMeta(String chemin, String nom, String contentType) {}
 
   public record WorkflowHistorique(
       String etape, String action, String commentaire, String acteur, OffsetDateTime date) {}

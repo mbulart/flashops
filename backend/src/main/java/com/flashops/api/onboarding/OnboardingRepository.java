@@ -94,7 +94,7 @@ public class OnboardingRepository {
         """
         UPDATE onboarding.candidatures SET email=?, telephone=?,
           raison_sociale=?, nom_commercial=?, forme_juridique=?, rccm=?, idnat=?,
-          numero_impot=?, adresse_siege=?, ville=?, province=?, modifie_le=NOW()
+          numero_impot=?, adresse_siege=?, ville=?, province=?, commune=?, modifie_le=NOW()
         WHERE id=?
         """,
         clean(body.email()),
@@ -108,6 +108,7 @@ public class OnboardingRepository {
         e == null ? null : clean(e.adresse()),
         e == null ? null : clean(e.ville()),
         e == null ? null : clean(e.province()),
+        e == null ? null : clean(e.commune()),
         id);
 
     jdbc.update("DELETE FROM onboarding.representants WHERE candidature_id=?", id);
@@ -140,28 +141,111 @@ public class OnboardingRepository {
       jdbc.update(
           """
           INSERT INTO onboarding.points_vente
-            (candidature_id, est_principal, nom_commercial, adresse, ville, province, telephone, ordre)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (candidature_id, est_principal, nom_commercial, adresse, ville, province, commune, telephone, ordre)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           """,
           id, p.principal(), safe(p.nom()), clean(p.adresse()), clean(p.ville()),
-          clean(p.province()), clean(p.telephone()), ordre++);
+          clean(p.province()), clean(p.commune()), clean(p.telephone()), ordre++);
     }
 
-    jdbc.update("DELETE FROM onboarding.documents WHERE candidature_id=?", id);
     for (Document d : safeList(body.documents())) {
+      if (d.typeCode() == null || d.typeCode().isBlank()) continue;
+      int kept =
+          jdbc.update(
+              """
+              UPDATE onboarding.documents d SET commentaire=?
+              FROM onboarding.types_document td
+              WHERE d.type_document_id=td.id AND d.candidature_id=? AND td.code=?
+                AND d.chemin_stockage NOT LIKE 'pending/%'
+              """,
+              clean(d.note()), id, d.typeCode());
+      if (kept > 0) continue;
+      jdbc.update(
+          """
+          DELETE FROM onboarding.documents d
+          USING onboarding.types_document td
+          WHERE d.type_document_id=td.id AND d.candidature_id=? AND td.code=?
+          """,
+          id, d.typeCode());
       jdbc.update(
           """
           INSERT INTO onboarding.documents
             (candidature_id, type_document_id, nom_fichier, chemin_stockage, statut, commentaire)
-          SELECT ?, td.id, ?, ?, ?, ? FROM onboarding.types_document td WHERE td.code=?
+          SELECT ?, td.id, ?, ?, 'non_fourni', ? FROM onboarding.types_document td WHERE td.code=?
           """,
-          id,
-          clean(d.nomFichier()) == null ? d.typeCode() : clean(d.nomFichier()),
-          "pending/" + id + "/" + d.typeCode(),
-          documentStatus(d),
-          clean(d.note()),
-          d.typeCode());
+          id, d.typeCode(), "pending/" + id + "/" + d.typeCode(), clean(d.note()), d.typeCode());
     }
+  }
+
+  public OnboardingDtos.FichierMeta fichier(long candidatureId, String typeCode) {
+    return jdbc.query(
+            """
+            SELECT d.chemin_stockage, d.nom_fichier, d.content_type
+            FROM onboarding.documents d
+            JOIN onboarding.types_document td ON td.id=d.type_document_id
+            WHERE d.candidature_id=? AND td.code=?
+              AND d.chemin_stockage NOT LIKE 'pending/%'
+            ORDER BY d.id DESC LIMIT 1
+            """,
+            (rs, n) ->
+                new OnboardingDtos.FichierMeta(rs.getString(1), rs.getString(2), rs.getString(3)),
+            candidatureId,
+            typeCode)
+        .stream()
+        .findFirst()
+        .orElse(null);
+  }
+
+  public boolean attachFichier(
+      long candidatureId,
+      String typeCode,
+      String filename,
+      String relativePath,
+      String contentType,
+      long size) {
+    Integer typeId =
+        jdbc.query(
+                "SELECT id FROM onboarding.types_document WHERE code=? AND actif",
+                (rs, n) -> rs.getInt(1),
+                typeCode)
+            .stream()
+            .findFirst()
+            .orElse(null);
+    if (typeId == null) return false;
+    jdbc.update(
+        """
+        DELETE FROM onboarding.documents
+        WHERE candidature_id=? AND type_document_id=?
+        """,
+        candidatureId, typeId);
+    jdbc.update(
+        """
+        INSERT INTO onboarding.documents
+          (candidature_id, type_document_id, nom_fichier, chemin_stockage, content_type,
+           taille_octets, statut, depose_par_public)
+        VALUES (?, ?, ?, ?, ?, ?, 'fourni', TRUE)
+        """,
+        candidatureId, typeId, filename, relativePath, contentType, size);
+    return true;
+  }
+
+  public String retirerFichier(long candidatureId, String typeCode) {
+    OnboardingDtos.FichierMeta meta = fichier(candidatureId, typeCode);
+    jdbc.update(
+        """
+        DELETE FROM onboarding.documents d
+        USING onboarding.types_document td
+        WHERE d.type_document_id=td.id AND d.candidature_id=? AND td.code=?
+        """,
+        candidatureId, typeCode);
+    jdbc.update(
+        """
+        INSERT INTO onboarding.documents
+          (candidature_id, type_document_id, nom_fichier, chemin_stockage, statut)
+        SELECT ?, td.id, td.code, ?, 'non_fourni' FROM onboarding.types_document td WHERE td.code=?
+        """,
+        candidatureId, "pending/" + candidatureId + "/" + typeCode, typeCode);
+    return meta == null ? null : meta.chemin();
   }
 
   public void markSubmitted(long id) {
@@ -270,7 +354,7 @@ public class OnboardingRepository {
         new Entreprise(rs.getString("raison_sociale"), rs.getString("nom_commercial"),
             rs.getString("forme_juridique"), rs.getString("rccm"), rs.getString("idnat"),
             rs.getString("numero_impot"), rs.getString("adresse_siege"), rs.getString("ville"),
-            rs.getString("province")),
+            rs.getString("province"), rs.getString("commune")),
         services(id), outlets(id), documents(id),
         instanceId == null ? List.of() : history(instanceId, internal),
         instanceId == null ? List.of() : actions(instanceId),
@@ -303,22 +387,28 @@ public class OnboardingRepository {
   private List<PointVente> outlets(long id) {
     return jdbc.query(
         """
-        SELECT id, nom_commercial, adresse, ville, province, telephone, est_principal
+        SELECT id, nom_commercial, adresse, ville, province, commune, telephone, est_principal
         FROM onboarding.points_vente WHERE candidature_id=? ORDER BY ordre,id
         """,
         (rs, n) -> new PointVente(rs.getLong(1), rs.getString(2), rs.getString(3),
-            rs.getString(4), rs.getString(5), rs.getString(6), rs.getBoolean(7)), id);
+            rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getBoolean(8)), id);
   }
 
   private List<Document> documents(long id) {
     return jdbc.query(
         """
-        SELECT d.id, td.code, td.libelle, d.nom_fichier, d.statut, d.commentaire
+        SELECT d.id, td.code, td.libelle, d.nom_fichier, d.statut, d.commentaire,
+          d.content_type, d.chemin_stockage
         FROM onboarding.documents d JOIN onboarding.types_document td ON td.id=d.type_document_id
         WHERE d.candidature_id=? ORDER BY td.ordre,d.id
         """,
-        (rs, n) -> new Document(rs.getLong(1), rs.getString(2), rs.getString(3),
-            rs.getString(4), rs.getString(5), rs.getString(6)), id);
+        (rs, n) -> {
+          String path = rs.getString(8);
+          boolean stored = path != null && !path.startsWith("pending/");
+          return new Document(rs.getLong(1), rs.getString(2), rs.getString(3),
+              stored ? rs.getString(4) : null, rs.getString(5), rs.getString(6),
+              rs.getString(7), stored);
+        }, id);
   }
 
   private List<OnboardingDtos.WorkflowHistorique> history(long instanceId, boolean internal) {
@@ -348,12 +438,6 @@ public class OnboardingRepository {
         """,
         (rs, n) -> new OnboardingDtos.WorkflowAction(rs.getString(1), rs.getString(2),
             rs.getBoolean(3)), instanceId);
-  }
-
-  private static String documentStatus(Document d) {
-    String s = clean(d.statut());
-    return s != null && List.of("non_fourni", "fourni", "en_verification", "conforme",
-        "non_conforme", "a_remplacer").contains(s) ? s : "non_fourni";
   }
 
   private static String clean(String value) {

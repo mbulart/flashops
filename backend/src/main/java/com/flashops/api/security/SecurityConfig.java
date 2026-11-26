@@ -71,6 +71,10 @@ public class SecurityConfig {
                         HttpMethod.PUT,
                         "/api/v1/public/onboarding/**")
                     .permitAll()
+                    .requestMatchers(
+                        HttpMethod.DELETE,
+                        "/api/v1/public/onboarding/**")
+                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

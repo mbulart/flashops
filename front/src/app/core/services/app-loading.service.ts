@@ -22,6 +22,11 @@ export class AppLoadingService {
     }
   }
 
+  forceHide(): void {
+    this.depth = 0;
+    this.visibleSignal.set(false);
+  }
+
   async run<T>(task: () => Promise<T>, message = 'Chargement…'): Promise<T> {
     this.show(message);
     try {

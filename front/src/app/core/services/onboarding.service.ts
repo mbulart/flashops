@@ -3,8 +3,10 @@ import { Injectable, inject } from '@angular/core';
 import { map } from 'rxjs';
 import {
   Candidature,
+  CandidatureDocument,
   CandidatureDraft,
   CandidaturePage,
+  GeoLieu,
   OnboardingFilters,
   OnboardingReferentiels,
   OnboardingTask,
@@ -30,6 +32,26 @@ export class OnboardingService {
 
   private get workflowUrl(): string {
     return `${this.runtime.apiUrl}/workflow`;
+  }
+
+  provinces() {
+    return this.http
+      .get<Envelope<GeoLieu[]>>(`${this.publicUrl}/geo/provinces`)
+      .pipe(map((value) => this.unwrap(value) ?? []));
+  }
+
+  villes(provinceId: number) {
+    const params = new HttpParams().set('province_id', String(provinceId));
+    return this.http
+      .get<Envelope<GeoLieu[]>>(`${this.publicUrl}/geo/villes`, { params })
+      .pipe(map((value) => this.unwrap(value) ?? []));
+  }
+
+  communes(villeId: number) {
+    const params = new HttpParams().set('ville_id', String(villeId));
+    return this.http
+      .get<Envelope<GeoLieu[]>>(`${this.publicUrl}/geo/communes`, { params })
+      .pipe(map((value) => this.unwrap(value) ?? []));
   }
 
   referentiels() {
@@ -63,6 +85,35 @@ export class OnboardingService {
         { params, headers: { 'X-Candidature-Jeton': jeton } }
       )
       .pipe(map((value) => this.unwrap(value)));
+  }
+
+  uploadDocument(id: number | string, typeCode: string, file: File, jeton: string) {
+    const body = new FormData();
+    body.append('file', file, file.name);
+    const params = new HttpParams().set('jeton', jeton);
+    return this.http
+      .post<Envelope<CandidatureDocument>>(
+        `${this.publicUrl}/candidatures/${id}/documents/${typeCode}`,
+        body,
+        { params, headers: { 'X-Candidature-Jeton': jeton } }
+      )
+      .pipe(map((value) => this.unwrap(value)));
+  }
+
+  deleteDocument(id: number | string, typeCode: string, jeton: string) {
+    const params = new HttpParams().set('jeton', jeton);
+    return this.http.delete<{ ok?: boolean }>(
+      `${this.publicUrl}/candidatures/${id}/documents/${typeCode}`,
+      { params, headers: { 'X-Candidature-Jeton': jeton } }
+    );
+  }
+
+  downloadDocument(id: number | string, typeCode: string, jeton: string) {
+    const params = new HttpParams().set('jeton', jeton);
+    return this.http.get(
+      `${this.publicUrl}/candidatures/${id}/documents/${typeCode}/fichier`,
+      { params, headers: { 'X-Candidature-Jeton': jeton }, responseType: 'blob' }
+    );
   }
 
   track(reference: string, jeton: string) {

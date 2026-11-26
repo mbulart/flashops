@@ -44,7 +44,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     /\/auth\/profile-photo\/?$/i.test(path) ||
     /\/auth\/profile-photo\/\d+\/?$/i.test(path);
   const isPublicRoute =
-    req.url.includes('/config/public') || req.url.includes('/public/agences');
+    req.url.includes('/config/public') ||
+    req.url.includes('/public/agences') ||
+    req.url.includes('/public/onboarding');
 
   let authedReq = req;
   if (token && !isAuthRoute) {

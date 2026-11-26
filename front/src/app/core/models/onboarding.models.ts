@@ -35,6 +35,7 @@ export interface Entreprise {
   adresse?: string;
   ville?: string;
   province?: string;
+  commune?: string;
 }
 
 export interface PointVente {
@@ -43,6 +44,7 @@ export interface PointVente {
   adresse: string;
   ville?: string;
   province?: string;
+  commune?: string;
   telephone?: string;
   principal: boolean;
 }
@@ -55,6 +57,13 @@ export interface CandidatureDocument {
   statut?: string;
   note?: string;
   url?: string;
+  content_type?: string;
+  a_fichier?: boolean;
+}
+
+export interface GeoLieu {
+  id: number;
+  libelle: string;
 }
 
 export interface WorkflowAction {

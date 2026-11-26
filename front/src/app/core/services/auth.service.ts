@@ -66,6 +66,33 @@ export class AuthService {
     }
   }
 
+  /** Reprend la session après veille sans déconnecter si le réseau n'est pas encore revenu. */
+  async warmSession(): Promise<void> {
+    if (!this.accessToken && !this.refreshToken) return;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3500);
+    try {
+      if (this.accessToken) {
+        const res = await fetch(`${this.baseUrl}/auth/me`, {
+          headers: { Authorization: `Bearer ${this.accessToken}` },
+          signal: ctrl.signal,
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { user: User };
+          this.userSignal.set(data.user);
+          return;
+        }
+        if (res.status !== 401 && res.status !== 403) return;
+      }
+      await this.tryRefresh();
+    } catch {
+      /* connexion encore endormie : on garde les jetons locaux */
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** Garantit un jeton d'accès valide (ping /me ou refresh). */
   async ensureAccessForWrite(): Promise<boolean> {
     if (!this.accessToken && !this.refreshToken) return false;
