@@ -48,6 +48,16 @@ export type AgenceFormModel = AgenceAdminInput & {
                     <label class="form-label" for="ag-nom">Nom</label>
                     <input id="ag-nom" class="form-control" name="nom" [(ngModel)]="form.nom" required maxlength="200" />
                   </div>
+                  <div class="col-12">
+                    <label class="form-label" for="ag-nom-commercial">Nom commercial</label>
+                    <input
+                      id="ag-nom-commercial"
+                      class="form-control"
+                      name="nomCommercial"
+                      [(ngModel)]="form.nom_commercial"
+                      maxlength="200"
+                    />
+                  </div>
                   <div class="col-md-6">
                     <label class="form-label" for="ag-cat">Catégorie</label>
                     <input id="ag-cat" class="form-control" name="cat" [(ngModel)]="form.categorie" list="ag-cat-list" maxlength="80" />
@@ -325,6 +335,7 @@ export class AgenceFormModalComponent implements OnChanges {
     this.save.emit({
       code_agence: this.form.code_agence.trim(),
       nom: this.form.nom.trim(),
+      nom_commercial: this.form.nom_commercial?.trim() || '',
       categorie: this.form.categorie?.trim() || '',
       pos_id: this.form.pos_id?.trim() || '',
       fp_agent: this.form.fp_agent?.trim() || '',
@@ -345,6 +356,7 @@ export class AgenceFormModalComponent implements OnChanges {
     return {
       code_agence: '',
       nom: '',
+      nom_commercial: '',
       categorie: '',
       pos_id: '',
       fp_agent: '',
@@ -365,6 +377,7 @@ export class AgenceFormModalComponent implements OnChanges {
     return {
       code_agence: a.code_agence || '',
       nom: a.nom || '',
+      nom_commercial: a.nom_commercial || '',
       categorie: a.categorie || '',
       pos_id: a.pos_id || '',
       fp_agent: a.fp_agent || '',

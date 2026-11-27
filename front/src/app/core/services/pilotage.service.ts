@@ -658,13 +658,19 @@ function normalizeAgenceGeo(raw: PilotageAgenceGeoPoint): PilotageAgenceGeoPoint
 }
 
 function normalizeAgenceFiche(raw: PilotageAgenceFiche): PilotageAgenceFiche {
-  const row = raw as PilotageAgenceFiche & { agence_id?: number; code_agence?: string; pos_id?: string };
+  const row = raw as PilotageAgenceFiche & {
+    agence_id?: number;
+    code_agence?: string;
+    pos_id?: string;
+    nom_commercial?: string;
+  };
   const lat = numberOrNull(row.latitude);
   const lng = numberOrNull(row.longitude);
   return {
     agenceId: Number(row.agenceId ?? row.agence_id ?? 0),
     codeAgence: row.codeAgence ?? row.code_agence ?? '',
     nom: row.nom ?? '',
+    nom_commercial: row.nom_commercial ?? '',
     categorie: row.categorie ?? '',
     posId: row.posId ?? row.pos_id ?? '',
     region: row.region ?? '',

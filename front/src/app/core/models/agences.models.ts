@@ -2,6 +2,7 @@ export interface AgenceAdmin {
   agenceId: number;
   code_agence: string;
   nom: string;
+  nom_commercial: string;
   categorie: string;
   pos_id: string;
   fp_agent: string;
@@ -36,6 +37,7 @@ export interface AgenceAdminPage {
 export interface AgenceAdminInput {
   code_agence: string;
   nom: string;
+  nom_commercial?: string;
   categorie?: string;
   pos_id?: string;
   fp_agent?: string;

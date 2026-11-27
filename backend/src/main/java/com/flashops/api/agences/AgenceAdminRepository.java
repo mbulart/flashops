@@ -55,6 +55,7 @@ public class AgenceAdminRepository {
       SELECT d.agence_id,
              coalesce(nullif(btrim(d.code_agence), ''), '') AS code_agence,
              coalesce(nullif(btrim(d.nom), ''), '') AS nom,
+             coalesce(nullif(btrim(d.nom_commercial), ''), '') AS nom_commercial,
              coalesce(nullif(btrim(d.categorie), ''), '') AS categorie,
              coalesce(nullif(btrim(d.pos_id), ''), '') AS pos_id,
              coalesce(nullif(btrim(d.fp_agent), ''), '') AS fp_agent,
@@ -161,15 +162,16 @@ public class AgenceAdminRepository {
         jdbc.queryForObject(
             """
             INSERT INTO pilotage.dim_agence (
-              code_agence, nom, categorie, pos_id, fp_agent,
+              code_agence, nom, nom_commercial, categorie, pos_id, fp_agent,
               ville, commune, province, pays, adresse,
               latitude, longitude, region_id, zone_id, parent_agence_id
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             RETURNING agence_id
             """,
             Integer.class,
             blankToNull(body.codeAgence()),
             blankToNull(body.nom()),
+            blankToNull(body.nomCommercial()),
             blankToNull(body.categorie()),
             blankToNull(body.posId()),
             blankToNull(body.fpAgent()),
@@ -193,6 +195,7 @@ public class AgenceAdminRepository {
             UPDATE pilotage.dim_agence SET
               code_agence = ?,
               nom = ?,
+              nom_commercial = ?,
               categorie = ?,
               pos_id = ?,
               fp_agent = ?,
@@ -210,6 +213,7 @@ public class AgenceAdminRepository {
             """,
             blankToNull(body.codeAgence()),
             blankToNull(body.nom()),
+            blankToNull(body.nomCommercial()),
             blankToNull(body.categorie()),
             blankToNull(body.posId()),
             blankToNull(body.fpAgent()),
@@ -456,6 +460,7 @@ public class AgenceAdminRepository {
         rs.getInt("agence_id"),
         rs.getString("code_agence"),
         rs.getString("nom"),
+        rs.getString("nom_commercial"),
         rs.getString("categorie"),
         rs.getString("pos_id"),
         rs.getString("fp_agent"),

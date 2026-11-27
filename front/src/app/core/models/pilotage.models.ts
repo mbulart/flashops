@@ -339,6 +339,7 @@ export interface PilotageAgenceFiche {
   agenceId: number;
   codeAgence: string;
   nom: string;
+  nom_commercial?: string;
   categorie: string;
   posId: string;
   region: string;

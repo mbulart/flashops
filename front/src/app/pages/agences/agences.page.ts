@@ -293,7 +293,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
 
       @if (loading()) {
         <div class="p-3">
-          <app-skeleton type="table" [rows]="8" [cols]="7" />
+          <app-skeleton type="table" [rows]="8" [cols]="8" />
         </div>
       } @else {
         <div class="parametrages-table-scroll">
@@ -301,6 +301,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
             <thead>
               <tr>
                 <th>Agence</th>
+                <th>Nom commercial</th>
                 <th>Identifiants</th>
                 <th>Réseau</th>
                 <th>Localisation</th>
@@ -318,6 +319,9 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                       <span class="agences-cell-primary">{{ row.nom || '—' }}</span>
                       <span class="agences-cell-muted">{{ row.categorie || '—' }}</span>
                     </button>
+                  </td>
+                  <td>
+                    <span class="agences-cell-primary">{{ row.nom_commercial || '—' }}</span>
                   </td>
                   <td>
                     <div class="agences-cell-primary">
@@ -950,6 +954,7 @@ export class AgencesPageComponent implements OnInit {
               { label: 'agence_id', key: 'agenceId' },
               { label: 'code_agence', key: 'code_agence' },
               { label: 'nom', key: 'nom' },
+              { label: 'nom_commercial', key: 'nom_commercial' },
               { label: 'categorie', key: 'categorie' },
               { label: 'pos_id (FP)', key: 'pos_id' },
               { label: 'fp_agent', key: 'fp_agent' },

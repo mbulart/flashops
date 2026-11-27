@@ -248,6 +248,7 @@ public final class PilotageDtos {
       int agenceId,
       @JsonProperty("code_agence") String codeAgence,
       String nom,
+      @JsonProperty("nom_commercial") String nomCommercial,
       String categorie,
       @JsonProperty("pos_id") String posId,
       String region,

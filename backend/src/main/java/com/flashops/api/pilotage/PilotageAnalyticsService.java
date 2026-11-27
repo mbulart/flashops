@@ -209,6 +209,7 @@ public class PilotageAnalyticsService {
                       r.agenceId(),
                       r.codeAgence(),
                       r.nom(),
+                      r.nomCommercial(),
                       r.categorie(),
                       r.posId(),
                       r.region(),

@@ -77,6 +77,9 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
         <header class="agency-sheet__head">
           <div class="agency-sheet__identity">
             <h2 id="agency-sheet-title">{{ title() }}</h2>
+            @if (commercialName()) {
+              <p class="agency-sheet__commercial">{{ commercialName() }}</p>
+            }
             <p class="agency-sheet__meta">
               <span class="font-monospace">{{ codeLine() }}</span>
               @if (posLine()) {
@@ -466,6 +469,13 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
+    }
+
+    .agency-sheet__commercial {
+      margin: 0.15rem 0 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.3;
     }
 
     .agency-sheet__meta,
@@ -1082,6 +1092,10 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
     return this.fiche()?.nom || this.agency.nom || this.agency.codeAgence || 'Agence';
   }
 
+  commercialName(): string {
+    return (this.fiche()?.nom_commercial || '').trim();
+  }
+
   codeLine(): string {
     return this.fiche()?.codeAgence || this.agency.codeAgence || '—';
   }
@@ -1144,6 +1158,7 @@ export class PilotageAgencyModalComponent implements OnChanges, OnInit, OnDestro
     const fiche = this.fiche();
     const text = (value?: string | null) => (value && value.trim() ? value.trim() : '—');
     return [
+      { label: 'Nom commercial', value: text(this.commercialName()) },
       { label: 'Code', value: text(fiche?.codeAgence || this.agency.codeAgence) },
       { label: 'Catégorie', value: text(fiche?.categorie || this.agency.categorie) },
       { label: 'Région', value: text(fiche?.region || this.agency.region) },

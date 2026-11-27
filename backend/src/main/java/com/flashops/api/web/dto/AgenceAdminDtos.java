@@ -14,6 +14,7 @@ public final class AgenceAdminDtos {
       int agenceId,
       @JsonProperty("code_agence") String codeAgence,
       String nom,
+      @JsonProperty("nom_commercial") String nomCommercial,
       String categorie,
       @JsonProperty("pos_id") String posId,
       @JsonProperty("fp_agent") String fpAgent,
@@ -43,6 +44,7 @@ public final class AgenceAdminDtos {
   public record AgenceAdminInput(
       @NotBlank @Size(max = 80) @JsonProperty("code_agence") String codeAgence,
       @NotBlank @Size(max = 200) String nom,
+      @Size(max = 200) @JsonProperty("nom_commercial") String nomCommercial,
       @Size(max = 80) String categorie,
       @Size(max = 80) @JsonProperty("pos_id") String posId,
       @Size(max = 80) @JsonProperty("fp_agent") String fpAgent,
