@@ -108,6 +108,7 @@ public class OnboardingService {
     if (!onboarding.delete(id)) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "candidature introuvable");
     }
+    storage.deleteCandidature(id);
   }
 
   @Transactional

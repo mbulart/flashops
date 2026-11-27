@@ -40,3 +40,5 @@ flashops:
     documents-dir: ${FLASHOPS_DOCUMENTS_DIR:./data/documents}
   geonames:
     username: ${GEONAMES_USERNAME:}
+  captcha:
+    hmac-secret: ${FLASHOPS_CAPTCHA_SECRET:flashops-local-captcha-hmac-secret}

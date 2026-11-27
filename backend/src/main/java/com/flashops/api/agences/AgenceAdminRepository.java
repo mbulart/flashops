@@ -323,20 +323,15 @@ public class AgenceAdminRepository {
       args.add(q.activityDays());
     }
     if (q.inactiveSinceDays() != null && q.inactiveSinceDays() > 0) {
-      // Tranche sur l'âge de la dernière TX (a déjà eu de l'activité).
-      int minDays = q.inactiveSinceDays();
-      Integer maxDays = nextInactiveBucketExclusive(minDays);
+      // Dernière TX entre 1 et N jours : inactive, mais pas plus ancienne que N jours.
       where.append(
           """
            AND last_tx.premiere_tx IS NOT NULL
            AND last_tx.derniere_tx IS NOT NULL
-           AND last_tx.derniere_tx <= (CURRENT_DATE - ?::int)
+           AND last_tx.derniere_tx < CURRENT_DATE
+           AND last_tx.derniere_tx >= (CURRENT_DATE - ?::int)
           """);
-      args.add(minDays);
-      if (maxDays != null) {
-        where.append(" AND last_tx.derniere_tx > (CURRENT_DATE - ?::int) ");
-        args.add(maxDays);
-      }
+      args.add(q.inactiveSinceDays());
     }
     if (q.statutActivites() != null && !q.statutActivites().isEmpty()) {
       List<String> clean =
@@ -468,20 +463,4 @@ public class AgenceAdminRepository {
     return t.isEmpty() ? null : t;
   }
 
-  /**
-   * Borne exclusive supérieure de la tranche « dernière TX ».
-   * Presets : 3→[3,7), …, 90→[90,+∞).
-   * Saisie libre N : [N, N+1) — ex. 1 → TX il y a 1 jour, pas les vieux inactifs.
-   */
-  private static Integer nextInactiveBucketExclusive(int minDays) {
-    return switch (minDays) {
-      case 3 -> 7;
-      case 7 -> 15;
-      case 15 -> 30;
-      case 30 -> 60;
-      case 60 -> 90;
-      case 90 -> null;
-      default -> minDays + 1;
-    };
-  }
 }

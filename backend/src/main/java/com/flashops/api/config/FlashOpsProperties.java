@@ -8,7 +8,8 @@ public record FlashOpsProperties(
     Cors cors,
     Admin admin,
     Storage storage,
-    Geonames geonames) {
+    Geonames geonames,
+    Captcha captcha) {
 
   public record Jwt(String secret, int accessTtlMinutes, int refreshTtlHours) {}
 
@@ -19,4 +20,6 @@ public record FlashOpsProperties(
   public record Storage(String avatarsDir, String documentsDir) {}
 
   public record Geonames(String username) {}
+
+  public record Captcha(String hmacSecret) {}
 }

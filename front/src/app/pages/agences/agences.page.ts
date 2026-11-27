@@ -121,36 +121,19 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
           </div>
           <div class="filter-field filter-field--inactive">
             <label class="form-label" for="ag-inactive">Sans activité depuis</label>
-            <div class="agences-inactive-fields">
-              <select
+            <div class="agences-inactive-custom input-group input-group-sm">
+              <input
                 id="ag-inactive"
-                class="form-select form-select-sm"
-                [(ngModel)]="draftInactivePreset"
-                (ngModelChange)="onInactivePresetChange()"
-                title="Agences déjà actives un jour, sans transaction depuis cette durée"
-              >
-                <option [ngValue]="null">Tranche…</option>
-                <option [ngValue]="3">3 à 7 jours</option>
-                <option [ngValue]="7">7 à 15 jours</option>
-                <option [ngValue]="15">15 à 30 jours</option>
-                <option [ngValue]="30">1 à 2 mois</option>
-                <option [ngValue]="60">2 à 3 mois</option>
-                <option [ngValue]="90">Plus de 3 mois</option>
-              </select>
-              <div class="agences-inactive-custom input-group input-group-sm">
-                <input
-                  id="ag-inactive-custom"
-                  type="number"
-                  min="1"
-                  step="1"
-                  class="form-control form-control-sm"
-                  [(ngModel)]="draftInactiveCustomDays"
-                  (ngModelChange)="onInactiveCustomChange()"
-                  placeholder="N"
-                  title="Saisie libre : dernière TX il y a exactement N jours (pas les plus anciens)"
-                />
-                <span class="input-group-text">j</span>
-              </div>
+                type="number"
+                min="1"
+                step="1"
+                class="form-control form-control-sm"
+                [(ngModel)]="draftInactiveCustomDays"
+                (ngModelChange)="onInactiveCustomChange()"
+                placeholder="N"
+                title="Dernière transaction entre 1 et N jours (pas aujourd’hui, pas plus ancien que N jours)"
+              />
+              <span class="input-group-text">j</span>
             </div>
           </div>
           <div class="filter-field">
@@ -482,14 +465,8 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
       flex-wrap: wrap;
       min-height: calc(1.5em + 0.5rem + 2px);
     }
-    .agences-inactive-fields {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 0.35rem;
-      align-items: stretch;
-    }
     .agences-inactive-custom {
-      width: 5.25rem;
+      width: 7.5rem;
       flex-wrap: nowrap;
     }
     .agences-inactive-custom .form-control {
@@ -658,7 +635,6 @@ export class AgencesPageComponent implements OnInit {
   readonly statutOptions = STATUT_OPTIONS;
 
   draftActivityDays: number | null = null;
-  draftInactivePreset: number | null = null;
   draftInactiveCustomDays: number | null = null;
   draftStatutIds: number[] = [];
   draftSansCoords = false;
@@ -765,15 +741,7 @@ export class AgencesPageComponent implements OnInit {
 
   onActivityDaysChange(): void {
     if (this.draftActivityDays != null) {
-      this.draftInactivePreset = null;
       this.draftInactiveCustomDays = null;
-    }
-  }
-
-  onInactivePresetChange(): void {
-    if (this.draftInactivePreset != null) {
-      this.draftInactiveCustomDays = null;
-      this.draftActivityDays = null;
     }
   }
 
@@ -781,14 +749,12 @@ export class AgencesPageComponent implements OnInit {
     const n = this.normalizeCustomDays(this.draftInactiveCustomDays);
     this.draftInactiveCustomDays = n;
     if (n != null) {
-      this.draftInactivePreset = null;
       this.draftActivityDays = null;
     }
   }
 
   resetFilters(): void {
     this.draftActivityDays = null;
-    this.draftInactivePreset = null;
     this.draftInactiveCustomDays = null;
     this.draftStatutIds = [];
     this.draftSansCoords = false;
@@ -1165,9 +1131,7 @@ export class AgencesPageComponent implements OnInit {
   }
 
   private resolveInactiveSinceDays(): number | null {
-    const custom = this.normalizeCustomDays(this.draftInactiveCustomDays);
-    if (custom != null) return custom;
-    return this.draftInactivePreset;
+    return this.normalizeCustomDays(this.draftInactiveCustomDays);
   }
 
   private normalizeCustomDays(value: number | null | undefined): number | null {

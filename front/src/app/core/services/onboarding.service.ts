@@ -60,34 +60,46 @@ export class OnboardingService {
       .pipe(map((value) => this.unwrap(value)));
   }
 
-  createDraft(body: CandidatureDraft) {
-    return this.http
-      .post<Envelope<Candidature>>(`${this.publicUrl}/candidatures`, body)
-      .pipe(map((value) => this.unwrap(value)));
+  captchaUrl(): string {
+    return `${this.publicUrl}/captcha`;
   }
 
-  updateDraft(id: number | string, body: CandidatureDraft, jeton: string) {
-    const params = new HttpParams().set('jeton', jeton);
+  verifyCaptcha(payload: string) {
     return this.http
-      .put<Envelope<Candidature>>(`${this.publicUrl}/candidatures/${id}`, body, {
-        params,
-        headers: { 'X-Candidature-Jeton': jeton },
+      .post<Envelope<{ grant: string }>>(`${this.publicUrl}/captcha/valider`, { payload })
+      .pipe(map((value) => this.unwrap(value).grant));
+  }
+
+  createDraft(body: CandidatureDraft, grant: string) {
+    return this.http
+      .post<Envelope<Candidature>>(`${this.publicUrl}/candidatures`, body, {
+        headers: { 'X-Onboarding-Grant': grant },
       })
       .pipe(map((value) => this.unwrap(value)));
   }
 
-  submit(id: number | string, jeton: string) {
+  updateDraft(id: number | string, body: CandidatureDraft, jeton: string, grant: string) {
+    const params = new HttpParams().set('jeton', jeton);
+    return this.http
+      .put<Envelope<Candidature>>(`${this.publicUrl}/candidatures/${id}`, body, {
+        params,
+        headers: { 'X-Candidature-Jeton': jeton, 'X-Onboarding-Grant': grant },
+      })
+      .pipe(map((value) => this.unwrap(value)));
+  }
+
+  submit(id: number | string, jeton: string, grant: string) {
     const params = new HttpParams().set('jeton', jeton);
     return this.http
       .post<Envelope<Candidature>>(
         `${this.publicUrl}/candidatures/${id}/soumettre`,
         { jeton },
-        { params, headers: { 'X-Candidature-Jeton': jeton } }
+        { params, headers: { 'X-Candidature-Jeton': jeton, 'X-Onboarding-Grant': grant } }
       )
       .pipe(map((value) => this.unwrap(value)));
   }
 
-  uploadDocument(id: number | string, typeCode: string, file: File, jeton: string) {
+  uploadDocument(id: number | string, typeCode: string, file: File, jeton: string, grant: string) {
     const body = new FormData();
     body.append('file', file, file.name);
     const params = new HttpParams().set('jeton', jeton);
@@ -95,16 +107,16 @@ export class OnboardingService {
       .post<Envelope<CandidatureDocument>>(
         `${this.publicUrl}/candidatures/${id}/documents/${typeCode}`,
         body,
-        { params, headers: { 'X-Candidature-Jeton': jeton } }
+        { params, headers: { 'X-Candidature-Jeton': jeton, 'X-Onboarding-Grant': grant } }
       )
       .pipe(map((value) => this.unwrap(value)));
   }
 
-  deleteDocument(id: number | string, typeCode: string, jeton: string) {
+  deleteDocument(id: number | string, typeCode: string, jeton: string, grant: string) {
     const params = new HttpParams().set('jeton', jeton);
     return this.http.delete<{ ok?: boolean }>(
       `${this.publicUrl}/candidatures/${id}/documents/${typeCode}`,
-      { params, headers: { 'X-Candidature-Jeton': jeton } }
+      { params, headers: { 'X-Candidature-Jeton': jeton, 'X-Onboarding-Grant': grant } }
     );
   }
 

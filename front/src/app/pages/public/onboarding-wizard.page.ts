@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -14,9 +15,18 @@ import {
 import { AppSettingsService } from '../../core/services/app-settings.service';
 import { OnboardingService } from '../../core/services/onboarding.service';
 import { ToastService } from '../../core/services/toast.service';
+import {
+  clearLocalDraft,
+  clearLocalFiles,
+  deleteLocalFile,
+  getLocalFile,
+  putLocalFile,
+  readLocalDraft,
+  writeLocalDraft,
+} from './onboarding-local-draft';
 
-const STORAGE_REFERENCE = 'flashops_onboarding_reference';
-const STORAGE_TOKEN = 'flashops_onboarding_jeton';
+declare module 'altcha/i18n/fr-fr';
+
 const MAX_FILE = 8 * 1024 * 1024;
 
 interface OutletGeo {
@@ -69,6 +79,9 @@ interface PreviewState {
             <div class="step-panel">
               @if (formError()) {
                 <p class="form-alert" role="alert">{{ formError() }}</p>
+              }
+              @if (notice()) {
+                <p class="form-note" role="status">{{ notice() }}</p>
               }
               @switch (step()) {
                 @case (0) {
@@ -271,13 +284,16 @@ interface PreviewState {
           </div>
         }
 
-        <footer>
+        <footer class="wizard-footer">
           <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="step() === 0 || saving() || sliding()" (click)="previous()">Précédent</button>
-          @if (step() < steps.length - 1) {
-            <button type="button" class="btn btn-primary btn-sm" [disabled]="saving() || sliding() || !!loadError()" (click)="next()">{{ saving() ? 'Enregistrement…' : 'Continuer' }}</button>
-          } @else {
-            <button type="button" class="btn btn-primary btn-sm" [disabled]="saving() || submitting() || sliding()" (click)="submit()">{{ submitting() ? 'Envoi…' : 'Soumettre la candidature' }}</button>
-          }
+          <div class="footer-actions">
+            <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="saving() || submitting() || sliding() || !!loadError()" (click)="saveDraft()">Enregistrer en brouillon</button>
+            @if (step() < steps.length - 1) {
+              <button type="button" class="btn btn-primary btn-sm" [disabled]="saving() || sliding() || !!loadError()" (click)="next()">Continuer</button>
+            } @else {
+              <button type="button" class="btn btn-primary btn-sm" [disabled]="saving() || submitting() || sliding()" (click)="submit()">{{ submitting() ? 'Envoi…' : 'Soumettre la candidature' }}</button>
+            }
+          </div>
         </footer>
       </section>
     </main>
@@ -302,7 +318,7 @@ interface PreviewState {
           <footer>
             @if (file.mode === 'confirm') {
               <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="previewBusy()" (click)="closePreview()">Annuler</button>
-              <button type="button" class="btn btn-primary btn-sm" [disabled]="previewBusy()" (click)="confirmPreview()">{{ previewBusy() ? 'Envoi…' : 'Valider' }}</button>
+              <button type="button" class="btn btn-primary btn-sm" [disabled]="previewBusy()" (click)="confirmPreview()">Valider</button>
             } @else {
               <button type="button" class="btn btn-outline-danger btn-sm" [disabled]="previewBusy()" (click)="deletePreview()">Supprimer</button>
               <label class="btn btn-outline-secondary btn-sm mb-0">
@@ -312,6 +328,22 @@ interface PreviewState {
               <button type="button" class="btn btn-primary btn-sm" [disabled]="previewBusy()" (click)="closePreview()">Fermer</button>
             }
           </footer>
+        </div>
+      </div>
+    }
+
+    @if (captchaOpen()) {
+      <div class="file-modal" role="dialog" aria-modal="true" aria-labelledby="captcha-title">
+        <div class="file-dialog captcha-dialog" (click)="$event.stopPropagation()">
+          <header>
+            <strong id="captcha-title">{{ captchaMode() === 'soumettre' ? 'Soumettre la candidature' : 'Enregistrer le brouillon' }}</strong>
+            <button type="button" class="btn-close" aria-label="Fermer" [disabled]="saving()" (click)="closeCaptcha()"></button>
+          </header>
+          <div class="captcha-body">
+            <p class="captcha-copy">Vérification anti-robot. Les informations restent sur cet appareil tant que cette étape n’est pas confirmée.</p>
+            <div id="onboarding-captcha-host"></div>
+            @if (captchaError()) { <p class="form-alert mt-3 mb-0" role="alert">{{ captchaError() }}</p> }
+          </div>
         </div>
       </div>
     }
@@ -348,6 +380,12 @@ interface PreviewState {
     .req { color:#c0392b; }
     .field-error { display:block; color:#c0392b; font-size:.72rem; font-weight:600; margin-top:.15rem; }
     .form-alert { background:#fdecea; color:#9b2c2c; border-radius:.45rem; padding:.45rem .65rem; font-size:.82rem; margin:0 0 .7rem; }
+    .form-note { background:#eef8f0; color:#146c36; border-radius:.45rem; padding:.45rem .65rem; font-size:.82rem; margin:0 0 .7rem; }
+    .wizard-footer { display:flex; justify-content:space-between; align-items:center; gap:.5rem; flex-wrap:wrap; }
+    .footer-actions { display:flex; gap:.5rem; margin-left:auto; flex-wrap:wrap; }
+    .captcha-dialog { width:min(460px, 100%); }
+    .captcha-body { padding:.85rem 1rem 1.1rem; }
+    .captcha-copy { font-size:.85rem; margin:0 0 .75rem; }
     .choice-group { border:0; margin:0 0 .75rem; padding:0; }
     legend { font-size:.85rem; font-weight:700; border-bottom:1px solid var(--bs-border-color); padding-bottom:.3rem; }
     .choice-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:.35rem .6rem; }
@@ -406,6 +444,10 @@ export class OnboardingWizardPageComponent implements OnInit {
   readonly preview = signal<PreviewState | null>(null);
   readonly previewBusy = signal(false);
   readonly previewError = signal('');
+  readonly notice = signal('');
+  readonly captchaOpen = signal(false);
+  readonly captchaMode = signal<'brouillon' | 'soumettre'>('brouillon');
+  readonly captchaError = signal('');
   readonly previewUrl = computed<SafeResourceUrl | null>(() => {
     const url = this.preview()?.url;
     return url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null;
@@ -449,6 +491,11 @@ export class OnboardingWizardPageComponent implements OnInit {
   };
   private draftId?: number | string;
   private token = '';
+  private reference = '';
+  private pendingDeletes = new Set<string>();
+  private serverFiles = new Set<string>();
+  private captchaBusy = false;
+  private altchaReady: Promise<void> | null = null;
 
   async ngOnInit(): Promise<void> {
     try {
@@ -464,6 +511,7 @@ export class OnboardingWizardPageComponent implements OnInit {
         statut: 'À fournir',
         a_fichier: false,
       }));
+      await this.restoreLocal();
     } catch {
       this.loadError.set('Impossible de charger le formulaire. Rechargez la page.');
     } finally {
@@ -477,7 +525,9 @@ export class OnboardingWizardPageComponent implements OnInit {
 
   touch(): void {
     if (this.formError()) this.formError.set('');
+    if (this.notice()) this.notice.set('');
     if (Object.keys(this.errors()).length) this.errors.set({});
+    this.remember();
   }
 
   docLabel(doc: CandidatureDocument): string {
@@ -514,6 +564,7 @@ export class OnboardingWizardPageComponent implements OnInit {
       principal: false,
     });
     this.outletGeo = [...this.outletGeo, this.emptyGeo()];
+    this.remember();
   }
 
   removeOutlet(index: number): void {
@@ -523,6 +574,7 @@ export class OnboardingWizardPageComponent implements OnInit {
     this.outletGeo.splice(index, 1);
     this.outletGeo = [...this.outletGeo];
     if (wasPrincipal) this.draft.points_vente[0].principal = true;
+    this.remember();
   }
 
   setPrincipal(index: number): void {
@@ -607,10 +659,7 @@ export class OnboardingWizardPageComponent implements OnInit {
       return;
     }
     this.formError.set('');
-    if (!(await this.persist())) {
-      this.formError.set("L'enregistrement a échoué. Réessayez.");
-      return;
-    }
+    this.remember();
     await this.goToStep(Math.min(this.step() + 1, this.steps.length - 1), 'next');
   }
 
@@ -618,8 +667,14 @@ export class OnboardingWizardPageComponent implements OnInit {
     if (this.sliding() || this.saving() || this.step() === 0) return;
     this.errors.set({});
     this.formError.set('');
-    await this.persist();
+    this.remember();
     await this.goToStep(Math.max(this.step() - 1, 0), 'prev');
+  }
+
+  saveDraft(): void {
+    if (this.saving() || this.sliding() || this.loadError()) return;
+    this.remember();
+    void this.openCaptcha('brouillon');
   }
 
   async submit(): Promise<void> {
@@ -632,23 +687,16 @@ export class OnboardingWizardPageComponent implements OnInit {
         return;
       }
     }
-    if (!(await this.persist()) || !this.draftId || !this.token) {
-      this.formError.set("L'enregistrement a échoué. Réessayez.");
+    const documents = this.validate(this.steps.length - 2);
+    if (Object.keys(documents).length) {
+      this.errors.set(documents);
+      this.formError.set('Corrigez les champs indiqués.');
+      await this.goToStep(this.steps.length - 2, 'prev');
       return;
     }
-    this.submitting.set(true);
-    try {
-      const result = await firstValueFrom(this.service.submit(this.draftId, this.token));
-      this.persistAccess(result.reference, result.jeton || this.token);
-      this.toast.success('Votre candidature a été soumise.');
-      await this.router.navigate(['/devenir-distributeur/suivi'], {
-        queryParams: { reference: result.reference, jeton: result.jeton || this.token },
-      });
-    } catch {
-      this.toast.error("La candidature n'a pas pu être soumise.");
-    } finally {
-      this.submitting.set(false);
-    }
+    this.formError.set('');
+    this.remember();
+    await this.openCaptcha('soumettre');
   }
 
   pickDocument(doc: CandidatureDocument, event: Event): void {
@@ -674,38 +722,39 @@ export class OnboardingWizardPageComponent implements OnInit {
     this.previewBusy.set(true);
     this.previewError.set('');
     try {
-      if (!(await this.persist()) || !this.draftId || !this.token) {
-        this.previewError.set("L'enregistrement a échoué. Réessayez.");
-        return;
-      }
-      const saved = await firstValueFrom(
-        this.service.uploadDocument(this.draftId, current.typeCode, current.file, this.token)
-      );
+      await putLocalFile(current.typeCode, current.file);
       const row = this.draft.documents.find((item) => item.type_code === current.typeCode);
       if (row) {
         row.a_fichier = true;
-        row.nom_fichier = saved.nom_fichier || current.file.name;
-        row.content_type = saved.content_type || current.file.type;
+        row.nom_fichier = current.file.name;
+        row.content_type = current.file.type;
         row.statut = 'Fourni';
-        row.id = saved.id;
       }
-      this.touch();
+      this.pendingDeletes.delete(current.typeCode);
+      this.remember();
       this.closePreview(true);
     } catch {
-      this.previewError.set("Le fichier n'a pas pu être enregistré.");
+      this.previewError.set("Le fichier n'a pas pu être conservé sur cet appareil.");
     } finally {
       this.previewBusy.set(false);
     }
   }
 
   async openStored(doc: CandidatureDocument): Promise<void> {
-    if (!doc.a_fichier || !this.draftId || !this.token) return;
+    if (!doc.a_fichier) return;
     this.previewBusy.set(true);
     try {
-      const blob = await firstValueFrom(
-        this.service.downloadDocument(this.draftId, doc.type_code, this.token)
-      );
-      const kind = blob.type.startsWith('image/') ? 'image' : 'pdf';
+      const local = await getLocalFile(doc.type_code);
+      const blob = local
+        ? local
+        : this.draftId && this.token
+          ? await firstValueFrom(this.service.downloadDocument(this.draftId, doc.type_code, this.token))
+          : null;
+      if (!blob) {
+        this.formError.set('Impossible d’ouvrir le fichier.');
+        return;
+      }
+      const kind = (blob.type || '').startsWith('image/') ? 'image' : 'pdf';
       this.setPreview({
         typeCode: doc.type_code,
         name: doc.nom_fichier || this.docLabel(doc),
@@ -721,20 +770,17 @@ export class OnboardingWizardPageComponent implements OnInit {
   }
 
   async removeDocument(doc: CandidatureDocument): Promise<void> {
-    if (!this.draftId || !this.token) {
-      doc.a_fichier = false;
-      doc.nom_fichier = undefined;
-      return;
-    }
     try {
-      await firstValueFrom(this.service.deleteDocument(this.draftId, doc.type_code, this.token));
-      doc.a_fichier = false;
-      doc.nom_fichier = undefined;
-      doc.content_type = undefined;
-      doc.statut = 'À fournir';
+      await deleteLocalFile(doc.type_code);
     } catch {
-      this.formError.set('Impossible de retirer le fichier.');
+      /* le retrait local reste possible */
     }
+    if (this.serverFiles.has(doc.type_code)) this.pendingDeletes.add(doc.type_code);
+    doc.a_fichier = false;
+    doc.nom_fichier = undefined;
+    doc.content_type = undefined;
+    doc.statut = 'À fournir';
+    this.remember();
   }
 
   async deletePreview(): Promise<void> {
@@ -755,6 +801,10 @@ export class OnboardingWizardPageComponent implements OnInit {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (this.captchaOpen()) {
+      this.closeCaptcha();
+      return;
+    }
     if (this.preview()) this.closePreview();
   }
 
@@ -883,23 +933,197 @@ export class OnboardingWizardPageComponent implements OnInit {
     return value.replace(/\D/g, '').length >= 8;
   }
 
-  private async persist(): Promise<boolean> {
-    this.saving.set(true);
-    try {
-      const result =
-        this.draftId && this.token
-          ? await firstValueFrom(this.service.updateDraft(this.draftId, this.draft, this.token))
-          : await firstValueFrom(this.service.createDraft(this.draft));
-      this.draftId = result.id;
-      this.token = result.jeton || this.token;
-      this.persistAccess(result.reference, this.token);
-      this.mergeDocs(result.documents);
-      return !!this.draftId && !!this.token;
-    } catch {
-      return false;
-    } finally {
-      this.saving.set(false);
+  private async restoreLocal(): Promise<void> {
+    const saved = readLocalDraft();
+    if (!saved?.draft) return;
+    const baseDocs = this.draft.documents;
+    this.draft = {
+      ...this.draft,
+      ...saved.draft,
+      representant: { ...this.draft.representant, ...(saved.draft.representant || {}) },
+      entreprise: { ...this.draft.entreprise, ...(saved.draft.entreprise || {}) },
+      services: saved.draft.services || [],
+      points_vente: saved.draft.points_vente?.length ? saved.draft.points_vente : this.draft.points_vente,
+      documents: baseDocs.map((doc) => {
+        const prev = saved.draft.documents?.find((item) => item.type_code === doc.type_code);
+        return prev ? { ...doc, ...prev, type_libelle: doc.type_libelle || prev.type_libelle } : doc;
+      }),
+    };
+    this.step.set(Math.min(Math.max(saved.step || 0, 0), this.steps.length - 1));
+    this.draftId = saved.id;
+    this.token = saved.jeton || '';
+    this.reference = saved.reference || '';
+    this.pendingDeletes = new Set(saved.pendingDeletes || []);
+    this.serverFiles = new Set(saved.serverFiles || []);
+    this.entProvinceId = saved.entProvinceId ?? null;
+    this.entVilleId = saved.entVilleId ?? null;
+    this.entCommuneId = saved.entCommuneId ?? null;
+    if (this.entProvinceId) this.entVilles = await this.villesOf(this.entProvinceId);
+    if (this.entVilleId) this.entCommunes = await this.communesOf(this.entVilleId);
+    const outlets = saved.outlets || [];
+    this.outletGeo = [];
+    for (let index = 0; index < this.draft.points_vente.length; index++) {
+      const ids = outlets[index] || { provinceId: null, villeId: null };
+      const villes = ids.provinceId ? await this.villesOf(ids.provinceId) : [];
+      const communes = ids.villeId ? await this.communesOf(ids.villeId) : [];
+      this.outletGeo.push({ provinceId: ids.provinceId, villeId: ids.villeId, villes, communes });
     }
+  }
+
+  private remember(): void {
+    try {
+      writeLocalDraft({
+        step: this.step(),
+        draft: this.draft,
+        id: this.draftId,
+        jeton: this.token || undefined,
+        reference: this.reference || undefined,
+        entProvinceId: this.entProvinceId,
+        entVilleId: this.entVilleId,
+        entCommuneId: this.entCommuneId,
+        outlets: this.outletGeo.map((item) => ({
+          provinceId: item.provinceId,
+          villeId: item.villeId,
+        })),
+        pendingDeletes: [...this.pendingDeletes],
+        serverFiles: [...this.serverFiles],
+      });
+    } catch {
+      this.formError.set('Impossible d’enregistrer le brouillon sur cet appareil.');
+    }
+  }
+
+  private async openCaptcha(mode: 'brouillon' | 'soumettre'): Promise<void> {
+    this.captchaMode.set(mode);
+    this.captchaError.set('');
+    this.captchaOpen.set(true);
+    try {
+      await this.ensureAltcha();
+    } catch {
+      this.captchaError.set('La vérification anti-robot n’a pas pu se charger.');
+      return;
+    }
+    setTimeout(() => this.mountCaptcha(), 0);
+  }
+
+  private ensureAltcha(): Promise<void> {
+    this.altchaReady ??= Promise.all([import('altcha'), import('altcha/i18n/fr-fr')]).then(
+      () => undefined
+    );
+    return this.altchaReady;
+  }
+
+  private mountCaptcha(): void {
+    const host = document.getElementById('onboarding-captcha-host');
+    if (!host) return;
+    host.replaceChildren();
+    const widget = document.createElement('altcha-widget');
+    widget.setAttribute('challengeurl', this.service.captchaUrl());
+    widget.setAttribute('auto', 'onload');
+    widget.setAttribute('language', 'fr-fr');
+    widget.addEventListener('verified', (event) => {
+      const payload = (event as CustomEvent<{ payload?: string }>).detail?.payload;
+      if (payload) void this.onCaptchaVerified(payload);
+    });
+    host.appendChild(widget);
+  }
+
+  closeCaptcha(force = false): void {
+    if (this.saving() && !force) return;
+    this.captchaOpen.set(false);
+    this.captchaError.set('');
+    document.getElementById('onboarding-captcha-host')?.replaceChildren();
+  }
+
+  private async onCaptchaVerified(payload: string): Promise<void> {
+    if (this.captchaBusy || this.saving()) return;
+    this.captchaBusy = true;
+    this.saving.set(true);
+    if (this.captchaMode() === 'soumettre') this.submitting.set(true);
+    this.captchaError.set('');
+    try {
+      await this.pushToServer(this.captchaMode(), payload);
+      if (this.captchaMode() === 'brouillon') this.closeCaptcha(true);
+    } catch (error) {
+      this.captchaError.set(
+        this.httpMessage(error, 'Enregistrement impossible. Recommencez la vérification.')
+      );
+      this.mountCaptcha();
+      if (this.captchaMode() === 'soumettre') {
+        this.toast.error("La candidature n'a pas pu être soumise.");
+      }
+    } finally {
+      this.captchaBusy = false;
+      this.saving.set(false);
+      this.submitting.set(false);
+    }
+  }
+
+  private async pushToServer(mode: 'brouillon' | 'soumettre', payload: string): Promise<void> {
+    const grant = await firstValueFrom(this.service.verifyCaptcha(payload));
+    if (!grant) throw new Error('vérification refusée');
+    const removed = new Set(this.pendingDeletes);
+    for (const doc of this.draft.documents) {
+      if (!doc.a_fichier && this.serverFiles.has(doc.type_code)) removed.add(doc.type_code);
+    }
+    const saved =
+      this.draftId && this.token
+        ? await firstValueFrom(this.service.updateDraft(this.draftId, this.draft, this.token, grant))
+        : await firstValueFrom(this.service.createDraft(this.draft, grant));
+    this.draftId = saved.id;
+    this.token = saved.jeton || this.token;
+    this.reference = saved.reference || this.reference;
+    if (!this.draftId || !this.token) throw new Error('enregistrement incomplet');
+    this.mergeDocs(saved.documents);
+    for (const doc of this.draft.documents) {
+      const file = await getLocalFile(doc.type_code);
+      if (file) {
+        const uploaded = await firstValueFrom(
+          this.service.uploadDocument(this.draftId, doc.type_code, file, this.token, grant)
+        );
+        doc.a_fichier = true;
+        doc.nom_fichier = uploaded.nom_fichier || file.name;
+        doc.content_type = uploaded.content_type || file.type;
+        doc.statut = 'Fourni';
+        doc.id = uploaded.id;
+        this.serverFiles.add(doc.type_code);
+        this.pendingDeletes.delete(doc.type_code);
+        continue;
+      }
+      if (removed.has(doc.type_code)) {
+        await firstValueFrom(
+          this.service.deleteDocument(this.draftId, doc.type_code, this.token, grant)
+        );
+        doc.a_fichier = false;
+        doc.nom_fichier = undefined;
+        doc.content_type = undefined;
+        doc.statut = 'À fournir';
+        this.serverFiles.delete(doc.type_code);
+        this.pendingDeletes.delete(doc.type_code);
+      }
+    }
+    if (mode === 'soumettre') {
+      const result = await firstValueFrom(this.service.submit(this.draftId, this.token, grant));
+      this.reference = result.reference || this.reference;
+      this.token = result.jeton || this.token;
+      await clearLocalFiles();
+      clearLocalDraft();
+      this.toast.success('Votre candidature a été soumise.');
+      await this.router.navigate(['/devenir-distributeur/suivi'], {
+        queryParams: { reference: this.reference, jeton: this.token },
+      });
+      return;
+    }
+    this.remember();
+    this.notice.set('Brouillon enregistré sur le serveur.');
+  }
+
+  private httpMessage(error: unknown, fallback: string): string {
+    if (error instanceof HttpErrorResponse) {
+      const body = error.error as { error?: string } | null;
+      if (body && typeof body.error === 'string' && body.error) return body.error;
+    }
+    return fallback;
   }
 
   private mergeDocs(docs: CandidatureDocument[] | undefined): void {
@@ -927,11 +1151,6 @@ export class OnboardingWizardPageComponent implements OnInit {
     await wait(240);
     this.slidePhase.set('idle');
     this.sliding.set(false);
-  }
-
-  private persistAccess(reference?: string, token?: string): void {
-    if (reference) localStorage.setItem(STORAGE_REFERENCE, reference);
-    if (token) localStorage.setItem(STORAGE_TOKEN, token);
   }
 
   private emptyGeo(): OutletGeo {

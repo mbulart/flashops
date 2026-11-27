@@ -1,7 +1,9 @@
 package com.flashops.api.web;
 
+import com.flashops.api.onboarding.OnboardingCaptchaService;
 import com.flashops.api.onboarding.OnboardingService;
 import com.flashops.api.web.dto.OnboardingDtos;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import org.springframework.core.io.FileSystemResource;
@@ -26,9 +28,22 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/v1/public/onboarding")
 public class PublicOnboardingController {
   private final OnboardingService onboarding;
+  private final OnboardingCaptchaService captcha;
 
-  public PublicOnboardingController(OnboardingService onboarding) {
+  public PublicOnboardingController(OnboardingService onboarding, OnboardingCaptchaService captcha) {
     this.onboarding = onboarding;
+    this.captcha = captcha;
+  }
+
+  @GetMapping("/captcha")
+  public Map<String, Object> captcha(HttpServletRequest request) {
+    return captcha.challenge(clientIp(request));
+  }
+
+  @PostMapping("/captcha/valider")
+  public Map<String, String> validerCaptcha(@RequestBody(required = false) Map<String, String> body) {
+    String payload = body == null ? null : body.get("payload");
+    return Map.of("grant", captcha.issueGrant(payload));
   }
 
   @GetMapping("/referentiels")
@@ -53,8 +68,17 @@ public class PublicOnboardingController {
 
   @PostMapping("/candidatures")
   public Map<String, OnboardingDtos.Candidature> create(
+      @RequestHeader(value = "X-Onboarding-Grant", required = false) String grant,
       @RequestBody OnboardingDtos.CandidatureDraft body) {
-    return Map.of("data", onboarding.create(body));
+    captcha.authorizeCreate(grant);
+    OnboardingDtos.Candidature created = onboarding.create(body);
+    Long createdId = created.id();
+    if (createdId == null) {
+      throw new org.springframework.web.server.ResponseStatusException(
+          org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, "enregistrement impossible");
+    }
+    captcha.bind(grant, createdId);
+    return Map.of("data", created);
   }
 
   @PutMapping("/candidatures/{id}")
@@ -62,7 +86,9 @@ public class PublicOnboardingController {
       @PathVariable long id,
       @RequestParam(required = false) String jeton,
       @RequestHeader(value = "X-Candidature-Jeton", required = false) String headerToken,
+      @RequestHeader(value = "X-Onboarding-Grant", required = false) String grant,
       @RequestBody OnboardingDtos.CandidatureDraft body) {
+    captcha.authorize(grant, id);
     return Map.of("data", onboarding.update(id, jeton, headerToken, body));
   }
 
@@ -71,7 +97,9 @@ public class PublicOnboardingController {
       @PathVariable long id,
       @RequestParam(required = false) String jeton,
       @RequestHeader(value = "X-Candidature-Jeton", required = false) String headerToken,
+      @RequestHeader(value = "X-Onboarding-Grant", required = false) String grant,
       @RequestBody(required = false) Map<String, String> body) {
+    captcha.authorize(grant, id);
     String bodyToken = body == null ? null : body.get("jeton");
     return Map.of(
         "data",
@@ -90,7 +118,9 @@ public class PublicOnboardingController {
       @PathVariable String typeCode,
       @RequestParam(required = false) String jeton,
       @RequestHeader(value = "X-Candidature-Jeton", required = false) String headerToken,
+      @RequestHeader(value = "X-Onboarding-Grant", required = false) String grant,
       @RequestPart("file") MultipartFile file) {
+    captcha.authorize(grant, id);
     return Map.of("data", onboarding.uploadDocument(id, jeton, headerToken, typeCode, file));
   }
 
@@ -99,7 +129,9 @@ public class PublicOnboardingController {
       @PathVariable long id,
       @PathVariable String typeCode,
       @RequestParam(required = false) String jeton,
-      @RequestHeader(value = "X-Candidature-Jeton", required = false) String headerToken) {
+      @RequestHeader(value = "X-Candidature-Jeton", required = false) String headerToken,
+      @RequestHeader(value = "X-Onboarding-Grant", required = false) String grant) {
+    captcha.authorize(grant, id);
     onboarding.deleteDocument(id, jeton, headerToken, typeCode);
     return Map.of("ok", true);
   }
@@ -116,5 +148,13 @@ public class PublicOnboardingController {
         .contentType(MediaType.parseMediaType(file.contentType()))
         .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
         .body(new FileSystemResource(file.path()));
+  }
+
+  private static String clientIp(HttpServletRequest request) {
+    String forwarded = request.getHeader("X-Forwarded-For");
+    if (forwarded != null && !forwarded.isBlank()) {
+      return forwarded.split(",")[0].trim();
+    }
+    return request.getRemoteAddr();
   }
 }

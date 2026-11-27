@@ -5,9 +5,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -45,6 +47,24 @@ public class OnboardingDocumentStorage {
       return Optional.empty();
     }
     return Optional.of(path);
+  }
+
+  public void deleteCandidature(long candidatureId) {
+    Path dir = root.resolve("candidatures").resolve(Long.toString(candidatureId)).normalize();
+    if (!dir.startsWith(root) || !Files.exists(dir)) return;
+    try (Stream<Path> walk = Files.walk(dir)) {
+      walk.sorted(Comparator.reverseOrder())
+          .forEach(
+              path -> {
+                try {
+                  Files.deleteIfExists(path);
+                } catch (IOException ignored) {
+                  /* le reste du dossier est quand même retiré */
+                }
+              });
+    } catch (IOException ignored) {
+      /* le dossier pourra être repris plus tard */
+    }
   }
 
   public void deleteQuietly(String relative) {
