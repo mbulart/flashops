@@ -37,6 +37,12 @@ public class OnboardingController {
     return Map.of("data", onboarding.list(q, statut, page, size));
   }
 
+  @GetMapping("/candidatures/non-traitees")
+  public Map<String, OnboardingDtos.DemandesNonTraitees> untreated() {
+    permissions.require(AuthSupport.currentUserId(), "onboarding.candidatures.lire");
+    return Map.of("data", onboarding.untreated());
+  }
+
   @GetMapping("/candidatures/{id}")
   public Map<String, OnboardingDtos.Candidature> detail(@PathVariable long id) {
     permissions.require(AuthSupport.currentUserId(), "onboarding.candidatures.lire");

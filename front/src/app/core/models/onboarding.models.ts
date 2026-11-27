@@ -146,6 +146,19 @@ export interface WorkflowNode {
   type?: string;
 }
 
+export interface DemandeNonTraitee {
+  id: number;
+  reference: string;
+  statut: string;
+  raison_sociale?: string | null;
+  soumis_le?: string | null;
+}
+
+export interface DemandesNonTraitees {
+  count: number;
+  items: DemandeNonTraitee[];
+}
+
 export interface WorkflowDefinition {
   id: number | string;
   code: string;

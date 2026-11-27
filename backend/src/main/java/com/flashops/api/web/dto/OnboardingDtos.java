@@ -114,6 +114,15 @@ public final class OnboardingDtos {
 
   public record TaskActionInput(String action, String commentaire) {}
 
+  public record DemandeNonTraitee(
+      long id,
+      String reference,
+      String statut,
+      @JsonProperty("raison_sociale") String raisonSociale,
+      @JsonProperty("soumis_le") OffsetDateTime soumisLe) {}
+
+  public record DemandesNonTraitees(long count, List<DemandeNonTraitee> items) {}
+
   public static CandidatureDraft emptyDraft() {
     return new CandidatureDraft(null, null, null, null, List.of(), List.of(), List.of());
   }

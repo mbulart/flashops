@@ -1,5 +1,6 @@
 package com.flashops.api.workflow;
 
+import com.flashops.api.onboarding.OnboardingMailService;
 import com.flashops.api.onboarding.OnboardingRepository;
 import com.flashops.api.web.dto.OnboardingDtos;
 import org.springframework.http.HttpStatus;
@@ -38,7 +39,7 @@ public class WorkflowEngine {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "action requise");
     }
     WorkflowRepository.TaskContext task = workflows.lockOpenTask(taskId);
-    requireActor(task, userId);
+    requireActor(userId);
     WorkflowRepository.Transition transition =
         workflows.transition(task.versionId(), task.currentNodeId(), input.action());
     if (transition.commentRequired()
@@ -62,26 +63,15 @@ public class WorkflowEngine {
     return task.candidatureId();
   }
 
-  private void requireActor(WorkflowRepository.TaskContext task, int userId) {
+  private void requireActor(int userId) {
     WorkflowRepository.UserAccess access = workflows.access(userId);
+    String email = access.email() == null ? "" : access.email().trim();
     if ("SUPER_ADMIN".equals(access.role())
-        || (task.assignedUserId() != null && task.assignedUserId() == userId)
-        || (task.assignedRole() != null && task.assignedRole().equals(access.role()))
-        || (task.assignedRole() != null
-            && access.permissions().contains("onboarding.taches.agir"))) {
+        || OnboardingMailService.PROCESSOR_EMAIL.equalsIgnoreCase(email)) {
       return;
     }
-    WorkflowRepository.ActorRule rule = workflows.actorRuleForTask(task.currentNodeId());
-    boolean allowed =
-        ("utilisateur".equals(rule.mode()) && rule.userId() != null && rule.userId() == userId)
-            || ("role".equals(rule.mode()) && rule.role() != null
-                && (rule.role().equals(access.role())
-                    || access.permissions().contains("onboarding.taches.agir")))
-            || ("permission".equals(rule.mode()) && rule.permission() != null
-                && access.permissions().contains(rule.permission()));
-    if (!allowed) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "tâche non assignée");
-    }
+    throw new ResponseStatusException(
+        HttpStatus.FORBIDDEN, "traitement réservé au responsable onboarding");
   }
 
   private static boolean isTaskNode(String type) {

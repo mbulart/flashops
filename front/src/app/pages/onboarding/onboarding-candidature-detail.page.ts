@@ -40,7 +40,7 @@ type DetailTab = 'apercu' | 'entreprise' | 'points' | 'documents' | 'workflow';
         <div><span>Entreprise</span><strong>{{ c.entreprise?.raison_sociale || '—' }}</strong></div>
         <div><span>Soumise le</span><strong>{{ (c.soumis_le | date:'dd/MM/yyyy HH:mm') || '—' }}</strong></div>
       </div>
-      @if ((c.actions_disponibles || []).length) {
+      @if (canTreat() && (c.actions_disponibles || []).length) {
         <app-section-card title="Actions disponibles">
           <div class="d-flex flex-wrap gap-2">
             @for (action of c.actions_disponibles || []; track action.code) {
@@ -115,6 +115,7 @@ export class OnboardingCandidatureDetailPageComponent implements OnInit {
   readonly item = signal<Candidature | null>(null);
   readonly activeTab = signal<DetailTab>('apercu');
   readonly isSuperAdmin = computed(() => this.auth.roleCode() === 'SUPER_ADMIN');
+  readonly canTreat = computed(() => this.auth.canTreatCandidatures());
   readonly tabs: { key: DetailTab; label: string }[] = [
     { key: 'apercu', label: 'Aperçu' }, { key: 'entreprise', label: 'Entreprise' },
     { key: 'points', label: 'Points de vente' }, { key: 'documents', label: 'Documents' },

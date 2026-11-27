@@ -6,6 +6,7 @@ import {
   CandidatureDocument,
   CandidatureDraft,
   CandidaturePage,
+  DemandesNonTraitees,
   GeoLieu,
   OnboardingFilters,
   OnboardingReferentiels,
@@ -148,6 +149,12 @@ export class OnboardingService {
           Array.isArray(value) ? { items: value, total: value.length } : value
         )
       );
+  }
+
+  untreated() {
+    return this.http
+      .get<Envelope<DemandesNonTraitees>>(`${this.onboardingUrl}/candidatures/non-traitees`)
+      .pipe(map((value) => this.unwrap(value)));
   }
 
   getCandidature(id: number | string) {

@@ -3,6 +3,7 @@ import {
   ElementRef,
   EventEmitter,
   HostListener,
+  OnInit,
   Output,
   inject,
   signal,
@@ -10,6 +11,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { OnboardingAlertsService } from '../../core/services/onboarding-alerts.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { User } from '../../core/models/api.models';
 import { UserAvatarComponent } from '../../shared/components/user-avatar/user-avatar.component';
@@ -30,6 +32,43 @@ import { UserAvatarComponent } from '../../shared/components/user-avatar/user-av
       </div>
 
       <div class="header-end">
+        @if (auth.can('onboarding.candidatures.lire')) {
+          <div class="header-notif" [class.is-open]="notifOpen()">
+            <button
+              type="button"
+              class="btn btn-icon header-notif-btn"
+              (click)="toggleNotif($event)"
+              [attr.aria-expanded]="notifOpen()"
+              aria-label="Notifications"
+            >
+              <i class="bi bi-bell"></i>
+              @if (alerts.count() > 0) {
+                <span class="header-notif-badge">{{ alerts.count() > 99 ? '99+' : alerts.count() }}</span>
+              }
+            </button>
+            @if (notifOpen()) {
+              <div class="header-notif-menu" role="menu">
+                <div class="header-notif-head">Demandes non traitées</div>
+                @for (item of alerts.items(); track item.id) {
+                  <a
+                    class="header-notif-item"
+                    [routerLink]="['/onboarding/candidatures', item.id]"
+                    (click)="closeNotif()"
+                  >
+                    <strong>{{ item.reference }}</strong>
+                    <span>{{ item.raison_sociale || 'Candidature' }}</span>
+                    <small>{{ alerts.label(item.statut) }}</small>
+                  </a>
+                } @empty {
+                  <p class="header-notif-empty">Aucune demande en attente.</p>
+                }
+                <a class="header-notif-all" routerLink="/onboarding/candidatures" (click)="closeNotif()">
+                  Voir les candidatures
+                </a>
+              </div>
+            }
+          </div>
+        }
         <button
           type="button"
           class="btn btn-icon"
@@ -83,30 +122,51 @@ import { UserAvatarComponent } from '../../shared/components/user-avatar/user-av
     </header>
   `,
 })
-export class HeaderComponent {
+export class HeaderComponent implements OnInit {
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
+  readonly alerts = inject(OnboardingAlertsService);
   private readonly host = inject(ElementRef<HTMLElement>);
 
   @Output() toggleSidebar = new EventEmitter<void>();
   @Output() toggleCollapse = new EventEmitter<void>();
 
   readonly menuOpen = signal(false);
+  readonly notifOpen = signal(false);
+
+  ngOnInit(): void {
+    this.alerts.start();
+  }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
     if (!this.host.nativeElement.contains(event.target as Node)) {
       this.menuOpen.set(false);
+      this.notifOpen.set(false);
     }
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.menuOpen.set(false);
+    this.notifOpen.set(false);
+  }
+
+  toggleNotif(event: MouseEvent): void {
+    event.stopPropagation();
+    this.menuOpen.set(false);
+    this.notifOpen.update((open) => !open);
+    if (!this.notifOpen()) return;
+    this.alerts.refresh();
+  }
+
+  closeNotif(): void {
+    this.notifOpen.set(false);
   }
 
   toggleMenu(event: MouseEvent): void {
     event.stopPropagation();
+    this.notifOpen.set(false);
     this.menuOpen.update((v) => !v);
   }
 

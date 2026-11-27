@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { OnboardingTask, WorkflowAction } from '../../core/models/onboarding.models';
+import { AuthService } from '../../core/services/auth.service';
 import { OnboardingService } from '../../core/services/onboarding.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -26,9 +27,15 @@ import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.com
               <td><a [routerLink]="['/onboarding/candidatures', task.candidature_id]">{{ task.reference || task.candidature_id }}</a></td>
               <td><strong>{{ task.libelle || 'Traitement du dossier' }}</strong><small class="d-block text-muted">{{ task.statut || '' }}</small></td>
               <td>{{ task.etape || '—' }}</td><td>{{ (task.echeance | date:'dd/MM/yyyy') || '—' }}</td>
-              <td><div class="d-flex gap-1 flex-wrap">@for (action of task.actions_disponibles || []; track action.code) {
-                <button class="btn btn-outline-dark btn-sm" (click)="openAction(task, action)">{{ action.libelle }}</button>
-              }</div></td>
+              <td>
+                @if (canTreat()) {
+                  <div class="d-flex gap-1 flex-wrap">@for (action of task.actions_disponibles || []; track action.code) {
+                    <button class="btn btn-outline-dark btn-sm" (click)="openAction(task, action)">{{ action.libelle }}</button>
+                  }</div>
+                } @else {
+                  <span class="text-muted">Lecture seule</span>
+                }
+              </td>
             </tr>
           } @empty { <tr><td colspan="5" class="text-center text-muted py-4">Aucune tâche en attente.</td></tr> }</tbody>
         </table></div>
@@ -53,7 +60,9 @@ import { SkeletonComponent } from '../../shared/components/skeleton/skeleton.com
 })
 export class OnboardingTachesPageComponent implements OnInit {
   private readonly service = inject(OnboardingService);
+  private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+  readonly canTreat = computed(() => this.auth.canTreatCandidatures());
   readonly tasks = signal<OnboardingTask[]>([]);
   readonly loading = signal(true);
   readonly acting = signal(false);

@@ -26,18 +26,21 @@ public class OnboardingService {
   private final WorkflowEngine engine;
   private final GeoReferentielService geo;
   private final OnboardingDocumentStorage storage;
+  private final OnboardingMailService mail;
 
   public OnboardingService(
       OnboardingRepository onboarding,
       WorkflowRepository workflows,
       WorkflowEngine engine,
       GeoReferentielService geo,
-      OnboardingDocumentStorage storage) {
+      OnboardingDocumentStorage storage,
+      OnboardingMailService mail) {
     this.onboarding = onboarding;
     this.workflows = workflows;
     this.engine = engine;
     this.geo = geo;
     this.storage = storage;
+    this.mail = mail;
   }
 
   public List<OnboardingDtos.Lieu> provinces() {
@@ -88,7 +91,9 @@ public class OnboardingService {
     String token = token(queryToken, headerToken);
     requireToken(id, token, true);
     engine.submit(id);
-    return onboarding.get(id, false, true);
+    OnboardingDtos.Candidature submitted = onboarding.get(id, false, true);
+    mail.notifySubmitted(submitted);
+    return submitted;
   }
 
   public OnboardingDtos.Candidature track(String reference, String token) {
@@ -97,6 +102,10 @@ public class OnboardingService {
 
   public OnboardingDtos.CandidaturePage list(String q, String status, int page, int size) {
     return onboarding.list(q, status, page, size);
+  }
+
+  public OnboardingDtos.DemandesNonTraitees untreated() {
+    return onboarding.nonTraitees();
   }
 
   public OnboardingDtos.Candidature detail(long id) {

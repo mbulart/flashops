@@ -6,6 +6,7 @@ import { CanPermissionDirective } from '../../shared/directives/can-permission.d
 import { AppSettingsService } from '../../core/services/app-settings.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { AuthService } from '../../core/services/auth.service';
+import { OnboardingAlertsService } from '../../core/services/onboarding-alerts.service';
 
 interface NavItem {
   label: string;
@@ -71,7 +72,12 @@ const STORAGE_KEY = 'flashops_sidebar_groups_open';
                     >
                       <i [class]="item.icon"></i>
                       @if (!collapsed) {
-                        <span>{{ item.label }}</span>
+                        <span class="sidebar-link-label">{{ item.label }}</span>
+                        @if (badge(item.path); as n) {
+                          <span class="sidebar-count">{{ n > 99 ? '99+' : n }}</span>
+                        }
+                      } @else if (badge(item.path)) {
+                        <span class="sidebar-count is-dot" aria-hidden="true"></span>
                       }
                     </a>
                   </ng-container>
@@ -130,6 +136,33 @@ const STORAGE_KEY = 'flashops_sidebar_groups_open';
         opacity 0.22s ease;
     }
 
+    .sidebar-link-label { flex: 1; min-width: 0; }
+    .sidebar-count {
+      margin-left: auto;
+      min-width: 1.35rem;
+      height: 1.35rem;
+      padding: 0 0.35rem;
+      border-radius: 999px;
+      background: #e11d2e;
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sidebar-count.is-dot {
+      position: absolute;
+      top: 0.35rem;
+      right: 0.35rem;
+      min-width: 0.55rem;
+      width: 0.55rem;
+      height: 0.55rem;
+      padding: 0;
+    }
+    .sidebar-link { position: relative; }
+
     .sidebar-group-items.is-collapsed {
       grid-template-rows: 0fr;
       opacity: 0;
@@ -153,6 +186,7 @@ export class SidebarComponent implements OnInit {
   private readonly theme = inject(ThemeService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  readonly alerts = inject(OnboardingAlertsService);
 
   private readonly openGroups = signal<Record<string, boolean>>({});
 
@@ -272,6 +306,7 @@ export class SidebarComponent implements OnInit {
   );
 
   ngOnInit(): void {
+    this.alerts.start();
     this.openGroups.set(this.loadOpenState());
     this.ensureActiveGroupOpen(this.router.url);
     this.router.events.pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd)).subscribe((e) => {
@@ -289,6 +324,10 @@ export class SidebarComponent implements OnInit {
     const next = { ...this.openGroups(), [label]: !this.isGroupOpen(label) };
     this.openGroups.set(next);
     this.persistOpenState(next);
+  }
+
+  badge(path: string): number {
+    return path === '/onboarding/candidatures' ? this.alerts.count() : 0;
   }
 
   groupKey(label: string): string {

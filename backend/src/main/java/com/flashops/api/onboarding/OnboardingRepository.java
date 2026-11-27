@@ -313,6 +313,26 @@ public class OnboardingRepository {
     return true;
   }
 
+  private static final String NON_TRAITEES =
+      "('soumise','en_cours','complement','suspendue')";
+
+  public OnboardingDtos.DemandesNonTraitees nonTraitees() {
+    Long total = jdbc.queryForObject(
+        "SELECT count(*) FROM onboarding.candidatures WHERE statut_admin IN " + NON_TRAITEES,
+        Long.class);
+    List<OnboardingDtos.DemandeNonTraitee> items = jdbc.query(
+        "SELECT id, reference, statut_admin, raison_sociale, soumise_le "
+            + "FROM onboarding.candidatures WHERE statut_admin IN " + NON_TRAITEES
+            + " ORDER BY COALESCE(soumise_le, cree_le) DESC LIMIT 8",
+        (rs, n) -> new OnboardingDtos.DemandeNonTraitee(
+            rs.getLong("id"),
+            rs.getString("reference"),
+            rs.getString("statut_admin"),
+            rs.getString("raison_sociale"),
+            rs.getObject("soumise_le", java.time.OffsetDateTime.class)));
+    return new OnboardingDtos.DemandesNonTraitees(total == null ? 0 : total, items);
+  }
+
   public OnboardingDtos.CandidaturePage list(String q, String statut, int page, int size) {
     int safePage = Math.max(1, page);
     int safeSize = Math.min(200, Math.max(1, size));

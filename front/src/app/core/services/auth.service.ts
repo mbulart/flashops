@@ -41,6 +41,13 @@ export class AuthService {
     return this.permissionCodes().includes(permission);
   }
 
+  canTreatCandidatures(): boolean {
+    const user = this.userSignal();
+    if (!user) return false;
+    return user.role?.code === 'SUPER_ADMIN'
+      || user.email?.trim().toLowerCase() === 'a.mbelu@flash.one';
+  }
+
   canAny(...permissions: string[]): boolean {
     if (this.roleCode() === 'SUPER_ADMIN') return true;
     const codes = this.permissionCodes();

@@ -19,7 +19,7 @@ public class WorkflowRepository {
       long taskId, long instanceId, long candidatureId, long versionId, long currentNodeId,
       String assignedRole, Integer assignedUserId) {}
   public record ActorRule(String mode, String role, String permission, Integer userId) {}
-  public record UserAccess(String role, List<String> permissions) {}
+  public record UserAccess(String role, String email, List<String> permissions) {}
 
   private final JdbcTemplate jdbc;
 
@@ -141,10 +141,11 @@ public class WorkflowRepository {
   public UserAccess access(int userId) {
     return jdbc.query(
             """
-            SELECT r.code FROM utilisateurs u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.actif
-            """, (rs, n) -> rs.getString(1), userId)
+            SELECT r.code, u.courriel FROM utilisateurs u
+            JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.actif
+            """, (rs, n) -> new String[] {rs.getString(1), rs.getString(2)}, userId)
         .stream().findFirst()
-        .map(role -> new UserAccess(role, jdbc.query(
+        .map(row -> new UserAccess(row[0], row[1], jdbc.query(
             """
             SELECT p.code FROM roles_permissions rp JOIN permissions p ON p.id=rp.permission_id
             JOIN utilisateurs u ON u.role_id=rp.role_id WHERE u.id=?
