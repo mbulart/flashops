@@ -131,7 +131,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 [(ngModel)]="draftInactiveCustomDays"
                 (ngModelChange)="onInactiveCustomChange()"
                 placeholder="N"
-                title="Année en cours uniquement : dernière transaction cette année, et aucune depuis au moins N jours (Taptap Send compris)"
+                title="Année en cours : dernière transaction entre N et N+10 jours (Taptap Send compris)"
               />
               <span class="input-group-text">j</span>
             </div>

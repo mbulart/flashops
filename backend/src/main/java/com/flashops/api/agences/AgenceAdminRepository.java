@@ -327,14 +327,15 @@ public class AgenceAdminRepository {
       args.add(q.activityDays());
     }
     if (q.inactiveSinceDays() != null && q.inactiveSinceDays() > 0) {
-      // Année en cours seulement : dernière TX cette année, et aucune depuis au moins N jours.
+      // Année en cours, inactivité d'au moins N jours, sans dépasser N+10 jours.
       where.append(
           """
            AND last_tx.premiere_tx IS NOT NULL
            AND last_tx.derniere_tx IS NOT NULL
            AND last_tx.derniere_tx >= date_trunc('year', CURRENT_DATE)::date
-           AND last_tx.derniere_tx <= (CURRENT_DATE - ?::int)
+           AND last_tx.derniere_tx BETWEEN (CURRENT_DATE - (?::int + 10)) AND (CURRENT_DATE - ?::int)
           """);
+      args.add(q.inactiveSinceDays());
       args.add(q.inactiveSinceDays());
     }
     if (q.statutActivites() != null && !q.statutActivites().isEmpty()) {
