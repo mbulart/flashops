@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class OnboardingMailService {
-  static final String PROCESSOR_EMAIL = "a.mbelu@flash.one";
+  public static final String PROCESSOR_EMAIL = "a.mbelu@flash.one";
 
   private static final Logger log = LoggerFactory.getLogger(OnboardingMailService.class);
 
