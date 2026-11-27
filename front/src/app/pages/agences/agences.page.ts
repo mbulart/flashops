@@ -131,7 +131,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 [(ngModel)]="draftInactiveCustomDays"
                 (ngModelChange)="onInactiveCustomChange()"
                 placeholder="N"
-                title="Dernière transaction entre 1 et N jours (pas aujourd’hui, pas plus ancien que N jours)"
+                title="Aucune transaction depuis N jours, tous produits confondus (y compris Taptap Send)"
               />
               <span class="input-group-text">j</span>
             </div>

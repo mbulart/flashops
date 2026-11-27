@@ -35,6 +35,10 @@ public class AgenceAdminRepository {
       END
       """;
 
+  /**
+   * Première / dernière transaction de l'agence, tous produits de l'agrégat journalier. Taptap Send
+   * (FLASHPAYMENT, partenaire TAPTAPSEND) y est déjà inclus : il avance la date comme les autres.
+   */
   private static final String ACTIVITY_JOIN =
       """
       LEFT JOIN (
@@ -323,13 +327,12 @@ public class AgenceAdminRepository {
       args.add(q.activityDays());
     }
     if (q.inactiveSinceDays() != null && q.inactiveSinceDays() > 0) {
-      // Dernière TX entre 1 et N jours : inactive, mais pas plus ancienne que N jours.
+      // Aucune transaction depuis N jours : dernière TX il y a N jours ou plus.
       where.append(
           """
            AND last_tx.premiere_tx IS NOT NULL
            AND last_tx.derniere_tx IS NOT NULL
-           AND last_tx.derniere_tx < CURRENT_DATE
-           AND last_tx.derniere_tx >= (CURRENT_DATE - ?::int)
+           AND last_tx.derniere_tx <= (CURRENT_DATE - ?::int)
           """);
       args.add(q.inactiveSinceDays());
     }
