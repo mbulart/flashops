@@ -245,6 +245,7 @@ public class AgenceAdminRepository {
           """
            AND (
              d.nom ILIKE ?
+             OR coalesce(d.nom_commercial, '') ILIKE ?
              OR d.code_agence ILIKE ?
              OR coalesce(d.pos_id, '') ILIKE ?
              OR coalesce(d.fp_agent, '') ILIKE ?
@@ -253,6 +254,7 @@ public class AgenceAdminRepository {
              OR CAST(d.agence_id AS text) ILIKE ?
            )
           """);
+      args.add(like);
       args.add(like);
       args.add(like);
       args.add(like);

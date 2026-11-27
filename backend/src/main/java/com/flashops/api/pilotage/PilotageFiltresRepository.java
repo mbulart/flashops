@@ -89,11 +89,13 @@ public class PilotageFiltresRepository {
               AND (
                 d.code_agence ILIKE ?
                 OR coalesce(d.nom, '') ILIKE ?
+                OR coalesce(d.nom_commercial, '') ILIKE ?
                 OR coalesce(d.pos_id, '') ILIKE ?
                 OR coalesce(d.fp_agent, '') ILIKE ?
               )
             """);
     var args = new ArrayList<Object>();
+    args.add(pattern);
     args.add(pattern);
     args.add(pattern);
     args.add(pattern);
