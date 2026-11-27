@@ -569,6 +569,7 @@ public class PilotageAnalyticsRepository {
       int size,
       String partyQuery,
       boolean exportAll) {
+    q = q.withContrat("tous");
     int safeSize = Math.min(Math.max(size, 1), exportAll ? 5_000 : 50);
     int safePage = Math.max(page, 1);
     long offset = (long) (safePage - 1) * safeSize;
@@ -838,6 +839,7 @@ public class PilotageAnalyticsRepository {
                      0::numeric AS montant
               FROM pilotage.dim_agence AS d
               WHERE d.agence_id <> 0
+                AND coalesce(d.contrat_statut, 'actif') <> 'resilie'
                 AND d.latitude IS NOT NULL AND d.longitude IS NOT NULL
                 AND d.latitude <> 0 AND d.longitude <> 0
               """);

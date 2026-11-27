@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, ViewChild, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { map } from 'rxjs';
 import { PilotageAgence, PilotageAgenceScope } from '../../../core/models/pilotage.models';
@@ -26,17 +26,24 @@ import { SearchMultiSelectComponent } from '../../../shared/components/search-mu
     />
   `,
 })
-export class PilotageAgencySelectComponent {
+export class PilotageAgencySelectComponent implements OnChanges {
   private readonly pilotage = inject(PilotageService);
 
   @ViewChild('select') select?: SearchMultiSelectComponent;
 
   @Input() selectedIds: number[] = [];
   @Input() agenceScope: PilotageAgenceScope = {};
+  @Input() contrat: 'actif' | 'tous' | 'resilie' = 'actif';
   @Output() selectedIdsChange = new EventEmitter<number[]>();
 
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['contrat'] && !changes['contrat'].firstChange) {
+      this.select?.reset();
+    }
+  }
+
   loadAgencies = (search: string, limit: number) =>
-    this.pilotage.searchAgences(search, limit, this.agenceScope).pipe(
+    this.pilotage.searchAgences(search, limit, this.agenceScope, this.contrat).pipe(
       map((rows) =>
         rows.map((a): SearchSelectOption => pilotageAgenceOption(a))
       )

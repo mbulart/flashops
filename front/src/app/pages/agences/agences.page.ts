@@ -42,6 +42,7 @@ const STATUT_OPTIONS: MultiSelectOption[] = [
   { id: pilotageCategoryOptionId('statut:Nouveau'), label: 'Nouveau' },
   { id: pilotageCategoryOptionId('statut:Actif'), label: 'Actif' },
   { id: pilotageCategoryOptionId('statut:Inactif'), label: 'Inactif' },
+  { id: pilotageCategoryOptionId('statut:Résilié'), label: 'Résilié' },
 ];
 
 const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
@@ -621,6 +622,10 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
       background: #f3f4f6;
       color: #6b7280;
     }
+    .agence-statut--resilie {
+      background: #fff4c2;
+      color: #6b5600;
+    }
   `,
 })
 export class AgencesPageComponent implements OnInit {
@@ -653,6 +658,7 @@ export class AgencesPageComponent implements OnInit {
     Nouveau: { bg: 'FFDBEAFE', fg: 'FF1D4ED8' },
     Actif: { bg: 'FFDCFCE7', fg: 'FF15803D' },
     Inactif: { bg: 'FFF3F4F6', fg: 'FF6B7280' },
+    Résilié: { bg: 'FFFFF4C2', fg: 'FF6B5600' },
   } as const;
 
   private applied: AgenceAdminFilters = { page: 1, size: 25 };
@@ -817,6 +823,7 @@ export class AgencesPageComponent implements OnInit {
     const s = (statut || 'Inactif').trim().toLowerCase();
     if (s === 'nouveau') return 'agence-statut--nouveau';
     if (s === 'actif') return 'agence-statut--actif';
+    if (s === 'résilié' || s === 'resilie') return 'agence-statut--resilie';
     return 'agence-statut--inactif';
   }
 
@@ -1062,6 +1069,15 @@ export class AgencesPageComponent implements OnInit {
     });
   }
 
+  private activityExportContrat(): 'actif' | 'tous' | 'resilie' {
+    const statuts = (this.applied.statut_activite ?? []).map((s) => s.trim().toLowerCase());
+    const wantResilie = statuts.some((s) => s === 'résilié' || s === 'resilie');
+    const wantActivity = statuts.some((s) => s === 'nouveau' || s === 'actif' || s === 'inactif');
+    if (wantResilie && wantActivity) return 'tous';
+    if (wantResilie) return 'resilie';
+    return 'actif';
+  }
+
   /** Critères activité pour exports mensuels : année en cours + filtres registre. */
   private buildActivityExportCriteria(): PilotageCriteria {
     const base = this.buildAgencyCriteria();
@@ -1078,6 +1094,7 @@ export class AgencesPageComponent implements OnInit {
       categories: [...(this.applied.categories ?? [])],
       zoneIds: this.applied.zone_id != null ? [this.applied.zone_id] : [],
       reseauRegions,
+      contrat: this.activityExportContrat(),
     };
   }
 

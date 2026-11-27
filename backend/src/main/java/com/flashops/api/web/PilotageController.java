@@ -18,6 +18,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -679,7 +681,8 @@ public class PilotageController {
       @RequestParam(value = "province_id", required = false) Integer provinceId,
       @RequestParam(value = "ville_id", required = false) List<Integer> villeId,
       @RequestParam(value = "territoire_id", required = false) Integer territoireId,
-      @RequestParam(value = "commune_id", required = false) List<Integer> communeId) {
+      @RequestParam(value = "commune_id", required = false) List<Integer> communeId,
+      @RequestParam(value = "contrat", required = false) String contrat) {
     int userId = AuthSupport.currentUserId();
     permissions.require(userId, "dashboard.voir");
     PilotageAgenceFilterScope scope =
@@ -692,7 +695,7 @@ public class PilotageController {
     out.put(
         "data",
         filtresService.searchAgences(
-            q, limit, scope, userScope.unrestricted() ? null : userScope.allowedAgenceIds()));
+            q, limit, scope, userScope.unrestricted() ? null : userScope.allowedAgenceIds(), contrat));
     return out;
   }
 
@@ -851,7 +854,16 @@ public class PilotageController {
             communeId);
     return query
         .withAgenceIds(scope.intersectAgences(query.agenceIds()))
-        .withProductAccess(access.extraProductKeys(), access.transfertRestrictedToExtras());
+        .withProductAccess(access.extraProductKeys(), access.transfertRestrictedToExtras())
+        .withContrat(requestContrat());
+  }
+
+  private static String requestContrat() {
+    var attrs = RequestContextHolder.getRequestAttributes();
+    if (attrs instanceof ServletRequestAttributes servlet) {
+      return servlet.getRequest().getParameter("contrat");
+    }
+    return null;
   }
 
   private PilotageAgenceFilterScope scopedGeo(PilotageAgenceFilterScope geo, int userId) {

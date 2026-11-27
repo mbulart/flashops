@@ -24,7 +24,9 @@ public record PilotageBundleQuery(
     PilotageAgenceFilterScope geoScope,
     List<String> domaines,
     List<String> extraProductKeys,
-    boolean transfertRestrictedToExtras) {
+    boolean transfertRestrictedToExtras,
+    /** actif (défaut, hors résiliés) | tous | resilie */
+    String contrat) {
 
   public PilotageBundleQuery(
       String domaine,
@@ -62,7 +64,48 @@ public record PilotageBundleQuery(
         geoScope,
         domaines,
         List.of(),
-        false);
+        false,
+        null);
+  }
+
+  /** actif | tous | resilie. Toute autre valeur revient à actif. */
+  public String contratMode() {
+    if (contrat == null || contrat.isBlank()) {
+      return "actif";
+    }
+    String value = contrat.trim().toLowerCase(java.util.Locale.ROOT);
+    if ("resilie".equals(value) || "résilié".equals(value) || "resiliees".equals(value)) {
+      return "resilie";
+    }
+    if ("tous".equals(value) || "inclure".equals(value)) {
+      return "tous";
+    }
+    return "actif";
+  }
+
+  public PilotageBundleQuery withContrat(String next) {
+    return new PilotageBundleQuery(
+        domaine,
+        devise,
+        devises,
+        tauxUsdCdf,
+        tauxUsdFcn,
+        from,
+        to,
+        produitIds,
+        ecran,
+        statutUniformes,
+        categories,
+        agenceIds,
+        agentIds,
+        typeOperationIds,
+        jourFiltre,
+        couloirCodes,
+        geoScope,
+        domaines,
+        extraProductKeys,
+        transfertRestrictedToExtras,
+        next);
   }
 
   public List<String> resolvedDomaines() {
@@ -137,7 +180,8 @@ public record PilotageBundleQuery(
         geoScope,
         domaines,
         extraProductKeys,
-        transfertRestrictedToExtras);
+        transfertRestrictedToExtras,
+        contrat);
   }
 
   public PilotageBundleQuery withPeriod(String from, String to) {
@@ -161,7 +205,8 @@ public record PilotageBundleQuery(
         geoScope,
         domaines,
         extraProductKeys,
-        transfertRestrictedToExtras);
+        transfertRestrictedToExtras,
+        contrat);
   }
 
   public PilotageBundleQuery withAgenceIds(List<Integer> nextAgenceIds) {
@@ -185,7 +230,8 @@ public record PilotageBundleQuery(
         geoScope,
         domaines,
         extraProductKeys,
-        transfertRestrictedToExtras);
+        transfertRestrictedToExtras,
+        contrat);
   }
 
   public PilotageBundleQuery withGeoScope(PilotageAgenceFilterScope nextGeoScope) {
@@ -209,7 +255,8 @@ public record PilotageBundleQuery(
         nextGeoScope,
         domaines,
         extraProductKeys,
-        transfertRestrictedToExtras);
+        transfertRestrictedToExtras,
+        contrat);
   }
 
   public PilotageBundleQuery withProductAccess(List<String> keys, boolean restrictTransfert) {
@@ -233,6 +280,7 @@ public record PilotageBundleQuery(
         geoScope,
         domaines,
         keys == null ? List.of() : List.copyOf(keys),
-        restrictTransfert);
+        restrictTransfert,
+        contrat);
   }
 }

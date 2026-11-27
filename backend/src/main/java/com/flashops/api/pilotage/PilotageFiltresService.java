@@ -75,13 +75,17 @@ public class PilotageFiltresService {
   }
 
   public List<PilotageDtos.AgenceRow> searchAgences(
-      String q, int limit, PilotageAgenceFilterScope scope, List<Integer> restrictAgenceIds) {
+      String q,
+      int limit,
+      PilotageAgenceFilterScope scope,
+      List<Integer> restrictAgenceIds,
+      String contrat) {
     int cap = Math.min(Math.max(limit, 1), 50);
     if (q == null || q.isBlank()) {
       return List.of();
     }
     var effective = scope != null ? scope : PilotageAgenceFilterScope.empty();
-    return repository.searchAgences(q, cap, effective, restrictAgenceIds).stream()
+    return repository.searchAgences(q, cap, effective, restrictAgenceIds, contrat).stream()
         .map(
             a ->
                 new PilotageDtos.AgenceRow(

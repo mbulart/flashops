@@ -80,8 +80,15 @@ public class AgenceAdminRepository {
              to_char(last_tx.premiere_tx, 'YYYY-MM-DD') AS premiere_transaction,
              to_char(last_tx.derniere_tx, 'YYYY-MM-DD') AS derniere_transaction,
              """
+          + """
+             CASE
+               WHEN coalesce(d.contrat_statut, 'actif') = 'resilie' THEN 'Résilié'
+               ELSE (
+             """
           + STATUT_ACTIVITE_EXPR
           + """
+               )
+             END
              AS statut_activite
       FROM pilotage.dim_agence AS d
       LEFT JOIN pilotage.dim_region AS rg ON rg.region_id = d.region_id
@@ -338,26 +345,38 @@ public class AgenceAdminRepository {
       args.add(q.inactiveSinceDays());
       args.add(q.inactiveSinceDays());
     }
-    if (q.statutActivites() != null && !q.statutActivites().isEmpty()) {
-      List<String> clean =
-          q.statutActivites().stream()
-              .filter(AgenceAdminRepository::notBlank)
-              .map(String::trim)
-              .map(
-                  s -> {
-                    String t = s.trim();
-                    if (t.equalsIgnoreCase("Nouveau")) return "Nouveau";
-                    if (t.equalsIgnoreCase("Actif")) return "Actif";
-                    if (t.equalsIgnoreCase("Inactif")) return "Inactif";
-                    return null;
-                  })
-              .filter(s -> s != null)
-              .distinct()
-              .toList();
-      if (!clean.isEmpty()) {
-        where.append(" AND (").append(STATUT_ACTIVITE_EXPR).append(") = ANY(?) ");
-        args.add(clean.toArray(new String[0]));
-      }
+    List<String> asked = q.statutActivites() == null ? List.of() : q.statutActivites();
+    boolean wantResilie =
+        asked.stream()
+            .filter(AgenceAdminRepository::notBlank)
+            .map(s -> s.trim().toLowerCase(java.util.Locale.ROOT))
+            .anyMatch(s -> s.equals("résilié") || s.equals("resilie") || s.equals("resilié"));
+    List<String> activity =
+        asked.stream()
+            .filter(AgenceAdminRepository::notBlank)
+            .map(String::trim)
+            .map(
+                s -> {
+                  if (s.equalsIgnoreCase("Nouveau")) return "Nouveau";
+                  if (s.equalsIgnoreCase("Actif")) return "Actif";
+                  if (s.equalsIgnoreCase("Inactif")) return "Inactif";
+                  return null;
+                })
+            .filter(s -> s != null)
+            .distinct()
+            .toList();
+    if (!wantResilie && activity.isEmpty()) {
+      where.append(" AND coalesce(d.contrat_statut, 'actif') <> 'resilie' ");
+    } else if (wantResilie && activity.isEmpty()) {
+      where.append(" AND d.contrat_statut = 'resilie' ");
+    } else if (!wantResilie) {
+      where.append(" AND coalesce(d.contrat_statut, 'actif') <> 'resilie' ");
+      where.append(" AND (").append(STATUT_ACTIVITE_EXPR).append(") = ANY(?) ");
+      args.add(activity.toArray(new String[0]));
+    } else {
+      where.append(" AND (d.contrat_statut = 'resilie' OR (");
+      where.append(STATUT_ACTIVITE_EXPR).append(") = ANY(?)) ");
+      args.add(activity.toArray(new String[0]));
     }
     if (notBlank(q.from()) && notBlank(q.to())) {
       where.append(

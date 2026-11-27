@@ -54,7 +54,8 @@ public final class PilotageBundleParams {
         scope,
         clean,
         List.of(),
-        false);
+        false,
+        null);
   }
 
   private static <T> List<T> nullToEmpty(List<T> list) {

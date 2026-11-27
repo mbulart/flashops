@@ -81,9 +81,12 @@ export class PilotageService {
       .pipe(map((r) => r.data));
   }
 
-  searchAgences(q: string, limit = 20, scope?: PilotageAgenceScope) {
+  searchAgences(q: string, limit = 20, scope?: PilotageAgenceScope, contrat?: string) {
     let params = new HttpParams().set('q', q).set('limit', String(limit));
     params = this.appendAgenceScope(params, scope);
+    if (contrat && contrat !== 'actif') {
+      params = params.set('contrat', contrat);
+    }
     return this.http
       .get<{ data: PilotageAgence[] }>(`${this.baseUrl}/agences/search`, { params })
       .pipe(map((r) => r.data ?? []));
@@ -436,6 +439,9 @@ export class PilotageService {
     }
     for (const s of criteria.statutUniformes) {
       params = params.append('statut_uniforme', s);
+    }
+    if (criteria.contrat && criteria.contrat !== 'actif') {
+      params = params.set('contrat', criteria.contrat);
     }
     for (const cat of criteria.categories) {
       params = params.append('categorie', cat);

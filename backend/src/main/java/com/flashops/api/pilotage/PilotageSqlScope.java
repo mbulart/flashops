@@ -48,6 +48,7 @@ final class PilotageSqlScope {
     }
 
     sql.append(" WHERE 1=1");
+    appendContrat(q, alias + ".agence_id", sql);
     PilotageProductRules.appendAggregateDomaines(
         alias,
         q.resolvedDomaines(),
@@ -126,6 +127,7 @@ final class PilotageSqlScope {
     }
 
     sql.append(" WHERE p.produit_id <> 0");
+    appendContrat(q, "f.agence_id", sql);
     PilotageProductRules.appendDimProduitDomaines(
         "p",
         q.resolvedDomaines(),
@@ -217,6 +219,7 @@ final class PilotageSqlScope {
     appendDeviseMatch(q, sql, args);
     sql.append(" WHERE g.mois = ?::date");
     args.add(moisIso);
+    appendContrat(q, "g.agence_id", sql);
     PilotageProductRules.appendAggregateDomaines(
         "g",
         q.resolvedDomaines(),
@@ -226,6 +229,29 @@ final class PilotageSqlScope {
         q.transfertRestrictedToExtras());
     appendCommonProductStatutFilters(q, "g", sql, args, false);
     return new ScopedSql(sql.toString(), args, false, null);
+  }
+
+  /**
+   * actif : hors agences résiliées, sauf si l'utilisateur a choisi des agences précises.
+   * resilie : seulement les résiliées. tous : aucun filtre de contrat.
+   */
+  static void appendContrat(PilotageBundleQuery q, String agenceIdExpr, StringBuilder sql) {
+    String mode = q.contratMode();
+    if ("tous".equals(mode)) {
+      return;
+    }
+    if ("resilie".equals(mode)) {
+      sql.append(" AND EXISTS (SELECT 1 FROM pilotage.dim_agence AS dx WHERE dx.agence_id = ")
+          .append(agenceIdExpr)
+          .append(" AND dx.contrat_statut = 'resilie')");
+      return;
+    }
+    if (q.agenceIds() != null && !q.agenceIds().isEmpty()) {
+      return;
+    }
+    sql.append(" AND NOT EXISTS (SELECT 1 FROM pilotage.dim_agence AS dx WHERE dx.agence_id = ")
+        .append(agenceIdExpr)
+        .append(" AND dx.contrat_statut = 'resilie')");
   }
 
   /** True si le client a choisi au moins un statut (pas le défaut implicite Succès argent). */

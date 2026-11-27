@@ -75,7 +75,7 @@ public class PilotageFiltresRepository {
   }
 
   public List<AgenceRow> searchAgences(
-      String q, int limit, PilotageAgenceFilterScope scope, List<Integer> restrictAgenceIds) {
+      String q, int limit, PilotageAgenceFilterScope scope, List<Integer> restrictAgenceIds, String contrat) {
     String term = q == null ? "" : q.trim();
     String pattern = "%" + term + "%";
     var sql =
@@ -104,6 +104,12 @@ public class PilotageFiltresRepository {
     }
     if (scope != null && scope.isActive()) {
       PilotageGeoMatchSupport.appendDimAgenceScope(jdbc, scope, "d", sql, args);
+    }
+    String mode = contrat == null ? "" : contrat.trim().toLowerCase(Locale.ROOT);
+    if ("resilie".equals(mode) || "résilié".equals(mode)) {
+      sql.append(" AND d.contrat_statut = 'resilie'");
+    } else if (!"tous".equals(mode) && !"inclure".equals(mode)) {
+      sql.append(" AND coalesce(d.contrat_statut, 'actif') <> 'resilie'");
     }
     sql.append(" ORDER BY d.code_agence LIMIT ?");
     args.add(limit);

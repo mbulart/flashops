@@ -121,6 +121,8 @@ export interface PilotageCriteria {
   zoneIds: number[];
   couloirCodes: string[];
   locationLabels: PilotageLocationLabels;
+  /** actif : hors résiliés. tous : les inclure. resilie : seulement elles. */
+  contrat?: 'actif' | 'tous' | 'resilie';
 }
 
 export interface PilotageKpiBlock {

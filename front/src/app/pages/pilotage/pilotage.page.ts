@@ -304,6 +304,14 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                       placeholder="Statuts"
                     />
                   </div>
+                  <div class="filter-field">
+                    <label class="form-label" for="pil-contrat">Contrat</label>
+                    <select id="pil-contrat" class="form-select" [(ngModel)]="draftContrat">
+                      <option value="actif">Hors résiliés</option>
+                      <option value="tous">Avec les résiliés</option>
+                      <option value="resilie">Résiliés seulement</option>
+                    </select>
+                  </div>
                 </div>
               }
             </section>
@@ -406,6 +414,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                   <app-pilotage-agency-select
                     #agencySelect
                     [agenceScope]="buildAgenceScope()"
+                    [contrat]="draftContrat"
                     [selectedIds]="draftAgenceIds"
                     (selectedIdsChange)="onAgenceIdsChange($event)"
                   />
@@ -1778,6 +1787,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
   draftProduitIds: number[] = [];
   draftEcran = '';
   draftStatutIds: number[] = [];
+  draftContrat: 'actif' | 'tous' | 'resilie' = 'actif';
   draftCategorieIds: number[] = [];
   draftAgenceIds: number[] = [];
   draftAgentIds: number[] = [];
@@ -2336,6 +2346,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
       sousProduit: sousKey,
       ecran: this.hasTransfert() ? this.draftEcran : '',
       statutUniformes: this.resolveDraftStatuts(),
+      contrat: this.draftContrat,
       categories: this.resolveDraftCategories(),
       agenceIds: [...this.draftAgenceIds],
       agentIds: [...this.draftAgentIds],
@@ -3309,6 +3320,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.draftSousProduit = '';
     this.sensListe.update((n) => n + 1);
     this.draftStatutIds = [];
+    this.draftContrat = 'actif';
     this.draftCategorieIds = [];
     this.draftTypeOperationIds = [];
     this.draftJourFiltre = '';
@@ -3418,6 +3430,8 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     this.draftSousProduit = pilotageCompactKey(q.get('sous') || '');
     const statuts = q.getAll('statut').filter((value) => PILOTAGE_STATUT_OPTIONS.some((option) => option.value === value));
     if (statuts.length) this.draftStatutIds = statuts.map((value) => pilotageStatutOptionId(value));
+    const contrat = (q.get('contrat') || '').trim();
+    if (contrat === 'tous' || contrat === 'resilie') this.draftContrat = contrat;
     const categories = q.getAll('categorie').map((value) => value.trim()).filter(Boolean);
     if (categories.length) this.draftCategorieIds = categories.map((value) => pilotageCategoryOptionId(value));
     this.draftAgenceIds = queryInts(q.getAll('agence_id'));
@@ -3451,6 +3465,7 @@ export class PilotagePageComponent implements OnInit, OnDestroy {
     if (this.draftModePaiement) params = params.set('mode', this.draftModePaiement);
     if (this.draftSousProduit) params = params.set('sous', this.draftSousProduit);
     for (const statut of this.resolveDraftStatuts()) params = params.append('statut', statut);
+    if (this.draftContrat !== 'actif') params = params.set('contrat', this.draftContrat);
     for (const categorie of this.resolveDraftCategories()) params = params.append('categorie', categorie);
     for (const id of this.draftAgenceIds) params = params.append('agence_id', String(id));
     for (const id of this.draftAgentIds) params = params.append('agent_id', String(id));

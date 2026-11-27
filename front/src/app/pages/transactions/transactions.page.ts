@@ -190,6 +190,14 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
                 />
               </div>
               <div class="filter-field">
+                <label class="form-label" for="tx-contrat">Contrat</label>
+                <select id="tx-contrat" class="form-select" [(ngModel)]="draftContrat">
+                  <option value="actif">Hors résiliés</option>
+                  <option value="tous">Avec les résiliés</option>
+                  <option value="resilie">Résiliés seulement</option>
+                </select>
+              </div>
+              <div class="filter-field">
                 <label class="form-label">Expéditeur / récepteur / réf.</label>
                 <input
                   type="search"
@@ -284,6 +292,7 @@ const DEFAULT_DOMAINES: PilotageDomaineOption[] = [
               <label class="form-label">Agence</label>
               <app-pilotage-agency-select
                 [agenceScope]="buildAgenceScope()"
+                [contrat]="draftContrat"
                 [selectedIds]="draftAgenceIds"
                 (selectedIdsChange)="onAgenceIdsChange($event)"
               />
@@ -485,6 +494,7 @@ export class TransactionsPageComponent implements OnInit {
   draftModePaiement: '' | 'cash' | 'momo' = '';
   draftSousProduit = '';
   draftStatutIds: number[] = [];
+  draftContrat: 'actif' | 'tous' | 'resilie' = 'actif';
   draftPartyQuery = '';
   draftPaysId: number | null = null;
   draftRegionIds: number[] = [];
@@ -712,6 +722,7 @@ export class TransactionsPageComponent implements OnInit {
     this.draftModePaiement = '';
     this.draftSousProduit = '';
     this.draftStatutIds = [];
+    this.draftContrat = 'actif';
     this.draftPartyQuery = '';
     this.draftPaysId = null;
     this.draftRegionIds = [];
@@ -792,6 +803,7 @@ export class TransactionsPageComponent implements OnInit {
       sousProduit: sousKey,
       ecran: this.hasTransfert() ? this.draftEcran : '',
       statutUniformes,
+      contrat: this.draftContrat,
       categories,
       agenceIds: [...this.draftAgenceIds],
       agentIds: [...this.draftAgentIds],
