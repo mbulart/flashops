@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { AppLoadingService } from '../../../core/services/app-loading.service';
+import { NavigationLoaderService } from '../../../core/services/navigation-loader.service';
 
 @Component({
   selector: 'app-global-loader',
@@ -22,6 +23,23 @@ import { AppLoadingService } from '../../../core/services/app-loading.service';
           alt=""
         />
         <p class="global-loader__text">{{ loading.message() }}</p>
+      </div>
+    } @else if (nav.visible()) {
+      <div class="nav-loader" role="status" aria-live="polite" aria-busy="true" aria-label="Chargement">
+        <img
+          class="nav-loader__logo flash-brand-pulse brand-logo--light"
+          src="branding/logo-light1.png"
+          width="96"
+          height="96"
+          alt=""
+        />
+        <img
+          class="nav-loader__logo flash-brand-pulse brand-logo--dark"
+          src="branding/logo-dark1.png"
+          width="96"
+          height="96"
+          alt=""
+        />
       </div>
     }
   `,
@@ -51,8 +69,33 @@ import { AppLoadingService } from '../../../core/services/app-loading.service';
       font-weight: 500;
       letter-spacing: var(--letter-spacing-body, -0.022em);
     }
+
+    .nav-loader {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: color-mix(in srgb, var(--app-bg, #f1f3f5) 42%, transparent);
+      backdrop-filter: blur(7px);
+      -webkit-backdrop-filter: blur(7px);
+      pointer-events: auto;
+      cursor: progress;
+    }
+
+    :host-context([data-bs-theme='dark']) .nav-loader {
+      background: color-mix(in srgb, #141414 55%, transparent);
+    }
+
+    .nav-loader__logo {
+      width: 6rem;
+      height: 6rem;
+      object-fit: contain;
+    }
   `,
 })
 export class GlobalLoaderComponent {
   readonly loading = inject(AppLoadingService);
+  readonly nav = inject(NavigationLoaderService);
 }

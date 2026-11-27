@@ -160,6 +160,11 @@ body.agency-modal-open app-root .rdc-shell--fullscreen {
   background: var(--flash-gray-100, #f1f3f5);
 }
 
+html.nav-locked,
+html.nav-locked body {
+  overflow: hidden;
+}
+
 @keyframes flash-brand-pulse {
   0%,
   100% {
