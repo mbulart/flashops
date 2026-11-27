@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, ParamMap, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import {
   AgenceAdmin,
@@ -628,6 +629,8 @@ export class AgencesPageComponent implements OnInit {
   private readonly pilotage = inject(PilotageService);
   private readonly appSettings = inject(AppSettingsService);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   readonly pageSizes = [25, 50, 100];
   readonly exportMenuOpen = signal(false);
@@ -694,19 +697,20 @@ export class AgencesPageComponent implements OnInit {
       },
     });
     this.pilotage.listReseauRegions().subscribe({
-      next: (rows) => this.regions.set(rows ?? []),
+      next: (rows) => {
+        this.regions.set(rows ?? []);
+        if (this.draftRegionIds.length) this.loadZones(this.draftRegionIds);
+      },
       error: () => this.regions.set([]),
     });
     this.agencesApi.categories().subscribe({
       next: (rows) => {
         this.categories.set(rows ?? []);
-        this.applyDefaultCategories();
-        this.applyFilters();
+        this.restoreFilters();
       },
       error: () => {
         this.categories.set([...DEFAULT_AGENCE_CATEGORIES]);
-        this.applyDefaultCategories();
-        this.applyFilters();
+        this.restoreFilters();
       },
     });
     this.loadZones([]);
@@ -769,9 +773,10 @@ export class AgencesPageComponent implements OnInit {
     this.applyFilters();
   }
 
-  applyFilters(): void {
-    this.page.set(1);
-    this.applied = this.buildFilters(1);
+  applyFilters(page = 1): void {
+    this.page.set(page);
+    this.applied = this.buildFilters(page);
+    this.syncUrl();
     this.reload();
   }
 
@@ -781,6 +786,7 @@ export class AgencesPageComponent implements OnInit {
     this.pageSize.set(next);
     this.page.set(1);
     this.applied = { ...this.applied, page: 1, size: next };
+    this.syncUrl();
     this.reload();
   }
 
@@ -789,6 +795,7 @@ export class AgencesPageComponent implements OnInit {
     if (next === this.page()) return;
     this.page.set(next);
     this.applied = { ...this.applied, page: next };
+    this.syncUrl();
     this.reload();
   }
 
@@ -1144,6 +1151,127 @@ export class AgencesPageComponent implements OnInit {
   private selectedCategories(): string[] {
     const ids = new Set(this.draftCategorieIds);
     return this.categories().filter((c) => ids.has(pilotageCategoryOptionId(c)));
+  }
+
+  private restoreFilters(): void {
+    const q = this.route.snapshot.queryParamMap;
+    if (!this.hasQueryFilters(q)) {
+      this.applyDefaultCategories();
+      this.applyFilters(1);
+      return;
+    }
+    this.draftQ = q.get('q') ?? '';
+    this.draftIdentifiant = q.get('identifiant') ?? '';
+    this.draftVille = q.get('ville') ?? '';
+    this.draftCommune = q.get('commune') ?? '';
+    this.draftRegionIds = this.numberList(q.get('region_ids'));
+    this.draftZoneId = this.positiveInt(q.get('zone_id'));
+    this.draftActivityDays = this.positiveInt(q.get('activity_days'));
+    this.draftInactiveCustomDays = this.positiveInt(q.get('inactive_since_days'));
+    this.draftSansCoords = q.get('sans_coords') === '1';
+    const statuts = this.pipeList(q.get('statut_activite'));
+    this.draftStatutIds = STATUT_OPTIONS.filter((option) => statuts.includes(option.label)).map(
+      (option) => option.id
+    );
+    if (q.has('categories') || this.hasNonPagingQuery(q)) {
+      this.draftCategorieIds = this.idsForCategoryNames(this.pipeList(q.get('categories')));
+    } else {
+      this.applyDefaultCategories();
+    }
+    const size = this.positiveInt(q.get('size'));
+    this.pageSize.set(size && this.pageSizes.includes(size) ? size : 25);
+    if (this.draftRegionIds.length && this.regions().length) this.loadZones(this.draftRegionIds);
+    this.applyFilters(this.positiveInt(q.get('page')) ?? 1);
+  }
+
+  private hasQueryFilters(q: ParamMap): boolean {
+    return [
+      'q',
+      'identifiant',
+      'region_ids',
+      'zone_id',
+      'ville',
+      'commune',
+      'categories',
+      'activity_days',
+      'inactive_since_days',
+      'statut_activite',
+      'sans_coords',
+      'page',
+      'size',
+    ].some((key) => q.has(key));
+  }
+
+  private hasNonPagingQuery(q: ParamMap): boolean {
+    return [
+      'q',
+      'identifiant',
+      'region_ids',
+      'zone_id',
+      'ville',
+      'commune',
+      'activity_days',
+      'inactive_since_days',
+      'statut_activite',
+      'sans_coords',
+    ].some((key) => q.has(key));
+  }
+
+  private syncUrl(): void {
+    const filters = this.applied;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      replaceUrl: true,
+      queryParams: {
+        q: filters.q || null,
+        identifiant: filters.identifiant || null,
+        region_ids: filters.region_ids?.length ? filters.region_ids.join(',') : null,
+        zone_id: filters.zone_id != null ? String(filters.zone_id) : null,
+        ville: filters.ville || null,
+        commune: filters.commune || null,
+        categories: filters.categories?.length ? filters.categories.join('|') : null,
+        activity_days: filters.activity_days ? String(filters.activity_days) : null,
+        inactive_since_days: filters.inactive_since_days
+          ? String(filters.inactive_since_days)
+          : null,
+        statut_activite: filters.statut_activite?.length
+          ? filters.statut_activite.join('|')
+          : null,
+        sans_coords: filters.sans_coords ? '1' : null,
+        page: filters.page && filters.page > 1 ? String(filters.page) : null,
+        size: filters.size && filters.size !== 25 ? String(filters.size) : null,
+      },
+    });
+  }
+
+  private idsForCategoryNames(names: string[]): number[] {
+    const ids: number[] = [];
+    for (const name of names) {
+      const match = this.categories().find(
+        (item) => item.trim().toLowerCase() === name.trim().toLowerCase()
+      );
+      if (match) ids.push(pilotageCategoryOptionId(match));
+    }
+    return ids;
+  }
+
+  private pipeList(value: string | null): string[] {
+    return (value ?? '')
+      .split('|')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  private numberList(value: string | null): number[] {
+    return this.pipeList((value ?? '').split(',').join('|'))
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item) && item > 0);
+  }
+
+  private positiveInt(value: string | null): number | null {
+    if (!value) return null;
+    const n = Math.floor(Number(value));
+    return Number.isFinite(n) && n > 0 ? n : null;
   }
 
   private applyDefaultCategories(): void {
